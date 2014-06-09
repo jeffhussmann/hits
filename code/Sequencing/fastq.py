@@ -6,7 +6,13 @@ from .fastq_cython import *
 from .utilities import identity
 import numpy as np
 
-# Note that SANGER_OFFSET and SOLEXA_OFFSET are imported from fastq_cython
+# SANGER_OFFSET is imported from fastq_cython
+SOLEXA_OFFSET = 64
+SOLEXA_TO_SANGER_SHIFT = SOLEXA_OFFSET - SANGER_OFFSET
+MAX_QUAL = 93
+MAX_EXPECTED_QUAL = 41
+
+base_order = 'TCAGN.'
 
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
@@ -29,6 +35,51 @@ def solexa_to_sanger(qual):
     # minimum of zero.
     nonnegative = np.maximum(ints, 0)
     return encode_sanger(nonnegative)
+
+def quality_and_complexity(reads, max_read_length):
+    q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
+    c_array = np.zeros((max_read_length, 256), int)
+
+    average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
+    
+    for read in reads:
+        average_q = process_read(read.seq, read.qual, q_array, c_array)
+        average_q_distribution[int(average_q)] += 1
+        
+    # To avoid a lookup at every single base, c_array is 2*max_read_length x 256.
+    # This pulls out only the columns corresponding to possible base
+    # identities. 
+    c_array = np.vstack([c_array.T[ord(b)] for b in base_order]).T
+    
+    return q_array, c_array, average_q_distribution
+
+def quality_and_complexity_paired(read_pairs, max_read_length):
+    R1_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
+    R1_c_array = np.zeros((max_read_length, 256), int)
+    R2_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
+    R2_c_array = np.zeros((max_read_length, 256), int)
+    
+    R1_average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
+    R2_average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
+    
+    for R1, R2 in read_pairs:
+        R1_average_q = process_read(R1.seq, R1.qual, R1_q_array, R1_c_array)
+        R1_average_q_distribution[int(R1_average_q)] += 1
+        R2_average_q = process_read(R2.seq, R2.qual, R2_q_array, R2_c_array)
+        R2_average_q_distribution[int(R2_average_q)] += 1
+        
+    # See comment in quality_and_complexity above. 
+    R1_c_array = np.vstack([R1_c_array.T[ord(b)] for b in base_order]).T
+    R2_c_array = np.vstack([R2_c_array.T[ord(b)] for b in base_order]).T
+    
+    results = (R1_q_array,
+               R1_c_array,
+               R2_q_array,
+               R2_c_array,
+               R1_average_q_distribution,
+               R2_average_q_distribution,
+              )
+    return results
 
 def get_line_groups(line_source):
     if type(line_source) == str:
