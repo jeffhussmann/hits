@@ -43,6 +43,9 @@ def build_region_fetcher(genome_dir, load_references=False):
     ''' Returns a function for fetching regions from the genome in genome_dir.
         If load_references == True, loads entire reference sequences into memory
         the first time they are fetched from.
+        If the returned function is given a negative start or an end that is
+        longer than the seq_name's sequence, the region returned will be
+        truncated.
     '''
     genome_index = get_genome_index(genome_dir)
     fasta_files = {fasta_file_name: pysam.Fastafile(fasta_file_name)
@@ -53,11 +56,15 @@ def build_region_fetcher(genome_dir, load_references=False):
     if load_references:
         references = {}
         def region_fetcher(seq_name, start, end):
+            if start < 0:
+                start = 0
             if seq_name not in references:
                 references[seq_name] = seq_name_to_file[seq_name].fetch(seq_name)
             return references[seq_name][start:end]
     else:   
         def region_fetcher(seq_name, start, end):
+            if start < 0:
+                start = 0
             region = seq_name_to_file[seq_name].fetch(seq_name, start, end)
             return region
 
