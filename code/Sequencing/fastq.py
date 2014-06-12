@@ -3,7 +3,7 @@
 from itertools import izip, chain
 from collections import namedtuple
 from .fastq_cython import *
-from .utilities import identity
+from .utilities import identity, base_order
 import numpy as np
 
 # SANGER_OFFSET is imported from fastq_cython
@@ -11,8 +11,6 @@ SOLEXA_OFFSET = 64
 SOLEXA_TO_SANGER_SHIFT = SOLEXA_OFFSET - SANGER_OFFSET
 MAX_QUAL = 93
 MAX_EXPECTED_QUAL = 41
-
-base_order = 'TCAGN.'
 
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
