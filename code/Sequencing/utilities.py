@@ -43,6 +43,10 @@ def counts_to_array(counts, dim=1):
             array = np.array([[0]])
     return array
 
+def mean_from_histogram(histogram):
+    mean = np.true_divide(np.dot(histogram, np.arange(len(histogram))), histogram.sum())
+    return mean
+
 def group_by(iterable, key):
     ''' Groups iterable into lists of consecutive elements that are transformed
         into the same value key.
