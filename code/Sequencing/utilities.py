@@ -44,7 +44,10 @@ def counts_to_array(counts, dim=1):
     return array
 
 def mean_from_histogram(histogram):
-    mean = np.true_divide(np.dot(histogram, np.arange(len(histogram))), histogram.sum())
+    if histogram.sum() == 0:
+        return 0
+    else:
+        mean = np.true_divide(np.dot(histogram, np.arange(len(histogram))), histogram.sum())
     return mean
 
 def group_by(iterable, key):
