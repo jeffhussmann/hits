@@ -13,10 +13,10 @@ from . import (array_1d,
                mismatches, 
                fast_mismatches, 
                counts, 
-               read_positions,
                codon_counts,
                RPKMs,
               )
+from . import read_positions_hdf5 as read_positions
 
 _concatenate_formats = {'fastq',
                         'fasta',
