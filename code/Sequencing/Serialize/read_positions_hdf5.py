@@ -2,6 +2,13 @@ import h5py
 import numpy as np
 import positions
 
+def is_an_int(string):
+    try:
+        int(string)
+    except ValueError:
+        return False
+    return True
+
 def read_file(file_name):
     genes = {}
     with h5py.File(file_name) as hdf5_file:
@@ -14,6 +21,10 @@ def read_file(file_name):
                 left_buffer = attrs.pop('left_buffer')
                 right_buffer = attrs.pop('right_buffer')
                 landmarks = attrs
+
+                if is_an_int(key):
+                    key = int(key)
+
                 genes[gene_name][key] = positions.PositionCounts(landmarks,
                                                                  left_buffer,
                                                                  right_buffer,
