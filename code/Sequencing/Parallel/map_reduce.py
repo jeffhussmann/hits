@@ -106,7 +106,7 @@ class MapReduceExperiment(object):
             file_name = self.merged_file_names[key]
         
         file_format = self.file_types[key]
-        data = file_format.read_file(self.merged_file_names[key])
+        data = file_format.read_file(file_name)
 
         return data
 
