@@ -45,7 +45,7 @@ class MapReduceExperiment(object):
             if not os.path.isdir(self.scratch_results_dir):
                 os.makedirs(self.scratch_results_dir)
 
-        self.results_files = [('log', 'log', '{name}_log.txt')]
+        self.results_files = [('log', Serialize.log, '{name}_log.txt')]
         self.figure_files = []
         self.outputs = [[] for _ in range(self.num_stages)]
         self.work = [[] for _ in range(self.num_stages)]
@@ -56,7 +56,7 @@ class MapReduceExperiment(object):
             for kind in ['log_stage', 'timing']:
                 key = '{0}_{1}'.format(kind, stage)
                 tail_template = '{{name}}_{0}_{1}.txt'.format(kind, stage)
-                self.results_files.append((key, 'log', tail_template))
+                self.results_files.append((key, Serialize.log, tail_template))
                 self.outputs[stage].append(key)
 
         self.cleanup[-1].append(self.consolidate_logs)
@@ -96,30 +96,40 @@ class MapReduceExperiment(object):
         Serialize.log.consolidate_stages(stage_file_names, self.file_names['log'])
 
     def write_file(self, key, data):
-        Serialize.write_file(data, self.file_names[key], self.file_types[key])
+        file_format = self.file_types[key]
+        file_format.write_file(data, self.file_names[key])
 
     def read_file(self, key, merged=False):
         if merged == False:
-            data = Serialize.read_file(self.file_names[key], self.file_types[key])
+            file_name = self.file_names[key]
         else:
-            data = Serialize.read_file(self.merged_file_names[key], self.file_types[key])
+            file_name = self.merged_file_names[key]
+        
+        file_format = self.file_types[key]
+        data = file_format.read_file(self.merged_file_names[key])
 
         return data
 
     def do_work(self, stage):
         times = []
-        for function, description in self.work[stage]:
+        for function in self.work[stage]:
             start_time = time.time()
             function()
             end_time = time.time()
-            times.append((description, end_time - start_time))
+            times.append((function.__name__, end_time - start_time))
 
         self.write_file('timing_{0}'.format(stage), times)
         self.write_file('log_stage_{0}'.format(stage), self.log)
 
     def do_cleanup(self, stage):
+        times = []
         for function in self.cleanup[stage]:
+            start_time = time.time()
             function()
+            end_time = time.time()
+            times.append((function.__name__, end_time - start_time))
+        
+        Serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
 
 def controller(ExperimentClass, script_path):
     args = parse_arguments()
@@ -299,6 +309,7 @@ def finish(args, ExperimentClass):
                               **description)
               for which_piece in range(args.num_pieces)]
 
+    merge_times = []
     for key in merged.outputs[args.stage]:
         piece_file_names = [piece.file_names[key] for piece in pieces]
         merged_file_name = merged.merged_file_names[key]
@@ -307,9 +318,13 @@ def finish(args, ExperimentClass):
         # merging. This could cause extreme headaches if left uncommented
         # accidentally.
         #continue
+        start_time = time.time()
         Serialize.merge_files(piece_file_names,
                               merged_file_name,
                               merged.file_types[key],
                              )
+        end_time = time.time()
+        merge_times.append(('Merging {}'.format(key), end_time - start_time))
 
+    Serialize.log.append(merge_times, merged.merged_file_names['timing_{0}'.format(args.stage)])
     merged.do_cleanup(args.stage)

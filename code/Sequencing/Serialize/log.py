@@ -9,7 +9,11 @@ def _write_pairs(pairs, log_file):
     for description, value in pairs:
         if not isinstance(value, collections.Iterable):
             value = [value]
-        value_string = ','.join(map(str, value))
+        if isinstance(value[0], int):
+            to_string = str
+        else:
+            to_string = '{:.2f}'.format
+        value_string = ','.join(map(to_string, value))
         log_file.write('{0}:{1}\n'.format(description, value_string))
 
 def write_file(pairs, log_file_name):
