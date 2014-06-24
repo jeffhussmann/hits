@@ -39,13 +39,15 @@ def get_genome_index(genome_dir):
         entries.update(parse_fai(fai_file_name))
     return entries
 
-def build_region_fetcher(genome_dir, load_references=False):
+def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
     ''' Returns a function for fetching regions from the genome in genome_dir.
         If load_references == True, loads entire reference sequences into memory
         the first time they are fetched from.
         If the returned function is given a negative start or an end that is
         longer than the seq_name's sequence, the region returned will be
         truncated.
+        If sam_file is given, use sam_file.getrname to transform tids into
+        RNAMEs.
     '''
     genome_index = get_genome_index(genome_dir)
     fasta_files = {fasta_file_name: pysam.Fastafile(fasta_file_name)
@@ -53,20 +55,42 @@ def build_region_fetcher(genome_dir, load_references=False):
     seq_name_to_file = {seq_name: fasta_files[genome_index[seq_name].file_name]
                         for seq_name in genome_index}
 
+    def possibly_transform_tid(seq_name):
+        ''' pysam AlignedRead's gives ints. ''' 
+        if isinstance(seq_name, int):
+            seq_name = sam_file.getrname(seq_name)
+        return seq_name
+
+    references = {}
+    def lookup_loaded(seq_name, start, end):
+        if seq_name not in references:
+            references[seq_name] = seq_name_to_file[seq_name].fetch(seq_name)
+        region = references[seq_name][start:end]
+        return region
+
+    def lookup_unloaded(seq_name, start, end):
+        region = seq_name_to_file[seq_name].fetch(seq_name, start, end)
+        return region
+
     if load_references:
-        references = {}
-        def region_fetcher(seq_name, start, end):
-            if start < 0:
-                start = 0
-            if seq_name not in references:
-                references[seq_name] = seq_name_to_file[seq_name].fetch(seq_name)
-            return references[seq_name][start:end]
-    else:   
-        def region_fetcher(seq_name, start, end):
-            if start < 0:
-                start = 0
-            region = seq_name_to_file[seq_name].fetch(seq_name, start, end)
-            return region
+        lookup = lookup_loaded
+    else:
+        lookup = lookup_unloaded
+
+    def region_fetcher(seq_name, start, end):
+        seq_name = possibly_transform_tid(seq_name)
+        if end < 0:
+            return '-'*(end - start)
+        if start < 0:
+            left_pad = '-'*(-start)
+            start = 0
+        else:
+            left_pad = ''
+
+        region = lookup(seq_name, start, end)
+        right_pad = '-'*((end - start) - len(region))
+
+        return left_pad + region + right_pad
 
     return region_fetcher
 
