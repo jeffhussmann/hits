@@ -83,7 +83,10 @@ def line_count(file_name):
 def progress_bar(max_val, iterable=None):
     if progressbar == None:
         # If the module wasn't imported
-        return xrange(max_val)
+        if iterable:
+            return iterable
+        else:
+            return xrange(max_val)
     else:
         max_str = str(len(str(max_val)))
         format_string = '%(value)' + max_str + 'd / %(max)d'
