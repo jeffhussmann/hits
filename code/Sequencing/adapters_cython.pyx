@@ -1,4 +1,4 @@
-cdef int adapter_hamming_distance(char *seq,
+cpdef int adapter_hamming_distance(char *seq,
                                   char *adapter,
                                   int seq_length,
                                   int adapter_length,
@@ -21,7 +21,7 @@ def find_adapter(char *adapter, int max_distance, char *seq):
     ''' Returns the leftmost position in seq for which either:
             - seq[position:position + len(adapter)] is within hamming distance
               max_distance of adapter
-            - seq[position:] is at least 6 bases long and is within hamming
+            - seq[position:] is at least 10 bases long and is within hamming
               distance one of a prefix of adapter
             - seq[position:] exactly matches a prefix of adapter.
     '''
