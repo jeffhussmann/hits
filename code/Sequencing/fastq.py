@@ -70,14 +70,14 @@ def quality_and_complexity_paired(read_pairs, max_read_length):
     R1_c_array = np.vstack([R1_c_array.T[ord(b)] for b in base_order]).T
     R2_c_array = np.vstack([R2_c_array.T[ord(b)] for b in base_order]).T
     
-    results = (R1_q_array,
-               R1_c_array,
-               R2_q_array,
-               R2_c_array,
-               R1_average_q_distribution,
-               R2_average_q_distribution,
-              )
-    return results
+    composition = {'R1_qs': R1_q_array,
+                   'R1_cs': R1_c_array,
+                   'R2_qs': R2_q_array,
+                   'R2_cs': R2_c_array,
+                   'R1_average_qs': R1_average_q_distribution,
+                   'R2_average_qs': R2_average_q_distribution,
+                  }
+    return composition
 
 def get_line_groups(line_source):
     if type(line_source) == str:
