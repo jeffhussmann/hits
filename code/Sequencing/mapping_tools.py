@@ -139,3 +139,45 @@ def map_bowtie2_paired(R1_file_name,
                        **kwargs):
     kwargs['R2_file_name'] = R2_file_name
     map_bowtie2(R1_file_name, index_prefix, sam_file_name, **kwargs)
+
+def map_tophat(reads_file_names,
+               bowtie2_index,
+               gtf_file_name,
+               transcriptome_index,
+               tophat_dir,
+               num_threads=1,
+              ):
+    tophat_command = ['tophat2',
+                      '--GTF', gtf_file_name,
+                      '--no-novel-juncs',
+                      '--num-threads', str(num_threads),
+                      '--output-dir', tophat_dir,
+                      '--transcriptome-index', transcriptome_index,
+                      bowtie2_index,
+                      ','.join(reads_file_names),
+                     ]
+    # tophat maintains its own logs of everything that is written to the
+    # console, so discard output.
+    subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
+
+def map_tophat_paired(R1_fn,
+                      R2_fn,
+                      bowtie2_index,
+                      gtf_file_name,
+                      transcriptome_index,
+                      tophat_dir,
+                      num_threads=1,
+                     ):
+    tophat_command = ['tophat2',
+                      '--GTF', gtf_file_name,
+                      '--no-novel-juncs',
+                      '--num-threads', str(num_threads),
+                      '--output-dir', tophat_dir,
+                      '--transcriptome-index', transcriptome_index,
+                      bowtie2_index,
+                      R1_fn,
+                      R2_fn,
+                     ]
+    # tophat maintains its own logs of everything that is written to the
+    # console, so discard output.
+    subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
