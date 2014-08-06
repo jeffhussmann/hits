@@ -13,6 +13,14 @@ def extend_stages(whole_stages, specific_stages):
         whole_stage.extend(specific_stage)
 
 class MapReduceExperiment(object):
+    specific_results_files = [
+        ('log', Serialize.log, '{name}_log.txt')
+    ]
+    specific_figure_files = []
+    specific_outputs = []
+    specific_work = []
+    specific_cleanup = []
+
     def __init__(self, **kwargs):
         self.name = kwargs['name']
         self.work_prefix = kwargs['work_prefix'].rstrip('/')
@@ -21,8 +29,6 @@ class MapReduceExperiment(object):
         self.num_pieces = kwargs['num_pieces']
         self.which_piece = kwargs['which_piece']
         
-        self.num_stages = type(self).num_stages
-
         suffix = split_file.generate_suffix(self.num_pieces, self.which_piece)
 
         self.scratch_results_dir = '{0}/{1}{2}'.format(self.scratch_prefix,
@@ -45,12 +51,21 @@ class MapReduceExperiment(object):
             if not os.path.isdir(self.scratch_results_dir):
                 os.makedirs(self.scratch_results_dir)
 
-        self.results_files = [('log', Serialize.log, '{name}_log.txt')]
+        # Build file name templates and lists of outputs, work, and cleanup from
+        # the specific lists of these things specified by each member in the
+        # inheritance chain.
+        class_hierarchy = [c for c in self.__class__.__mro__[::-1] if c != object]
+        self.results_files = []
         self.figure_files = []
         self.outputs = [[] for _ in range(self.num_stages)]
         self.work = [[] for _ in range(self.num_stages)]
         self.cleanup = [[] for _ in range(self.num_stages)]
-        self.log = []
+        for c in class_hierarchy:
+            self.results_files.extend(c.specific_results_files)
+            self.figure_files.extend(c.specific_figure_files)
+            extend_stages(self.outputs, c.specific_outputs)
+            extend_stages(self.work, c.specific_work)
+            extend_stages(self.cleanup, c.specific_cleanup)
     
         for stage in range(self.num_stages):
             for kind in ['log_stage', 'timing']:
@@ -59,22 +74,20 @@ class MapReduceExperiment(object):
                 self.results_files.append((key, Serialize.log, tail_template))
                 self.outputs[stage].append(key)
 
-        self.cleanup[-1].append(self.consolidate_logs)
+        self.cleanup[-1].append('consolidate_logs')
+
+        self.make_file_names()
+        self.log = []
 
     @classmethod
-    def from_description_file_name(cls, description_file_name):
+    def from_description_file_name(cls, description_file_name, num_pieces=1, which_piece=-1):
         description = parse_description(description_file_name)
-        return cls(num_pieces=1, which_piece=-1, **description)
+        return cls(num_pieces=num_pieces, which_piece=which_piece, **description)
 
     def make_file_names(self):
-        try:
-            self.file_names
-            self.merged_file_names
-            self.file_types
-        except AttributeError:
-            self.file_names = {}
-            self.merged_file_names = {}
-            self.file_types = {}
+        self.file_names = {}
+        self.merged_file_names = {}
+        self.file_types = {}
 
         for key, serialize_type, tail_template in self.results_files:
             file_tail = tail_template.format(name=self.name)
@@ -112,22 +125,22 @@ class MapReduceExperiment(object):
 
     def do_work(self, stage):
         times = []
-        for function in self.work[stage]:
+        for function_name in self.work[stage]:
             start_time = time.time()
-            function()
+            self.__getattribute__(function_name)()
             end_time = time.time()
-            times.append((function.__name__, end_time - start_time))
+            times.append((function_name, end_time - start_time))
 
         self.write_file('timing_{0}'.format(stage), times)
         self.write_file('log_stage_{0}'.format(stage), self.log)
 
     def do_cleanup(self, stage):
         times = []
-        for function in self.cleanup[stage]:
+        for function_name in self.cleanup[stage]:
             start_time = time.time()
-            function()
+            self.__getattribute__(function_name)()
             end_time = time.time()
-            times.append((function.__name__, end_time - start_time))
+            times.append((function_name, end_time - start_time))
         
         Serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
 
