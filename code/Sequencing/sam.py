@@ -172,6 +172,10 @@ def contains_indel_pysam(read):
     kinds = [k for k, l in read.cigar]
     return (1 in kinds or 2 in kinds)
 
+def contains_splicing_pysam(read):
+    kinds = [k for k, l in read.cigar]
+    return (3 in kinds)
+
 def contains_soft_clipping(parsed_line):
     cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
     kinds = [k for l, k in cigar_blocks]
@@ -201,6 +205,25 @@ def alignment_to_cigar_blocks(ref_aligned, read_aligned):
             expanded_sequence.append('M')
     sequence, counts = utilities.decompose_homopolymer_sequence(expanded_sequence)
     return [[count, char] for char, count in zip(sequence, counts)]
+
+def truncate_cigar_blocks(cigar_blocks, truncated_length):
+    ''' Given pysam-style cigar_blocks, truncates the blocks to explain
+        truncated_length read bases.
+    '''
+    bases_so_far = 0
+    truncated_blocks = []
+
+    consuming_operation = set([0, 1, 7, 8])
+    for operation, length in cigar_blocks:
+        if bases_so_far == truncated_length:
+            break
+        if operation in consuming_operation:
+            length_to_use = min(truncated_length - bases_so_far, length)
+            bases_so_far += length_to_use
+        else:
+            length_to_use = length
+        truncated_blocks.append((operation, length_to_use))
+    return truncated_blocks
 
 def alignment_to_cigar_string(ref_aligned, read_aligned):
     """ Builds a CIGAR string from an alignment. """
@@ -354,10 +377,13 @@ def sort(input_file_name, output_file_name):
             output_file.write(sq_line)
         external_sort.external_sort(input_file, output_file)
     
-def sort_bam(input_file_name, output_file_name):
+def sort_bam(input_file_name, output_file_name, by_name=False):
     # samtools appends a .bam to the output file name
     root, ext = os.path.splitext(output_file_name)
-    pysam.sort(input_file_name, root)
+    if by_name:
+        pysam.sort('-n', input_file_name, root)
+    else:
+        subprocess.check_call(['samtools', 'sort', input_file_name, root])
 
 def make_sorted_bam(sam_file_name, bam_file_name):
     sorted_bam_prefix, _ = os.path.splitext(bam_file_name)

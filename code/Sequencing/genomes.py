@@ -109,3 +109,6 @@ def max_RNAME_length(genome_index):
 def max_POS_length(genome_index):
     length = max(len(str(genome_index[name].length)) for name in genome_index)
     return length
+
+def max_tid_length(genome_index):
+    return len(str(len(genome_index)))

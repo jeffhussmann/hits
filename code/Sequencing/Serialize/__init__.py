@@ -2,6 +2,7 @@ import pysam
 import shutil
 from functools import partial
 from Sequencing import external_sort, sam
+import subprocess
 from . import log
 
 def _concatenate(input_file_names, output_file_name):
@@ -10,7 +11,9 @@ def _concatenate(input_file_names, output_file_name):
             shutil.copyfileobj(open(input_file_name), output_file)
 
 def _merge_sorted_bam_files(input_file_names, merged_file_name):
-    pysam.merge('-f', merged_file_name, *input_file_names)
+    merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
+    subprocess.check_call(merge_command)
+    #pysam.merge('-f', merged_file_name, *input_file_names)
     pysam.index(merged_file_name)
 
 def _merge_sam_files(input_file_names, merged_file_name, are_sorted=False):
