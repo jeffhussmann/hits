@@ -45,7 +45,7 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
         the first time they are fetched from.
         If the returned function is given a negative start or an end that is
         longer than the seq_name's sequence, the region returned will be
-        truncated.
+        padded with -.
         If sam_file is given, use sam_file.getrname to transform tids into
         RNAMEs.
     '''
