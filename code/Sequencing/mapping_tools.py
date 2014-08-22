@@ -104,6 +104,7 @@ def map_bowtie2(R1_file_name,
         ('min_insert_size',           ['-I', str(kwargs.get('min_insert_size'))]),
         ('max_insert_size',           ['-X', str(kwargs.get('max_insert_size'))]),
         ('forward_forward',           ['--ff']),
+        ('score_min',                 ['--score-min', kwargs.get('score_min')]),
     ]
 
     bowtie2_command = ['bowtie2']
@@ -147,16 +148,24 @@ def map_tophat(reads_file_names,
                transcriptome_index,
                tophat_dir,
                num_threads=1,
+               no_sort=False,
               ):
-    tophat_command = ['tophat2',
-                      '--GTF', gtf_file_name,
-                      '--no-novel-juncs',
-                      '--num-threads', str(num_threads),
-                      '--output-dir', tophat_dir,
-                      '--transcriptome-index', transcriptome_index,
-                      bowtie2_index,
-                      ','.join(reads_file_names),
-                     ]
+
+    joined_reads_names = ','.join(reads_file_names)
+
+    options = [
+        '--GTF', gtf_file_name,
+        '--no-novel-juncs',
+        '--num-threads', str(num_threads),
+        '--output-dir', tophat_dir,
+        '--transcriptome-index', transcriptome_index,
+        '--report-secondary-alignments',
+        '--read-realign-edit-dist', '0',
+    ]
+    if no_sort:
+        options.append('--no-sort-bam')
+
+    tophat_command = ['tophat2'] + options + [bowtie2_index, joined_reads_names]
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
