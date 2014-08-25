@@ -57,23 +57,25 @@ def quality_and_complexity_paired(read_pairs, max_read_length):
     R2_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
     R2_c_array = np.zeros((max_read_length, 256), int)
     
-    R1_average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
-    R2_average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
+    joint_average_q_distribution = np.zeros((MAX_EXPECTED_QUAL + 1, MAX_EXPECTED_QUAL + 1), int)
     
     for R1, R2 in read_pairs:
         R1_average_q = process_read(R1.seq, R1.qual, R1_q_array, R1_c_array)
-        R1_average_q_distribution[int(R1_average_q)] += 1
         R2_average_q = process_read(R2.seq, R2.qual, R2_q_array, R2_c_array)
-        R2_average_q_distribution[int(R2_average_q)] += 1
+        joint_average_q_distribution[int(R1_average_q), int(R2_average_q)] += 1
         
     # See comment in quality_and_complexity above. 
     R1_c_array = np.vstack([R1_c_array.T[ord(b)] for b in base_order]).T
     R2_c_array = np.vstack([R2_c_array.T[ord(b)] for b in base_order]).T
     
+    R1_average_q_distribution = joint_average_q_distribution.sum(axis=1) 
+    R2_average_q_distribution = joint_average_q_distribution.sum(axis=0) 
+
     composition = {'R1_qs': R1_q_array,
                    'R1_cs': R1_c_array,
                    'R2_qs': R2_q_array,
                    'R2_cs': R2_c_array,
+                   'joint_average_qs': joint_average_q_distribution,
                    'R1_average_qs': R1_average_q_distribution,
                    'R2_average_qs': R2_average_q_distribution,
                   }
