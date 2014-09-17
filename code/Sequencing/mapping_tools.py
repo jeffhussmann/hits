@@ -86,6 +86,7 @@ def map_bowtie2(R1_file_name,
         ('aligned_pairs_file_name',   ['--al-conc', kwargs.get('aligned_pairs_file_name')]),
         ('unaligned_pairs_file_name', ['--un-conc', kwargs.get('unaligned_pairs_file_name')]),
         ('suppress_unaligned_SAM',    ['--no-unal']),
+        ('omit_secondary_seq',        ['--omit-sec-seq']),
         ('memory_mapped_IO',          ['--mm']),
         ('local',                     ['--local']),
         ('ignore_quals',              ['--ignore-quals']),
@@ -105,6 +106,9 @@ def map_bowtie2(R1_file_name,
         ('max_insert_size',           ['-X', str(kwargs.get('max_insert_size'))]),
         ('forward_forward',           ['--ff']),
         ('score_min',                 ['--score-min', kwargs.get('score_min')]),
+        ('maximum_ambiguous',         ['--n-ceil', kwargs.get('maximum_ambiguous')]),
+        ('ambiguous_penalty',         ['--np', str(kwargs.get('ambiguous_penalty'))]),
+        ('allow_dovetail',            ['--dovetail']),
     ]
 
     bowtie2_command = ['bowtie2']
