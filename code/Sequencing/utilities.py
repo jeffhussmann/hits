@@ -50,7 +50,7 @@ def mean_from_histogram(histogram):
         mean = np.true_divide(np.dot(histogram, np.arange(len(histogram))), histogram.sum())
     return mean
 
-def group_by(iterable, key):
+def group_by(iterable, key=None):
     ''' Groups iterable into lists of consecutive elements that are transformed
         into the same value key.
     '''
