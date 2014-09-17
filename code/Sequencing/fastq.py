@@ -8,7 +8,6 @@ import numpy as np
 
 # SANGER_OFFSET is imported from fastq_cython
 SOLEXA_OFFSET = 64
-SOLEXA_TO_SANGER_SHIFT = SOLEXA_OFFSET - SANGER_OFFSET
 MAX_QUAL = 93
 MAX_EXPECTED_QUAL = 41
 
@@ -24,15 +23,20 @@ def encode_sanger(ints):
     ''' Converts a list of integer quals to a sanger-encoded string. '''
     return ''.join(chr(i + SANGER_OFFSET) for i in ints)
 
-def solexa_to_sanger(qual):
-    ''' Converts a string of solexa-encoded quals to sanger encoding. '''
-    ints = decode_solexa(qual)
+def encode_solexa(ints):
+    ''' Converts a list of integer quals to a solexa-encoded string. '''
+    return ''.join(chr(i + SOLEXA_OFFSET) for i in ints)
+
+_solexa_to_sanger_table = {}
+for q in range(-5, MAX_EXPECTED_QUAL + 1):
     # Old solexa encoding was -10 log(p / (1 - p)), which could be negative.
     # Character encodings of negative values cause problems, and we don't really
     # care about fine distinctions in low quality scores, so just set to a
     # minimum of zero.
-    nonnegative = np.maximum(ints, 0)
-    return encode_sanger(nonnegative)
+    _solexa_to_sanger_table[chr(q + SOLEXA_OFFSET)] = chr(max(q, 0) + SANGER_OFFSET)
+
+def solexa_to_sanger(qual):
+    return ''.join(_solexa_to_sanger_table[c] for c in qual)
 
 def quality_and_complexity(reads, max_read_length):
     q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
