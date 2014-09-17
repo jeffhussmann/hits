@@ -1,8 +1,8 @@
 cpdef int adapter_hamming_distance(char *seq,
-                                  char *adapter,
-                                  int seq_length,
-                                  int adapter_length,
-                                  int start,
+                                   char *adapter,
+                                   int seq_length,
+                                   int adapter_length,
+                                   int start,
                                  ):
     ''' Returns the hamming distance between the overlap of seq[start:] and
         adapter.
