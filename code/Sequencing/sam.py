@@ -10,6 +10,16 @@ import external_sort
 import pysam
 import fastq
 
+BAM_CMATCH = 0 # M
+BAM_CINS = 1 # I
+BAM_CDEL = 2 # D
+BAM_CREF_SKIP = 3 # N
+BAM_CSOFT_CLIP = 4 # S
+BAM_CHARD_CLIP = 5 # H
+BAM_CPAD = 6 # P
+BAM_CEQUAL = 7 # =
+BAM_CDIFF = 8 # X
+
 _unmapped_template = '{0}\t4\t*\t0\t0\t*\t*\t0\t0\t*\t*\n'.format
 
 def unmapped_aligned_read(qname):
