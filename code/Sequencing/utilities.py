@@ -24,6 +24,23 @@ base_to_complement_index = {b: i for i, b in enumerate(complement(base_order))}
 
 complement_index = {i: base_to_complement_index[b] for i, b in enumerate(base_order)}
 
+IUPAC = {'A': {'A'},
+         'C': {'C'},
+         'G': {'G'},
+         'T': {'T'},
+         'M': {'A', 'C'},
+         'R': {'A', 'G'},
+         'W': {'A', 'T'},
+         'S': {'C', 'G'},
+         'Y': {'C', 'T'},
+         'K': {'G', 'T'},
+         'V': {'A', 'C', 'G'},
+         'H': {'A', 'C', 'T'},
+         'D': {'A', 'G', 'T'},
+         'B': {'C', 'G', 'T'},
+         'N': {'G', 'A', 'T', 'C'},
+        }
+
 def counts_to_array(counts, dim=1):
     ''' Converts a dictionary with integer keys into an array. '''
     if dim == 1:
