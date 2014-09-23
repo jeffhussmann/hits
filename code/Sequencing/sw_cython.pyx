@@ -7,7 +7,7 @@ ctypedef np.int_t DTYPEINT_t
 
 cdef int mismatch = -1
 cdef int match = 2
-cdef int indel = -2
+cdef int indel = -3
 
 @cython.boundscheck(False)
 def local_alignment(char* query, char* target):
@@ -20,6 +20,8 @@ def local_alignment(char* query, char* target):
     cdef np.ndarray[DTYPEINT_t, ndim=2] col_direction_matrix = np.zeros(shape, DTYPEINT)
 
     max_score = 0
+    max_row = 0
+    max_col = 0
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
             if query[row - 1] == target[col - 1]:
