@@ -119,21 +119,6 @@ def progress_bar(max_val, iterable=None):
         else:
             return bar(xrange(max_val))
 
-def file_line_groups(name_number_pairs):
-    """ Given a list of (file_name, number) pairs, yields tuple
-    of groups of (number) lines with newlines stripped from each (file_name). """
-    
-    numbers = [number for file_name, number in name_number_pairs]
-    fhs = [open(file_name) for file_name_number in name_number_pairs]
-    
-    fh_groups = [izip(*[fh]*number) for fh, number in zip(fhs, numbers)]
-    for i, groups in enumerate(izip(*fh_groups)):
-        groups = [[line.rstrip() for line in group] for group in groups]
-        yield groups
-
-def hamming_distance(s1, s2):
-    return sum(1 for c1, c2 in izip(s1, s2) if c1 != c2)
-
 def pairwise(s):
     """ Returns the elements of s in overlapping pairs. """
     return [(s[i - 1], s[i]) for i in range(1, len(s))]
@@ -144,48 +129,3 @@ def all_consecutive(s):
         if y - x != 1:
             return False
     return True
-
-def decompose_homopolymer_sequence(fragment):
-    """ Decomposes a string into sequences of homopolymer chars and counts."""
-    sequence = []
-    counts = []
-    current_char = fragment[0]
-    current_length = 1
-    for i in range(1, len(fragment)):
-        if fragment[i] == current_char:
-            current_length += 1
-        else:
-            sequence.append(current_char)
-            counts.append(current_length)
-            current_char = fragment[i]
-            current_length = 1
-    sequence.append(current_char)
-    counts.append(current_length)
-    return (sequence, counts)
-
-def reconstitute_homopolymer_sequence(sequence, counts):
-    """ Expands sequences of homopolymer chars and counts into a string."""
-    reconstituted = []
-    for letter, count in zip(sequence, counts):
-        reconstituted.append(letter*count)
-    return "".join(reconstituted)
-
-def process_annotations(read):
-    # flow_indexes is a list of indexes of flows corresponding to each called base
-    flow_indexes = np.cumsum(np.array(read.annotations['flow_index']))
-    # clip_qual_left is (1-based in SFF but converted to 0-based by BioPython) 
-    # the position of the first base after the clipping point.
-    # Subtract 1 to get the index of the last base in the tag, 
-    # look up in flow_indexes, subtract 1 to get 0-based flow index.
-    read.annotations['last_flow_in_tag'] = flow_indexes[read.annotations['clip_qual_left'] - 1] - 1 
-    flows = map(lambda x: x / 100., read.annotations['flow_values'])
-    flows = np.array(flows)
-    # Remove the 1 nuc from the tag from the first hp (TODO: do some tag+adapters end in a non-1 hp?)
-    flows[read.annotations['last_flow_in_tag']] -= 1
-    read.annotations['flows'] = flows
-    read.annotations['last_overall_flow'] = flow_indexes[-1] - 1 
-    # The NCBI format specification says clip_qual_left is the 1-based index of the last good base,
-    # BioPython gives the 0-based index of the first bad base, which is the same thing,
-    # but inconsistent with the spirit of how it handles clip_qual_left.
-    read.annotations['last_good_flow'] = flow_indexes[read.annotations['clip_qual_right'] - 1] - 1
-    read.annotations['last_good_base'] = read.annotations['clip_qual_right'] - 1 
