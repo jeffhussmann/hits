@@ -77,6 +77,8 @@ def map_bowtie2(R1_file_name,
                 sam_file_name,
                 R2_file_name=None,
                 error_file_name='/dev/null',
+                custom_binary=False,
+                bam_output=False,
                 **kwargs):
     ''' Map reads to index_prefix with bowtie2. '''
 
@@ -111,7 +113,10 @@ def map_bowtie2(R1_file_name,
         ('allow_dovetail',            ['--dovetail']),
     ]
 
-    bowtie2_command = ['bowtie2']
+    if custom_binary:
+        bowtie2_command = ['/home/jah/src/bowtie2-dev/bowtie2']
+    else:
+        bowtie2_command = ['bowtie2']
     
     for kwarg, bowtie2_argument in kwarg_to_bowtie2_argument:
         if kwarg in kwargs:
@@ -120,6 +125,11 @@ def map_bowtie2(R1_file_name,
             if value:
                 bowtie2_command.extend(bowtie2_argument)
 
+    # kwargs are getting popped, so if anything is left, then it was something
+    # that wasn't being looked for
+    if len(kwargs) > 0:
+        raise ValueError('Unknown keyword argument', kwargs)
+
     bowtie2_command.extend(['-x', index_prefix])
 
     if R2_file_name:
@@ -127,16 +137,24 @@ def map_bowtie2(R1_file_name,
         bowtie2_command.extend(['-2', R2_file_name])
     else:
         bowtie2_command.extend(['-U', R1_file_name])
-
-    bowtie2_command.extend(['-S', sam_file_name])
     
-    # kwargs are getting popped, so if anything is left, then it was something
-    # that wasn't being looked for
-    if len(kwargs) > 0:
-        raise ValueError('Unknown keyword argument', kwargs)
-
-    with open(error_file_name, 'w') as error_file:
-        subprocess.check_call(bowtie2_command, stderr=error_file)
+    if not bam_output:
+        bowtie2_command.extend(['-S', sam_file_name])
+        
+        with open(error_file_name, 'w') as error_file:
+            subprocess.check_call(bowtie2_command, stderr=error_file)
+    else:
+        with open(error_file_name, 'w') as error_file:
+            bowtie2_process = subprocess.Popen(bowtie2_command,
+                                               stdout=subprocess.PIPE,
+                                               stderr=error_file,
+                                              )
+            bam_command = ['samtools', 'view', '-b', '-o', sam_file_name, '-']
+            samtools_process = subprocess.Popen(bam_command,
+                                                stdin=bowtie2_process.stdout,
+                                               )
+            bowtie2_process.stdout.close()
+            samtools_process.communicate()
 
 def map_bowtie2_paired(R1_file_name,
                        R2_file_name,
