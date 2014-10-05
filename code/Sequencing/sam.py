@@ -395,6 +395,12 @@ def sort_bam(input_file_name, output_file_name, by_name=False):
     else:
         subprocess.check_call(['samtools', 'sort', input_file_name, root])
 
+def merge_sorted_bam_files(input_file_names, merged_file_name):
+    merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
+    subprocess.check_call(merge_command)
+    #pysam.merge('-f', merged_file_name, *input_file_names)
+    pysam.index(merged_file_name)
+
 def make_sorted_bam(sam_file_name, bam_file_name):
     sorted_bam_prefix, _ = os.path.splitext(bam_file_name)
     bam_command = ['samtools', 'view', '-ubS', sam_file_name]

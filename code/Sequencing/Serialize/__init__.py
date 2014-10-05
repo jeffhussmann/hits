@@ -10,12 +10,6 @@ def _concatenate(input_file_names, output_file_name):
         for input_file_name in input_file_names:
             shutil.copyfileobj(open(input_file_name), output_file)
 
-def _merge_sorted_bam_files(input_file_names, merged_file_name):
-    merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
-    subprocess.check_call(merge_command)
-    #pysam.merge('-f', merged_file_name, *input_file_names)
-    pysam.index(merged_file_name)
-
 def _merge_sam_files(input_file_names, merged_file_name, are_sorted=False):
     ''' Merges a list of sam files.
         Requires all input files to have the same @SQ lines.
@@ -41,7 +35,7 @@ def _merge_sam_files(input_file_names, merged_file_name, are_sorted=False):
             for input_file in input_files:
                 shutil.copyfileobj(input_file, merged_file)
 
-special_mergers = {'bam': _merge_sorted_bam_files,
+special_mergers = {'bam': sam.merge_sorted_bam_files,
                    'sam_unsorted':  partial(_merge_sam_files, are_sorted=False),
                    'sam_sorted': partial(_merge_sam_files, are_sorted=True),
                    'fastq': _concatenate,
