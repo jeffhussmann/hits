@@ -114,7 +114,7 @@ def progress_bar(max_val, iterable=None):
                    progressbar.ETA(),
                   ]
         bar = progressbar.ProgressBar(widgets=widgets, maxval=max_val)
-        if iterable:
+        if iterable is not None:
             return bar(iterable)
         else:
             return bar(xrange(max_val))
