@@ -39,7 +39,7 @@ def build_adapter_ranges(index_sequence):
                    ]
     R2_names = ['TruSeq R1',
                 'I5',
-                'Chemistry only',
+                'Chemistry',
                 'P7',
                 'A tail',
                ]
