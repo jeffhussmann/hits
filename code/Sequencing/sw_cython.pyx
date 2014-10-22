@@ -5,12 +5,13 @@ cimport cython
 DTYPEINT = np.int
 ctypedef np.int_t DTYPEINT_t
 
-cdef int mismatch = -1
-cdef int match = 2
-cdef int indel = -3
-
 @cython.boundscheck(False)
-def local_alignment(char* query, char* target):
+def local_alignment(char* query,
+                    char* target,
+                    int match,
+                    int mismatch,
+                    int indel,
+                   ):
     cdef unsigned int row, col, next_col, next_row, max_row, max_col
     cdef int match_or_mismatch, diagonal, from_left, from_above, new_score, target_index, query_index, max_score
     cdef int num_indels
@@ -25,6 +26,10 @@ def local_alignment(char* query, char* target):
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
             if query[row - 1] == target[col - 1]:
+                match_or_mismatch = match
+            elif query[row - 1] == 'N':
+                match_or_mismatch = match
+            elif target[col - 1] == 'N':
                 match_or_mismatch = match
             else:
                 match_or_mismatch = mismatch
