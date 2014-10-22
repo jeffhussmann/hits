@@ -149,7 +149,7 @@ def map_bowtie2(R1_file_name,
                                                stdout=subprocess.PIPE,
                                                stderr=error_file,
                                               )
-            bam_command = ['samtools', 'view', '-b', '-o', sam_file_name, '-']
+            bam_command = ['samtools', 'view', '-bu', '-o', sam_file_name, '-']
             samtools_process = subprocess.Popen(bam_command,
                                                 stdin=bowtie2_process.stdout,
                                                )
