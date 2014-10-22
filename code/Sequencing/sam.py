@@ -387,19 +387,23 @@ def sort(input_file_name, output_file_name):
             output_file.write(sq_line)
         external_sort.external_sort(input_file, output_file)
     
-def sort_bam(input_file_name, output_file_name, by_name=False):
-    # samtools appends a .bam to the output file name
+def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     root, ext = os.path.splitext(output_file_name)
+    samtools_command = ['samtools', 'sort']
     if by_name:
-        pysam.sort('-n', input_file_name, root)
-    else:
-        subprocess.check_call(['samtools', 'sort', input_file_name, root])
+        samtools_command.append('-n')
+    samtools_command.extend(['-@', str(num_threads),
+                             '-T', root,
+                             '-o', output_file_name,
+                             input_file_name,
+                            ])
+    samtools_process = subprocess.Popen(samtools_command)
+    samtools_process.communicate()
 
 def merge_sorted_bam_files(input_file_names, merged_file_name):
     merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
     subprocess.check_call(merge_command)
-    #pysam.merge('-f', merged_file_name, *input_file_names)
-    pysam.index(merged_file_name)
+    index_bam(merged_file_name)
 
 def make_sorted_bam(sam_file_name, bam_file_name):
     sorted_bam_prefix, _ = os.path.splitext(bam_file_name)
@@ -418,8 +422,13 @@ def make_sorted_bam(sam_file_name, bam_file_name):
     if bam_process.returncode:
         raise RuntimeError(err_output)
 
+def bam_to_sam(bam_file_name, sam_file_name):
+    view_command = ['samtools', 'view', '-o', sam_file_name, bam_file_name]
+    subprocess.check_call(view_command)
+
 def index_bam(bam_file_name):
-    pysam.index(bam_file_name)
+    samtools_command = ['samtools', 'index', bam_file_name]
+    subprocess.check_call(samtools_command)
 
 def make_sorted_indexed_bam(sam_file_name, bam_file_name):
     make_sorted_bam(sam_file_name, bam_file_name)
