@@ -1,43 +1,69 @@
 from adapters_cython import *
 import numpy as np
+from Sequencing import utilities
 
-tru_seq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGA'
-tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
+primers = {'tru_seq': {'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT',
+                       'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+                      },
+           'PE': {'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
+                  'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
+                 },
+          }
 
-# Previous generation of adapters
-paired_end_R1_rc = tru_seq_R1_rc
-paired_end_R2_rc = 'AGATCGGAAGAGCGGTTCAGCAGGAATGCCGAGACCG'
-
-P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
-P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
+flow_cell = {'P5': 'AATGATACGGCGACCACCGAGA',
+             'P7': 'CAAGCAGAAGACGGCATACGAGAT',
+            }
 
 A_tail = 'A' * 10
 
-def build_adapters(index_sequence='', max_length=None):
-    adapter_in_R1 = tru_seq_R2_rc + index_sequence + P7_rc + A_tail
-    adapter_in_R2 = tru_seq_R1_rc + P5_rc + A_tail
+# For backwards compatibility
+tru_seq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGA'
+tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
+P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
+P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
+
+def build_before_adapters(index_sequence='', primer_type='tru_seq'):
+    before_R1 = flow_cell['P5'] + primers[primer_type]['R1']
+    before_R2 = flow_cell['P7'] + utilities.reverse_complement(index_sequence) + primers[primer_type]['R2']
+    return before_R1, before_R2
+
+def build_adapters(index_sequence='', max_length=None, primer_type='tru_seq'):
+    before_R1, before_R2 = build_before_adapters(index_sequence, primer_type)
+    adapter_in_R1 = utilities.reverse_complement(before_R2) + A_tail
+    adapter_in_R2 = utilities.reverse_complement(before_R1) + A_tail
     truncated_slice = slice(None, max_length)
     return adapter_in_R1[truncated_slice], adapter_in_R2[truncated_slice]
 
-def build_adapter_ranges(index_sequence):
+def build_adapter_ranges(index_sequence, primer_type='tru_seq'):
     def make_ranges(construct, names):
         cumulative_lengths = list(np.cumsum(map(len, construct)))
         bounds = zip([0] + cumulative_lengths, cumulative_lengths)
         ranges = zip(names, bounds)
         return ranges
     
-    R1_construct = [tru_seq_R2_rc, index_sequence, P7_rc, A_tail]
-    R1_names = ['TruSeq R2', 'I7', 'P7', 'A tail']
+    primer_in_R1 = utilities.reverse_complement(primers[primer_type]['R2'])
+    primer_in_R2 = utilities.reverse_complement(primers[primer_type]['R1'])
+
+    R1_construct = [primer_in_R1,
+                    index_sequence,
+                    P7_rc,
+                    A_tail,
+                   ]
+    R1_names = ['R2 primer',
+                'I7',
+                'P7',
+                'A tail',
+               ]
 
     chemistry_only_cycles = 7
     I5_length = 8
-    R2_construct = [tru_seq_R1_rc[:-(I5_length + chemistry_only_cycles)],
-                    tru_seq_R1_rc[-(I5_length + chemistry_only_cycles):-(chemistry_only_cycles)],
-                    tru_seq_R1_rc[-chemistry_only_cycles:],
+    R2_construct = [primer_in_R2[:-(I5_length + chemistry_only_cycles)],
+                    primer_in_R2[-(I5_length + chemistry_only_cycles):-(chemistry_only_cycles)],
+                    primer_in_R2[-chemistry_only_cycles:],
                     P5_rc,
                     A_tail,
                    ]
-    R2_names = ['TruSeq R1',
+    R2_names = ['R1 primer',
                 'I5',
                 'Chemistry',
                 'P7',
@@ -47,13 +73,6 @@ def build_adapter_ranges(index_sequence):
     R1_ranges = make_ranges(R1_construct, R1_names)
     R2_ranges = make_ranges(R2_construct, R2_names)
     return R1_ranges, R2_ranges
-
-def get_barcode_ranges(index_sequence):
-    start = len(tru_seq_R2_rc)
-    end = start + len(index_sequence)
-    barcode_in_R1_range = range(start, end)
-    barcode_in_R2_range = []
-    return barcode_in_R1_range, barcode_in_R2_range
 
 def consistent_paired_position(R1_seq,
                                R2_seq,
@@ -82,18 +101,3 @@ def consistent_paired_position(R1_seq,
         return min(common_positions)
     else:
         return None
-
-def indel_position(R1_seq,
-                   R2_seq,
-                   adapter_in_R1,
-                   adapter_in_R2,
-                   min_comparison_length,
-                   max_distance,
-                  ):
-    R1_positions = find_adapter_positions(R1_seq, adapter_in_R1, min_comparison_length, max_distance)
-    R2_positions = find_adapter_positions(R2_seq, adapter_in_R2, min_comparison_length, max_distance)
-
-    R1_positions = set(R1_positions)
-    R2_positions = set(R2_positions)
-
-    return R1_positions, R2_positions
