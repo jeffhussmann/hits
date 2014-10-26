@@ -36,7 +36,7 @@ def print_local_alignment(query, target, alignment_path):
     print 'query ', ''.join(query_string)
     print 'target', ''.join(target_string)
 
-def print_semi_global_alignment(query, target, alignment_path):
+def print_barcode_alignment(query, target, alignment_path):
     def index_to_char(seq, index):
         if index == -1:
             return '-'
@@ -45,10 +45,14 @@ def print_semi_global_alignment(query, target, alignment_path):
                 raise ValueError(index, len(seq), seq)
             return seq[index]
     
-    for last_target_index, _ in alignment_path[::-1]:
-        if last_target_index != -1:
+    for _, last_query_index in alignment_path[::-1]:
+        if last_query_index != GAP:
             break
+    right_query = query[last_query_index + 1:]
 
+    for last_target_index, _ in alignment_path[::-1]:
+        if last_target_index != GAP:
+            break
     right_target = target[last_target_index + 1:]
 
     query_string = []
@@ -58,6 +62,7 @@ def print_semi_global_alignment(query, target, alignment_path):
         query_string.append(index_to_char(query, q))
         target_string.append(index_to_char(target, t))
 
+    query_string.append(right_query)
     target_string.append(right_target)
 
     print 'query ', ''.join(query_string)
@@ -122,7 +127,7 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
     R1_start_in_R2 = alignment['query_mappings'][len(before_R1)]
     R2_start_in_R1 = alignment['target_mappings'][len(R2.seq) - 1]
     
-    # Since R1 is the query and R2 is the template, bases in R1 that aren't in
+    # Since R1 is the query and R2 is the target, bases in R1 that aren't in
     # R2 are called insertions, and bases in R2 that aren't in R1 are called
     # deletions.
     # An indel in the insert is non-physical.
@@ -196,11 +201,11 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment):
         print '\t', extended_R1[q], extended_R2[t]
     
 if __name__ == '__main__':
-    R1_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/small_R1.fastq'
-    R2_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/small_R2.fastq'
+    R1_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/smaller_R1.fastq'
+    R2_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/smaller_R2.fastq'
     
-    R1_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/small_R1_trimmed.fastq'
-    R2_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/small_R2_trimmed.fastq'
+    R1_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/smaller_R1_trimmed.fastq'
+    R2_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/smaller_R2_trimmed.fastq'
     primer_type = 'PE'
     index_sequence = ''
     

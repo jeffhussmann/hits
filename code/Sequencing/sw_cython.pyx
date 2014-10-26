@@ -102,13 +102,15 @@ def local_alignment(char* query,
 
     return alignment
 
-def semi_global_alignment(char* query,
-                          char* target,
-                          int match_bonus,
-                          int mismatch_penalty,
-                          int indel_penalty,
-                         ):
-    ''' Alignments must begin at 0, 0 and must use all of query. '''
+def barcode_alignment(char* query,
+                      char* target,
+                      int match_bonus,
+                      int mismatch_penalty,
+                      int indel_penalty,
+                     ):
+    ''' Alignments must begin at 0, 0 and must end on the right column or the
+    bottom row.
+    '''
     cdef int row, col, next_col, next_row, max_row, max_col
     cdef int match_or_mismatch, diagonal, from_left, from_above, new_score, target_index, query_index, max_score
     cdef int num_indels
@@ -116,7 +118,7 @@ def semi_global_alignment(char* query,
     cdef np.ndarray[DTYPEINT_t, ndim=2] score_matrix = np.zeros(shape, DTYPEINT)
     cdef np.ndarray[DTYPEINT_t, ndim=2] row_direction_matrix = np.zeros(shape, DTYPEINT)
     cdef np.ndarray[DTYPEINT_t, ndim=2] col_direction_matrix = np.zeros(shape, DTYPEINT)
-    
+
     cdef np.ndarray[DTYPEINT_t, ndim=1] query_mappings = np.ones(len(query), DTYPEINT) * SOFT_CLIPPED
     cdef np.ndarray[DTYPEINT_t, ndim=1] target_mappings = np.ones(len(target), DTYPEINT) * SOFT_CLIPPED
 
@@ -149,8 +151,19 @@ def semi_global_alignment(char* query,
             elif new_score == from_above:
                 row_direction_matrix[row, col] = -1
 
-    row = len(query)
-    col = score_matrix[row].argmax()
+    best_bottom_col = score_matrix[len(query)].argmax()
+    best_bottom_score = score_matrix[len(query), best_bottom_col]
+
+    best_right_row = score_matrix[:, len(target)].argmax()
+    best_right_score = score_matrix[best_right_row, len(target)]
+
+    if best_bottom_score >= best_right_score:
+        row = len(query)
+        col = best_bottom_col
+    else:
+        row = best_right_row
+        col = len(target)
+    
     max_score = score_matrix[row, col]
 
     path = []
@@ -193,6 +206,7 @@ def semi_global_alignment(char* query,
                  'insertions': insertions,
                  'deletions': deletions,
                  'mismatches': mismatches,
+                 'score_matrix': score_matrix,
                 }
 
     return alignment
