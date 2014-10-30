@@ -27,7 +27,8 @@ def process_read(char* seq,
         b = seq[i]
         c_array[i, b] += 1
 
-    average_q /= seq_length
+    if seq_length != 0:
+        average_q /= seq_length
     return average_q
 
 def RSQCI_length(char *quals, int length):
