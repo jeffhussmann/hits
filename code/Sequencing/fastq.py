@@ -96,6 +96,10 @@ def get_line_groups(line_source):
 
 Read = namedtuple('Read', ['name', 'seq', 'qual'])
 
+def Read_to_record(self):
+    return make_record(*self)
+Read.__str__ = Read_to_record
+
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
     name = name_standardizer(name_line.rstrip().lstrip('@'))
