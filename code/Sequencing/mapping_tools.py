@@ -72,44 +72,46 @@ def map_paired_bwa(R1_file_name, R2_file_name,
                               stderr=error_file,
                              )
 
-def map_bowtie2(R1_file_name,
-                index_prefix,
-                sam_file_name,
-                R2_file_name=None,
+def map_bowtie2(index_prefix, 
+                R1_file_name,
+                R2_file_name,
+                output_file_name,
                 error_file_name='/dev/null',
                 custom_binary=False,
                 bam_output=False,
-                **kwargs):
+                unpaired_Reads=None,
+                paired_Reads=None,
+                **options):
     ''' Map reads to index_prefix with bowtie2. '''
 
     kwarg_to_bowtie2_argument = [
-        ('aligned_reads_file_name',   ['--al', kwargs.get('aligned_reads_file_name')]),
-        ('unaligned_reads_file_name', ['--un', kwargs.get('unaligned_reads_file_name')]),
-        ('aligned_pairs_file_name',   ['--al-conc', kwargs.get('aligned_pairs_file_name')]),
-        ('unaligned_pairs_file_name', ['--un-conc', kwargs.get('unaligned_pairs_file_name')]),
+        ('aligned_reads_file_name',   ['--al', options.get('aligned_reads_file_name')]),
+        ('unaligned_reads_file_name', ['--un', options.get('unaligned_reads_file_name')]),
+        ('aligned_pairs_file_name',   ['--al-conc', options.get('aligned_pairs_file_name')]),
+        ('unaligned_pairs_file_name', ['--un-conc', options.get('unaligned_pairs_file_name')]),
         ('suppress_unaligned_SAM',    ['--no-unal']),
         ('omit_secondary_seq',        ['--omit-sec-seq']),
         ('memory_mapped_IO',          ['--mm']),
         ('local',                     ['--local']),
         ('ignore_quals',              ['--ignore-quals']),
-        ('threads',                   ['--threads', str(kwargs.get('threads')), '--reorder']),
-        ('seed_length',               ['-L', str(kwargs.get('seed_length'))]),
-        ('seed_failures',             ['-D', str(kwargs.get('seed_failures'))]),
-        ('reseed',                    ['-R', str(kwargs.get('reseed'))]),
-        ('seed_mismatches',           ['-N', str(kwargs.get('seed_mismatches'))]),
-        ('seed_interval_function',    ['-i', kwargs.get('seed_interval_function')]),
-        ('gbar',                      ['--gbar', str(kwargs.get('gbar'))]),
+        ('threads',                   ['--threads', str(options.get('threads')), '--reorder']),
+        ('seed_length',               ['-L', str(options.get('seed_length'))]),
+        ('seed_failures',             ['-D', str(options.get('seed_failures'))]),
+        ('reseed',                    ['-R', str(options.get('reseed'))]),
+        ('seed_mismatches',           ['-N', str(options.get('seed_mismatches'))]),
+        ('seed_interval_function',    ['-i', options.get('seed_interval_function')]),
+        ('gbar',                      ['--gbar', str(options.get('gbar'))]),
         ('report_all',                ['-a']),
-        ('report_up_to',              ['-k', str(kwargs.get('report_up_to'))]),
+        ('report_up_to',              ['-k', str(options.get('report_up_to'))]),
         ('fasta_input',               ['-f']),
         ('report_timing',             ['-t']),
         ('omit_unmapped',             ['--no-unal']),
-        ('min_insert_size',           ['-I', str(kwargs.get('min_insert_size'))]),
-        ('max_insert_size',           ['-X', str(kwargs.get('max_insert_size'))]),
+        ('min_insert_size',           ['-I', str(options.get('min_insert_size'))]),
+        ('max_insert_size',           ['-X', str(options.get('max_insert_size'))]),
         ('forward_forward',           ['--ff']),
-        ('score_min',                 ['--score-min', kwargs.get('score_min')]),
-        ('maximum_ambiguous',         ['--n-ceil', kwargs.get('maximum_ambiguous')]),
-        ('ambiguous_penalty',         ['--np', str(kwargs.get('ambiguous_penalty'))]),
+        ('score_min',                 ['--score-min', options.get('score_min')]),
+        ('maximum_ambiguous',         ['--n-ceil', options.get('maximum_ambiguous')]),
+        ('ambiguous_penalty',         ['--np', str(options.get('ambiguous_penalty'))]),
         ('allow_dovetail',            ['--dovetail']),
     ]
 
@@ -117,52 +119,98 @@ def map_bowtie2(R1_file_name,
         bowtie2_command = ['/home/jah/src/bowtie2-dev/bowtie2']
     else:
         bowtie2_command = ['bowtie2']
-    
+
     for kwarg, bowtie2_argument in kwarg_to_bowtie2_argument:
-        if kwarg in kwargs:
-            value = kwargs.pop(kwarg)
+        if kwarg in options:
+            value = options.pop(kwarg)
             # If set to false, don't add the argument.
             if value:
                 bowtie2_command.extend(bowtie2_argument)
 
-    # kwargs are getting popped, so if anything is left, then it was something
-    # that wasn't being looked for
-    if len(kwargs) > 0:
-        raise ValueError('Unknown keyword argument', kwargs)
+    # options are getting popped, so if anything is left, then it was
+    # something that wasn't being looked for
+    if len(options) > 0:
+        raise ValueError('Unknown keyword argument', options)
 
     bowtie2_command.extend(['-x', index_prefix])
 
-    if R2_file_name:
+    if R2_file_name != None:
         bowtie2_command.extend(['-1', R1_file_name])
         bowtie2_command.extend(['-2', R2_file_name])
     else:
         bowtie2_command.extend(['-U', R1_file_name])
-    
-    if not bam_output:
-        bowtie2_command.extend(['-S', sam_file_name])
-        
-        with open(error_file_name, 'w') as error_file:
-            subprocess.check_call(bowtie2_command, stderr=error_file)
-    else:
-        with open(error_file_name, 'w') as error_file:
-            bowtie2_process = subprocess.Popen(bowtie2_command,
-                                               stdout=subprocess.PIPE,
-                                               stderr=error_file,
-                                              )
-            bam_command = ['samtools', 'view', '-bu', '-o', sam_file_name, '-']
-            samtools_process = subprocess.Popen(bam_command,
-                                                stdin=bowtie2_process.stdout,
-                                               )
-            bowtie2_process.stdout.close()
-            samtools_process.communicate()
 
-def map_bowtie2_paired(R1_file_name,
-                       R2_file_name,
-                       index_prefix,
-                       sam_file_name,
-                       **kwargs):
-    kwargs['R2_file_name'] = R2_file_name
-    map_bowtie2(R1_file_name, index_prefix, sam_file_name, **kwargs)
+    if unpaired_Reads and paired_Reads:
+        raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
+
+    if paired_Reads and not custom_binary:
+        raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
+
+    using_fifos = (unpaired_Reads != None or paired_Reads != None)
+
+    if using_fifos:
+        if os.path.exists(R1_file_name):
+            raise RuntimeError('R1_file_name already exists')
+        os.mkfifo(R1_file_name)
+
+        if R2_file_name:
+            if os.path.exists(R2_file_name):
+                raise RuntimeError('R1_file_name already exists')
+            os.mkfifo(R2_file_name)
+
+    try:
+        if not bam_output:
+            bowtie2_command.extend(['-S', output_file_name])
+            
+            with open(error_file_name, 'w') as error_file:
+                bowtie2_process = subprocess.Popen(bowtie2_command,
+                                                   stderr=error_file,
+                                                  )
+        else:
+            with open(error_file_name, 'w') as error_file:
+                bowtie2_process = subprocess.Popen(bowtie2_command,
+                                                   stdout=subprocess.PIPE,
+                                                   stderr=error_file,
+                                                  )
+                bam_command = ['samtools',
+                               'view',
+                               '-bu',
+                               '-o',
+                               output_file_name,
+                               '-',
+                              ]
+                samtools_process = subprocess.Popen(bam_command,
+                                                    stdin=bowtie2_process.stdout,
+                                                   )
+                bowtie2_process.stdout.close()
+
+        if unpaired_Reads:
+            with open(R1_file_name, 'w') as R1_fh:
+                for R1 in unpaired_Reads:
+                    R1_fh.write(str(R1))
+        elif paired_Reads:
+            with open(R1_file_name, 'w') as R1_fh, open(R2_file_name, 'w') as R2_fh:
+                for R1, R2 in paired_Reads:
+                    R1_fh.write(str(R1))
+                    R2_fh.write(str(R2))
+
+        if not bam_output:
+            bowtie2_process.wait()
+            if bowtie2_process.returncode != 0:
+                raise subprocess.CalledProcessError(bowtie2_command,
+                                                    bowtie2_process.returncode,
+                                                   )
+        else:
+            samtools_process.communicate()
+            if samtools_process.returncode != 0:
+                raise subprocess.CalledProcessError(bowtie2_command,
+                                                    samtools.returncode,
+                                                   )
+    finally:
+        if using_fifos:
+            os.remove(R1_file_name)
+            if R2_file_name:
+                os.remove(R2_file_name)
 
 def map_tophat(reads_file_names,
                bowtie2_index,
