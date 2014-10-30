@@ -2,6 +2,59 @@ import numpy as np
 from Sequencing import utilities, fastq, adapters, annotation
 from sw_cython import *
 
+empty_alignment = {'score': -1e6,
+                   'path': [],
+                   'query_mappings': [],
+                   'target_mappings': [],
+                   'insertions': set(),
+                   'deletions': set(),
+                   'mismatches': set(),
+                  }
+
+def last_query_index(alignment_path):
+    for q, t in alignment_path[::-1]:
+        if q != GAP:
+            return q
+
+    return -1
+
+def last_target_index(alignment_path):
+    for q, t in alignment_path[::-1]:
+        if t != GAP:
+            return t
+
+    return -1
+
+def last_n_query_pairs(alignment_path, n):
+    ''' Returns (q, t) pairs for the last n elements of alignment_path for which
+    q is not a gap.
+    '''
+    pairs = []
+
+    for q, t in alignment_path[::-1]:
+        if q != GAP:
+            pairs.append((q, t))
+        if len(pairs) == n:
+            break
+    
+    pairs = pairs[::-1]
+
+    return pairs
+
+def make_char_pairs(index_pairs, query, target):
+    char_pairs = []
+    for q, t in index_pairs:
+        if q == GAP:
+            q_char = '-'
+        else:
+            q_char = query[q]
+        if t == GAP:
+            t_char = '-'
+        else:
+            t_char = target[t]
+        char_pairs.append((q_char, t_char))
+    return char_pairs
+
 def print_local_alignment(query, target, alignment_path):
     def index_to_char(seq, index):
         if index == GAP:
@@ -62,8 +115,8 @@ def print_barcode_alignment(query, target, alignment_path):
         query_string.append(index_to_char(query, q))
         target_string.append(index_to_char(target, t))
 
-    query_string.append(right_query)
-    target_string.append(right_target)
+    query_string.extend([' ', right_query])
+    target_string.extend([' ', right_target])
 
     print 'query ', ''.join(query_string)
     print 'target', ''.join(target_string)
@@ -76,6 +129,7 @@ trimmed_annotation_fields = [
 ]
 
 TrimmedAnnotation = annotation.Annotation_factory(trimmed_annotation_fields)
+NO_DETECTED_OVERLAP = -2
 
 def trim_pairs(read_pairs, index_sequence, primer_type):
     before_R1, before_R2 = adapters.build_before_adapters(index_sequence, primer_type)
@@ -84,7 +138,7 @@ def trim_pairs(read_pairs, index_sequence, primer_type):
         status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
         if status == 'illegal' or status == 'bad':
             trim_at = len(R1.seq)
-            insert_length = -2
+            insert_length = NO_DETECTED_OVERLAP
         else:
             trim_at = max(0, insert_length)
 
@@ -96,22 +150,22 @@ def trim_pairs(read_pairs, index_sequence, primer_type):
                                           adapter_seq=R1.seq[adapter_slice],
                                           adapter_qual=R1.qual[adapter_slice],
                                          )
-        R1_trimmed_record = fastq.make_record(R1_annotation.identifier,
-                                              R1.seq[payload_slice],
-                                              R1.qual[payload_slice],
-                                             )
+        R1_trimmed = fastq.Read(R1_annotation.identifier,
+                                R1.seq[payload_slice],
+                                R1.qual[payload_slice],
+                               )
 
         R2_annotation = TrimmedAnnotation(original_name=R2.name,
                                           insert_length=insert_length,
                                           adapter_seq=R2.seq[adapter_slice],
                                           adapter_qual=R2.qual[adapter_slice],
                                          )
-        R2_trimmed_record = fastq.make_record(R2_annotation.identifier,
-                                              R2.seq[payload_slice],
-                                              R2.qual[payload_slice],
-                                             )
+        R2_trimmed = fastq.Read(R2_annotation.identifier,
+                                R2.seq[payload_slice],
+                                R2.qual[payload_slice],
+                               )
 
-        yield R1_trimmed_record, R2_trimmed_record
+        yield R1_trimmed, R2_trimmed
 
 def infer_insert_length(R1, R2, before_R1, before_R2):
     ''' Infer the length of the insert represented by R1 and R2 by performing
@@ -178,7 +232,7 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
     
     insert_length = length_from_R1
 
-    if 2 * len(alignment['path']) - alignment['score'] > 20:
+    if 2 * len(alignment['path']) - alignment['score'] > .2 * len(alignment['path']):
         status = 'bad'
     else:
         status = 'good'
