@@ -5,6 +5,7 @@ from collections import namedtuple
 from .fastq_cython import *
 from .utilities import identity, base_order
 import numpy as np
+import string
 
 # SANGER_OFFSET is imported from fastq_cython
 SOLEXA_OFFSET = 64
@@ -100,10 +101,13 @@ def Read_to_record(self):
     return make_record(*self)
 Read.__str__ = Read_to_record
 
+period_to_N = string.maketrans('.', 'N')
+
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
     name = name_standardizer(name_line.rstrip().lstrip('@'))
     seq = seq_line.strip()
+    seq = seq.translate(period_to_N)
     qual = qual_convertor(qual_line.strip())
     read = Read(name, seq, qual)
     return read
