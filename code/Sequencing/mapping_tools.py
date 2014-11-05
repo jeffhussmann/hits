@@ -1,7 +1,10 @@
 import os
+import tempfile
 import subprocess
-from glob import glob
-import Bio.SeqIO
+import threading
+import Queue
+from Sequencing import fastq
+from Sequencing import sam
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -72,18 +75,98 @@ def map_paired_bwa(R1_file_name, R2_file_name,
                               stderr=error_file,
                              )
 
-def map_bowtie2(index_prefix, 
-                R1_file_name,
-                R2_file_name,
-                output_file_name,
-                error_file_name='/dev/null',
-                custom_binary=False,
-                bam_output=False,
-                unpaired_Reads=None,
-                paired_Reads=None,
-                **options):
-    ''' Map reads to index_prefix with bowtie2. '''
+class ThreadWriter(threading.Thread):
+    def __init__(self, fifo_name, reads):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.fifo_name = fifo_name
+        self.reads = reads
+        self.start()
 
+    def run(self):
+        with open(self.fifo_name, 'w') as fifo_fh:
+            for read in self.reads:
+                fifo_fh.write(str(read))
+
+class PairedThreadWriter(threading.Thread):
+    def __init__(self, R1_fifo_name, R2_fifo_name, read_pairs):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.R1_fifo_name = R1_fifo_name
+        self.R2_fifo_name = R2_fifo_name
+        self.read_pairs = read_pairs
+        self.start()
+
+    def run(self):
+        with open(self.R1_fifo_name, 'w') as R1_fifo_fh, open(self.R2_fifo_name, 'w') as R2_fifo_fh:
+            for R1, R2 in self.read_pairs:
+                R1_fifo_fh.write(str(R1))
+                R2_fifo_fh.write(str(R2))
+
+class ThreadReader(threading.Thread):
+    def __init__(self, fifo_name):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.fifo_name = fifo_name
+        self.queue = Queue.Queue(maxsize=1000)
+        self.start()
+        
+    def run(self):
+        with open(self.fifo_name, 'r') as fifo_fh:
+            for read in fastq.reads(fifo_fh):
+                self.queue.put(read)
+
+        self.queue.put(None)
+
+    def output(self):
+        for read in iter(self.queue.get, None):
+            yield read
+
+class PairedThreadReader(threading.Thread):
+    def __init__(self, R1_fifo_name, R2_fifo_name):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.R1_fifo_name = R1_fifo_name
+        self.R2_fifo_name = R2_fifo_name
+        self.queue = Queue.Queue(maxsize=1000)
+        self.start()
+        
+    def run(self):
+        with open(self.R1_fifo_name) as R1_fifo_fh, open(self.R2_fifo_name) as R2_fifo_fh:
+            for read_pair in fastq.read_pairs(R1_fifo_fh, R2_fifo_fh):
+                self.queue.put(read_pair)
+
+        self.queue.put(None)
+
+    def output(self):
+        for read_pair in iter(self.queue.get, None):
+            yield read_pair
+
+def prep_fifos(is_paired):
+    temp_dir = tempfile.mkdtemp()
+    template_fn = '{0}/R%_fifo'.format(temp_dir)
+    R1_fn = '{0}/R1_fifo'.format(temp_dir)
+    os.mkfifo(R1_fn)
+
+    if not is_paired:
+        R2_fn = None
+    else:
+        R2_fn = '{0}/R2_fifo'.format(temp_dir)
+        os.mkfifo(R2_fn)
+
+    return temp_dir, template_fn, R1_fn, R2_fn
+
+def cleanup_fifos(temp_dir, R1_fn, R2_fn):
+    os.remove(R1_fn)
+    if R2_fn != None:
+        os.remove(R2_fn)
+    os.rmdir(temp_dir)
+
+def prep_bowtie2_command(index_prefix,
+                         R1_fn,
+                         R2_fn,
+                         custom_binary,
+                         **options):
     kwarg_to_bowtie2_argument = [
         ('aligned_reads_file_name',   ['--al', options.get('aligned_reads_file_name')]),
         ('unaligned_reads_file_name', ['--un', options.get('unaligned_reads_file_name')]),
@@ -134,83 +217,173 @@ def map_bowtie2(index_prefix,
 
     bowtie2_command.extend(['-x', index_prefix])
 
-    if R2_file_name != None:
-        bowtie2_command.extend(['-1', R1_file_name])
-        bowtie2_command.extend(['-2', R2_file_name])
+    if R2_fn != None:
+        bowtie2_command.extend(['-1', R1_fn])
+        bowtie2_command.extend(['-2', R2_fn])
     else:
-        bowtie2_command.extend(['-U', R1_file_name])
+        bowtie2_command.extend(['-U', R1_fn])
 
+    return bowtie2_command
+
+def launch_bowtie2_pipeline(bowtie2_command,
+                            output_file_name,
+                            error_file_name,
+                            bam_output,
+                           ):
+    error_file = open(error_file_name, 'w')
+    if not bam_output:
+        bowtie2_command.extend(['-S', output_file_name])
+        
+        bowtie2_process = subprocess.Popen(bowtie2_command,
+                                           stderr=error_file,
+                                          )
+        last_process = bowtie2_process
+    else:
+        bowtie2_process = subprocess.Popen(bowtie2_command,
+                                           stdout=subprocess.PIPE,
+                                           stderr=error_file,
+                                          )
+        view_command = ['samtools', 'view', '-ubh', '-']
+        sort_command = ['samtools', 'sort',
+                        '-T', output_file_name,
+                        '-o', output_file_name,
+                        '-',
+                       ]
+        view_process = subprocess.Popen(view_command,
+                                        stdin=bowtie2_process.stdout,
+                                        stdout=subprocess.PIPE,
+                                       )
+        sort_process = subprocess.Popen(sort_command,
+                                        stdin=view_process.stdout,
+                                       )
+        bowtie2_process.stdout.close()
+        view_process.stdout.close()
+        last_process = sort_process
+
+    return last_process
+
+def map_bowtie2(index_prefix,
+                R1_fn,
+                R2_fn,
+                output_file_name,
+                error_file_name='/dev/null',
+                custom_binary=False,
+                bam_output=False,
+                unpaired_Reads=None,
+                paired_Reads=None,
+                **options):
     if unpaired_Reads and paired_Reads:
         raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
 
     if paired_Reads and not custom_binary:
         raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
 
-    using_fifos = (unpaired_Reads != None or paired_Reads != None)
-
-    if using_fifos:
-        if os.path.exists(R1_file_name):
-            raise RuntimeError('R1_file_name already exists')
-        os.mkfifo(R1_file_name)
-
-        if R2_file_name:
-            if os.path.exists(R2_file_name):
-                raise RuntimeError('R1_file_name already exists')
-            os.mkfifo(R2_file_name)
+    using_input_fifos = (unpaired_Reads != None or paired_Reads != None)
+    is_paired = (R2_fn != None or paired_Reads != None)
 
     try:
-        if not bam_output:
-            bowtie2_command.extend(['-S', output_file_name])
-            
-            with open(error_file_name, 'w') as error_file:
-                bowtie2_process = subprocess.Popen(bowtie2_command,
-                                                   stderr=error_file,
-                                                  )
-        else:
-            with open(error_file_name, 'w') as error_file:
-                bowtie2_process = subprocess.Popen(bowtie2_command,
-                                                   stdout=subprocess.PIPE,
-                                                   stderr=error_file,
-                                                  )
-                bam_command = ['samtools',
-                               'view',
-                               '-bu',
-                               '-o',
-                               output_file_name,
-                               '-',
-                              ]
-                samtools_process = subprocess.Popen(bam_command,
-                                                    stdin=bowtie2_process.stdout,
-                                                   )
-                bowtie2_process.stdout.close()
+        if using_input_fifos:
+            temp_input_dir, _, R1_fn, R2_fn = prep_fifos(is_paired)
+        
+        bowtie2_command = prep_bowtie2_command(index_prefix,
+                                               R1_fn,
+                                               R2_fn,
+                                               custom_binary,
+                                               **options)
 
-        if unpaired_Reads:
-            with open(R1_file_name, 'w') as R1_fh:
-                for R1 in unpaired_Reads:
-                    R1_fh.write(str(R1))
-        elif paired_Reads:
-            with open(R1_file_name, 'w') as R1_fh, open(R2_file_name, 'w') as R2_fh:
-                for R1, R2 in paired_Reads:
-                    R1_fh.write(str(R1))
-                    R2_fh.write(str(R2))
+        last_process = launch_bowtie2_pipeline(bowtie2_command,
+                                               output_file_name,
+                                               error_file_name,
+                                               bam_output,
+                                              )
 
-        if not bam_output:
-            bowtie2_process.wait()
-            if bowtie2_process.returncode != 0:
-                raise subprocess.CalledProcessError(bowtie2_command,
-                                                    bowtie2_process.returncode,
-                                                   )
-        else:
-            samtools_process.communicate()
-            if samtools_process.returncode != 0:
-                raise subprocess.CalledProcessError(bowtie2_command,
-                                                    samtools.returncode,
-                                                   )
+        if using_input_fifos:
+            if not is_paired:
+                writer = ThreadWriter(R1_fn, unpaired_Reads)
+            else:
+                writer = PairedThreadWriter(R1_fn, R2_fn, paired_Reads)
+
+        last_process.wait()
+        if last_process.returncode != 0:
+            raise subprocess.CalledProcessError(bowtie2_command,
+                                                last_process.returncode,
+                                               )
+        if bam_output:
+            sam.index_bam(output_file_name)
     finally:
-        if using_fifos:
-            os.remove(R1_file_name)
-            if R2_file_name:
-                os.remove(R2_file_name)
+        if using_input_fifos:
+            cleanup_fifos(temp_input_dir, R1_fn, R2_fn)
+
+def map_bowtie2_yield_unaligned(index_prefix,
+                                R1_fn,
+                                R2_fn,
+                                output_file_name,
+                                error_file_name='/dev/null',
+                                custom_binary=False,
+                                bam_output=False,
+                                unpaired_Reads=None,
+                                paired_Reads=None,
+                                **options):
+    if unpaired_Reads and paired_Reads:
+        raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
+
+    if paired_Reads and not custom_binary:
+        raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
+
+    using_input_fifos = (unpaired_Reads != None or paired_Reads != None)
+    is_paired = (R2_fn != None or paired_Reads != None)
+
+    try:
+        if using_input_fifos:
+            temp_input_dir, _, R1_fn, R2_fn = prep_fifos(is_paired)
+        
+        temp_output_dir, unal_template_fn, unal_R1_fn, unal_R2_fn = prep_fifos(is_paired)
+        if not is_paired:
+            options['unaligned_reads_file_name'] = unal_R1_fn
+        else:
+            options['unaligned_pairs_file_name'] = unal_template_fn
+
+        bowtie2_command = prep_bowtie2_command(index_prefix,
+                                               R1_fn,
+                                               R2_fn,
+                                               custom_binary,
+                                               **options)
+
+        last_process = launch_bowtie2_pipeline(bowtie2_command,
+                                               output_file_name,
+                                               error_file_name,
+                                               bam_output,
+                                              )
+
+        if using_input_fifos:
+            if not is_paired:
+                writer = ThreadWriter(R1_fn, unpaired_Reads)
+            else:
+                writer = PairedThreadWriter(R1_fn, R2_fn, paired_Reads)
+
+        if not is_paired:
+            reader = ThreadReader(unal_R1_fn)
+            for read in reader.output():
+                yield read
+        else:
+            reader = PairedThreadReader(unal_R1_fn,
+                                        unal_R2_fn,
+                                       )
+            for read_pair in reader.output():
+                yield read_pair
+        
+        last_process.wait()
+        if last_process.returncode != 0:
+            raise subprocess.CalledProcessError(bowtie2_command,
+                                                last_process.returncode,
+                                               )
+        if bam_output:
+            sam.index_bam(output_file_name)
+    finally:
+        if using_input_fifos:
+            cleanup_fifos(temp_input_dir, R1_fn, R2_fn)
+
+        cleanup_fifos(temp_output_dir, unal_R1_fn, unal_R2_fn)
 
 def map_tophat(reads_file_names,
                bowtie2_index,
