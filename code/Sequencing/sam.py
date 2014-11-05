@@ -406,9 +406,8 @@ def merge_sorted_bam_files(input_file_names, merged_file_name):
     index_bam(merged_file_name)
 
 def make_sorted_bam(sam_file_name, bam_file_name):
-    sorted_bam_prefix, _ = os.path.splitext(bam_file_name)
-    bam_command = ['samtools', 'view', '-ubS', sam_file_name]
-    sort_command = ['samtools', 'sort', '-', sorted_bam_prefix]
+    bam_command = ['samtools', 'view', '-ubh', sam_file_name]
+    sort_command = ['samtools', 'sort', '-T', bam_file_name, '-o', bam_file_name, '-']
     bam_process = subprocess.Popen(bam_command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE,
@@ -446,3 +445,21 @@ def get_mapq_counts(bam_file_name):
     bam_file = pysam.Samfile(bam_file_name)
     mapq_counts = Counter(ar.mapq for ar in bam_file)
     return mapq_counts
+
+def sam_to_fastq(sam_file_name):
+    sam_file = pysam.Samfile(sam_file_name)
+    for mapping in sam_file:
+        if mapping.is_unmapped:
+            seq = mapping.seq
+            qual = mapping.qual
+        elif mapping.is_reverse:
+            seq = utilities.reverse_complement(mapping.seq)
+            qual = mapping.qual[::-1]
+        else:
+            seq = mapping.seq
+            qual = mapping.qual
+
+        read = fastq.Read(mapping.qname, seq, qual)
+        yield read
+
+bam_to_fastq = sam_to_fastq
