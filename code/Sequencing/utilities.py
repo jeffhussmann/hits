@@ -18,7 +18,7 @@ def complement(sequence_string):
     c_string = str(Seq(sequence_string).complement())
     return c_string
 
-base_order = 'ACGTN-.'
+base_order = 'ACGTN-'
 base_to_index = {b: i for i, b in enumerate(base_order)}
 base_to_complement_index = {b: i for i, b in enumerate(complement(base_order))}
 
