@@ -11,6 +11,20 @@ empty_alignment = {'score': -1e6,
                    'mismatches': set(),
                   }
 
+def first_query_index(alignment_path):
+    for q, t in alignment_path:
+        if q != GAP:
+            return q
+
+    return -1
+
+def first_target_index(alignment_path):
+    for q, t in alignment_path:
+        if t != GAP:
+            return t
+
+    return -1
+
 def last_query_index(alignment_path):
     for q, t in alignment_path[::-1]:
         if q != GAP:
@@ -64,15 +78,17 @@ def print_local_alignment(query, target, alignment_path):
                 raise ValueError(index, len(seq), seq)
             return seq[index]
     
-    first_query_index, first_target_index = alignment_path[0]
-    last_query_index, last_target_index = alignment_path[-1]
+    first_q = first_query_index(alignment_path)
+    first_t = first_target_index(alignment_path)
+    last_q = last_query_index(alignment_path)
+    last_t = last_target_index(alignment_path)
 
-    left_query = query[:first_query_index]
-    left_target = target[:first_target_index]
-    right_query = query[last_query_index + 1:]
-    right_target = target[last_target_index + 1:]
+    left_query = query[:first_q]
+    left_target = target[:first_t]
+    right_query = query[last_q + 1:]
+    right_target = target[last_t + 1:]
 
-    left_length = max(first_query_index, first_target_index)
+    left_length = max(first_q, first_t)
     left_query = '{:>{length}s} '.format(left_query, length=left_length)
     left_target = '{:>{length}s} '.format(left_target, length=left_length)
     
@@ -134,7 +150,7 @@ NO_DETECTED_OVERLAP = -2
 def trim_pairs(read_pairs, index_sequence, primer_type):
     before_R1, before_R2 = adapters.build_before_adapters(index_sequence, primer_type)
 
-    for R1, R2, in read_pairs:
+    for R1, R2 in read_pairs:
         status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
         if status == 'illegal' or status == 'bad':
             trim_at = len(R1.seq)
@@ -224,18 +240,19 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
         # understand it, -1 is relatively common so is tolerated.
         return 'illegal', 500, -1
 
-    if length_from_R1 != length_from_R2:
-        print length_from_R1, length_from_R2
-        print_diagnostic(R1, R2, before_R1, before_R2, alignment)
-        # This shouldn't be possible without an illegal indel.
-        raise ValueError
-    
     insert_length = length_from_R1
 
     if 2 * len(alignment['path']) - alignment['score'] > .2 * len(alignment['path']):
         status = 'bad'
     else:
         status = 'good'
+    
+    if status == 'good' and (length_from_R1 != length_from_R2):
+        print 'length from R1', length_from_R1
+        print 'length from R2', length_from_R2
+        print_diagnostic(R1, R2, before_R1, before_R2, alignment)
+        # This shouldn't be possible without an illegal indel.
+        raise ValueError
 
     return status, insert_length, alignment
 
