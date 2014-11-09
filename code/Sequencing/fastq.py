@@ -3,7 +3,7 @@
 from itertools import izip, chain
 from collections import namedtuple
 from .fastq_cython import *
-from .utilities import identity, base_order
+from .utilities import identity, base_order, reverse_complement
 import numpy as np
 import string
 
@@ -135,6 +135,11 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False):
              for line_group in line_groups)
 
     return reads
+
+def reverse_complement_reads(file_name, **kwargs):
+    for read in reads(file_name, **kwargs):
+        rc_read = Read(read.name, reverse_complement(read.seq), read.qual[::-1])
+        yield rc_read
 
 def detect_structure(line_groups):
     ''' Look at the first read to figure out the read name structure. '''
