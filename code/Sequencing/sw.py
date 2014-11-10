@@ -105,38 +105,6 @@ def print_local_alignment(query, target, alignment_path):
     print 'query ', ''.join(query_string)
     print 'target', ''.join(target_string)
 
-def print_barcode_alignment(query, target, alignment_path):
-    def index_to_char(seq, index):
-        if index == -1:
-            return '-'
-        else:
-            if index >= len(seq):
-                raise ValueError(index, len(seq), seq)
-            return seq[index]
-    
-    for _, last_query_index in alignment_path[::-1]:
-        if last_query_index != GAP:
-            break
-    right_query = query[last_query_index + 1:]
-
-    for last_target_index, _ in alignment_path[::-1]:
-        if last_target_index != GAP:
-            break
-    right_target = target[last_target_index + 1:]
-
-    query_string = []
-    target_string = []
-
-    for q, t in alignment_path:
-        query_string.append(index_to_char(query, q))
-        target_string.append(index_to_char(target, t))
-
-    query_string.extend([' ', right_query])
-    target_string.extend([' ', right_target])
-
-    print 'query ', ''.join(query_string)
-    print 'target', ''.join(target_string)
-
 trimmed_annotation_fields = [
     ('original_name', 's'),
     ('insert_length', '04d'),
@@ -147,41 +115,188 @@ trimmed_annotation_fields = [
 TrimmedAnnotation = annotation.Annotation_factory(trimmed_annotation_fields)
 NO_DETECTED_OVERLAP = -2
 
-def trim_pairs(read_pairs, index_sequence, primer_type):
-    before_R1, before_R2 = adapters.build_before_adapters(index_sequence, primer_type)
+def generate_alignments(query,
+                        target,
+                        alignment_type,
+                        match_bonus=2,
+                        mismatch_penalty=-2,
+                        indel_penalty=-5,
+                        max_alignments=-1,
+                        min_score=60,
+                       ):
+    if alignment_type == 'local':
+        force_query_start = False
+        force_target_start = False
+        force_either_start = False
+        force_edge_end = False
+    elif alignment_type == 'barcode':
+        force_query_start = True
+        force_target_start = True
+        force_either_start = False
+        force_edge_end = True
+    elif alignment_type == 'overlap':
+        force_query_start = False
+        force_target_start = False
+        force_either_start = True
+        force_edge_end = True
+    elif alignment_type == 'unpaired_adapter':
+        force_query_start = True
+        force_target_start = False
+        force_either_start = False
+        force_edge_end = True
 
-    for R1, R2 in read_pairs:
-        status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
-        if status == 'illegal' or status == 'bad':
-            trim_at = len(R1.seq)
-            insert_length = NO_DETECTED_OVERLAP
+    matrices = generate_matrices(query,
+                                 target,
+                                 match_bonus,
+                                 mismatch_penalty,
+                                 indel_penalty,
+                                 force_query_start,
+                                 force_target_start,
+                                 force_either_start,
+                                )
+    cells_seen = set()
+    if force_edge_end:
+        possible_ends = propose_edge_ends(matrices['score'], cells_seen, min_score)
+    else:
+        possible_ends = propose_all_ends(matrices['score'], cells_seen, min_score)
+
+    alignments = []
+    for possible_end in possible_ends:
+        #print possible_end, matrices['score'][possible_end],
+        alignment = backtrack(query,
+                              target,
+                              matrices,
+                              cells_seen,
+                              possible_end,
+                              force_query_start,
+                              force_target_start,
+                              force_either_start,
+                             )
+        if alignment != None:
+            alignments.append(alignment)
+            #print alignment['path']
+            #sw.print_local_alignment(query, target, alignment['path'])
+            if len(alignments) == max_alignments:
+                break
         else:
-            trim_at = max(0, insert_length)
+            #print 'collision'
+            pass
 
-        payload_slice = slice(None, trim_at)
-        adapter_slice = slice(trim_at, None)
+    return alignments
 
-        R1_annotation = TrimmedAnnotation(original_name=R1.name,
-                                          insert_length=insert_length,
-                                          adapter_seq=R1.seq[adapter_slice],
-                                          adapter_qual=R1.qual[adapter_slice],
-                                         )
-        R1_trimmed = fastq.Read(R1_annotation.identifier,
-                                R1.seq[payload_slice],
-                                R1.qual[payload_slice],
-                               )
+def propose_edge_ends(score_matrix, cells_seen, min_score):
+    num_rows, num_cols = score_matrix.shape
+    right_edge = [(i, num_cols - 1) for i in range(num_rows)]
+    bottom_edge = [(num_rows - 1, i) for i in range(num_cols)]
+    edge_cells = right_edge + bottom_edge
+    sorted_edge_cells = sorted(edge_cells,
+                               key=lambda cell: score_matrix[cell],
+                               reverse=True,
+                              )
+    for cell in sorted_edge_cells:
+        if score_matrix[cell] <= min_score:
+            break
 
-        R2_annotation = TrimmedAnnotation(original_name=R2.name,
-                                          insert_length=insert_length,
-                                          adapter_seq=R2.seq[adapter_slice],
-                                          adapter_qual=R2.qual[adapter_slice],
-                                         )
-        R2_trimmed = fastq.Read(R2_annotation.identifier,
-                                R2.seq[payload_slice],
-                                R2.qual[payload_slice],
-                               )
+        if cell in cells_seen:
+            continue
 
-        yield R1_trimmed, R2_trimmed
+        yield cell
+
+def propose_all_ends(score_matrix, cells_seen, min_score):
+    sorted_indices = score_matrix.ravel().argsort()[::-1]
+    for index in sorted_indices:
+        cell = np.unravel_index(index, score_matrix.shape)
+
+        if score_matrix[cell] < min_score:
+            break
+
+        if cell in cells_seen:
+            continue
+
+        yield cell
+
+def backtrack(query,
+              target,
+              matrices,
+              cells_seen,
+              end_cell,
+              force_query_start,
+              force_target_start,
+              force_either_start,
+             ):
+    query_mappings = np.ones(len(query), int) * SOFT_CLIPPED
+    target_mappings = np.ones(len(target), int) * SOFT_CLIPPED
+
+    path = []
+    insertions = set()
+    deletions = set()
+    mismatches = set()
+    
+    unconstrained_start = not(force_query_start or force_target_start or force_either_start)
+
+    row, col = end_cell
+
+    while True:
+        if (row, col) in cells_seen:
+            #print (row, col), 'was already seen'
+            return None
+        cells_seen.add((row, col))
+
+        next_col = col + matrices['col_direction'][row, col]
+        next_row = row + matrices['row_direction'][row, col]
+        if next_col == col:
+            target_index = GAP
+            insertions.add(row - 1)
+        else:
+            target_index = col - 1
+        if next_row == row:
+            query_index = GAP
+            deletions.add(col - 1)
+        else:
+            query_index = row - 1
+        
+        if target_index != GAP:
+            target_mappings[target_index] = query_index
+        if query_index != GAP:
+            query_mappings[query_index] = target_index
+        if target_index != GAP and query_index != GAP and query[query_index] != target[target_index]:
+            mismatches.add((query_index, target_index))
+
+        path.append((query_index, target_index))
+
+        row = next_row
+        col = next_col
+
+        if unconstrained_start:
+            if matrices['score'][row, col] <= 0:
+                break
+        elif force_query_start and force_target_start:
+            if row == 0 and col == 0:
+                break
+        elif force_either_start:
+            if row == 0 or col == 0:
+                break
+        elif force_query_start:
+            if row == 0:
+                break
+        elif force_target_start:
+            if col == 0:
+                break
+
+    path = path[::-1]
+
+    alignment = {'score': matrices['score'][end_cell],
+                 'path': path,
+                 'query_mappings': query_mappings,
+                 'target_mappings': target_mappings,
+                 'insertions': insertions,
+                 'deletions': deletions,
+                 'mismatches': mismatches,
+                 'XM': len(mismatches),
+                 'XO': len(insertions) + len(deletions),
+                }
+
+    return alignment
 
 def infer_insert_length(R1, R2, before_R1, before_R2):
     ''' Infer the length of the insert represented by R1 and R2 by performing
@@ -190,7 +305,17 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
     '''
     extended_R1 = before_R1 + R1.seq
     extended_R2 = utilities.reverse_complement(before_R2 + R2.seq)
-    alignment = overlap_alignment(extended_R1, extended_R2, 2, -1, -5)
+    alignment,  = generate_alignments(extended_R1,
+                                      extended_R2, 
+                                      'overlap',
+                                      2,
+                                      -1,
+                                      -5,
+                                      1,
+                                      0,
+                                     )
+
+    #print_diagnostic(R1, R2, before_R1, before_R2, alignment)
     
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
@@ -218,7 +343,7 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
         length_from_R1 = R2_start_in_R1 - R1_start + 1
         length_from_R2 = R2_start - R1_start_in_R2 + 1
     else:
-        # overlap_alignment forces the alignment to start with either the
+        # overlap alignment forces the alignment to start with either the
         # beginning of R1 or R2 and end with either the end of R1 or R2. 
         # Making it to this else brach means that either the first base of R1 or
         # the first base of R2 or both wasn't aligned. This either means that
