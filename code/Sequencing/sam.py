@@ -6,6 +6,7 @@ import subprocess
 from collections import Counter
 from itertools import izip
 import os
+import shutil
 import external_sort
 import pysam
 import fastq
@@ -401,8 +402,11 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     samtools_process.communicate()
 
 def merge_sorted_bam_files(input_file_names, merged_file_name):
-    merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
-    subprocess.check_call(merge_command)
+    if len(input_file_names) == 1:
+        shutil.copy(input_file_names[0], merged_file_name)
+    else:
+        merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
+        subprocess.check_call(merge_command)
     index_bam(merged_file_name)
 
 def make_sorted_bam(sam_file_name, bam_file_name):
@@ -439,6 +443,7 @@ def get_length_counts(bam_file_name, only_primary=True):
         qlen_counts = Counter(ar.qlen for ar in bam_file if not ar.is_unmapped and not ar.is_secondary)
     else:
         qlen_counts = Counter(ar.qlen for ar in bam_file)
+    
     return qlen_counts
 
 def get_mapq_counts(bam_file_name):
