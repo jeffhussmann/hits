@@ -16,28 +16,28 @@ def first_query_index(alignment_path):
         if q != GAP:
             return q
 
-    return -1
+    return None
 
 def first_target_index(alignment_path):
     for q, t in alignment_path:
         if t != GAP:
             return t
 
-    return -1
+    return None
 
 def last_query_index(alignment_path):
     for q, t in alignment_path[::-1]:
         if q != GAP:
             return q
 
-    return -1
+    return None
 
 def last_target_index(alignment_path):
     for q, t in alignment_path[::-1]:
         if t != GAP:
             return t
 
-    return -1
+    return None
 
 def last_n_query_pairs(alignment_path, n):
     ''' Returns (q, t) pairs for the last n elements of alignment_path for which
@@ -70,6 +70,12 @@ def make_char_pairs(index_pairs, query, target):
     return char_pairs
 
 def print_local_alignment(query, target, alignment_path):
+    if alignment_path == []:
+        print query
+        print
+        print target
+        return
+
     def index_to_char(seq, index):
         if index == GAP:
             return '-'
@@ -119,10 +125,10 @@ def generate_alignments(query,
                         target,
                         alignment_type,
                         match_bonus=2,
-                        mismatch_penalty=-2,
+                        mismatch_penalty=-1,
                         indel_penalty=-5,
-                        max_alignments=-1,
-                        min_score=60,
+                        max_alignments=1,
+                        min_score=None,
                        ):
     if alignment_type == 'local':
         force_query_start = False
@@ -175,7 +181,7 @@ def generate_alignments(query,
         if alignment != None:
             alignments.append(alignment)
             #print alignment['path']
-            #sw.print_local_alignment(query, target, alignment['path'])
+            #print_local_alignment(query, target, alignment['path'])
             if len(alignments) == max_alignments:
                 break
         else:
@@ -184,7 +190,7 @@ def generate_alignments(query,
 
     return alignments
 
-def propose_edge_ends(score_matrix, cells_seen, min_score):
+def propose_edge_ends(score_matrix, cells_seen, min_score=None):
     num_rows, num_cols = score_matrix.shape
     right_edge = [(i, num_cols - 1) for i in range(num_rows)]
     bottom_edge = [(num_rows - 1, i) for i in range(num_cols)]
@@ -194,7 +200,7 @@ def propose_edge_ends(score_matrix, cells_seen, min_score):
                                reverse=True,
                               )
     for cell in sorted_edge_cells:
-        if score_matrix[cell] <= min_score:
+        if min_score != None and score_matrix[cell] < min_score:
             break
 
         if cell in cells_seen:
@@ -235,8 +241,14 @@ def backtrack(query,
     unconstrained_start = not(force_query_start or force_target_start or force_either_start)
 
     row, col = end_cell
+    if row == 0 or col == 0:
+        # There are no query or target bases involved in a path that ends on
+        # the top or the left edge.
+        reached_end = True
+    else:
+        reached_end = False
 
-    while True:
+    while not reached_end:
         if (row, col) in cells_seen:
             #print (row, col), 'was already seen'
             return None
@@ -269,19 +281,19 @@ def backtrack(query,
 
         if unconstrained_start:
             if matrices['score'][row, col] <= 0:
-                break
+                reached_end = True
         elif force_query_start and force_target_start:
             if row == 0 and col == 0:
-                break
+                reached_end = True
         elif force_either_start:
             if row == 0 or col == 0:
-                break
+                reached_end = True
         elif force_query_start:
             if row == 0:
-                break
+                reached_end = True
         elif force_target_start:
             if col == 0:
-                break
+                reached_end = True
 
     path = path[::-1]
 
