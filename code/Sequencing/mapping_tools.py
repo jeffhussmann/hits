@@ -5,6 +5,7 @@ import threading
 import Queue
 from Sequencing import fastq
 from Sequencing import sam
+import pysam
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -75,98 +76,85 @@ def map_paired_bwa(R1_file_name, R2_file_name,
                               stderr=error_file,
                              )
 
-class ThreadWriter(threading.Thread):
-    def __init__(self, fifo_name, reads):
+class DoNothing(object):
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        pass
+
+class TemporaryFifo(object):
+    def __init__(self, name='fifo'):
+        self.name = name
+
+    def __enter__(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.file_name = '{0}/{1}'.format(self.temp_dir, self.name)
+        os.mkfifo(self.file_name)
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        os.remove(self.file_name)
+        os.rmdir(self.temp_dir)
+
+class PairedTemporaryFifos(object):
+    def __enter__(self):
+        self.temp_dir = tempfile.mkdtemp()
+        
+        # For peace of mind, make sure there are no %'s in the directory name
+        # because bowtie2 will be doing a string replacement on %'s.
+        while '%' in self.temp_dir:
+            os.rmdir(self.temp_dir)
+            self.temp_dir = tempfile.mkdtemp()
+        
+        self.file_name_template = '{0}/R%_fifo.fastq'.format(self.temp_dir)
+
+        self.R1_file_name = self.file_name_template.replace('%', '1')
+        os.mkfifo(self.R1_file_name)
+
+        self.R2_file_name = self.file_name_template.replace('%', '2')
+        os.mkfifo(self.R2_file_name)
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        os.remove(self.R1_file_name)
+        os.remove(self.R2_file_name)
+        os.rmdir(self.temp_dir)
+
+class ThreadFastqWriter(threading.Thread):
+    def __init__(self, reads, file_name):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.fifo_name = fifo_name
         self.reads = reads
+        self.file_name = file_name
         self.start()
 
     def run(self):
-        with open(self.fifo_name, 'w') as fifo_fh:
+        with open(self.file_name, 'w') as fifo_fh:
             for read in self.reads:
                 fifo_fh.write(str(read))
 
-class PairedThreadWriter(threading.Thread):
-    def __init__(self, R1_fifo_name, R2_fifo_name, read_pairs):
+class ThreadPairedFastqWriter(threading.Thread):
+    def __init__(self, read_pairs, R1_fn, R2_fn):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.R1_fifo_name = R1_fifo_name
-        self.R2_fifo_name = R2_fifo_name
         self.read_pairs = read_pairs
+        self.R1_fn = R1_fn
+        self.R2_fn = R2_fn
         self.start()
 
     def run(self):
-        with open(self.R1_fifo_name, 'w') as R1_fifo_fh, open(self.R2_fifo_name, 'w') as R2_fifo_fh:
+        with open(R1_fn, 'w') as R1_fh, open(R2_fn, 'w') as R2_fh:
             for R1, R2 in self.read_pairs:
-                R1_fifo_fh.write(str(R1))
-                R2_fifo_fh.write(str(R2))
+                R1_fh.write(str(R1))
+                R2_fh.write(str(R2))
 
-class ThreadReader(threading.Thread):
-    def __init__(self, fifo_name):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.fifo_name = fifo_name
-        self.queue = Queue.Queue(maxsize=1000)
-        self.start()
-        
-    def run(self):
-        with open(self.fifo_name, 'r') as fifo_fh:
-            for read in fastq.reads(fifo_fh):
-                self.queue.put(read)
-
-        self.queue.put(None)
-
-    def output(self):
-        for read in iter(self.queue.get, None):
-            yield read
-
-class PairedThreadReader(threading.Thread):
-    def __init__(self, R1_fifo_name, R2_fifo_name):
-        threading.Thread.__init__(self)
-        self.daemon = True
-        self.R1_fifo_name = R1_fifo_name
-        self.R2_fifo_name = R2_fifo_name
-        self.queue = Queue.Queue(maxsize=1000)
-        self.start()
-        
-    def run(self):
-        with open(self.R1_fifo_name) as R1_fifo_fh, open(self.R2_fifo_name) as R2_fifo_fh:
-            for read_pair in fastq.read_pairs(R1_fifo_fh, R2_fifo_fh):
-                self.queue.put(read_pair)
-
-        self.queue.put(None)
-
-    def output(self):
-        for read_pair in iter(self.queue.get, None):
-            yield read_pair
-
-def prep_fifos(is_paired):
-    temp_dir = tempfile.mkdtemp()
-    template_fn = '{0}/R%_fifo'.format(temp_dir)
-    R1_fn = '{0}/R1_fifo'.format(temp_dir)
-    os.mkfifo(R1_fn)
-
-    if not is_paired:
-        R2_fn = None
-    else:
-        R2_fn = '{0}/R2_fifo'.format(temp_dir)
-        os.mkfifo(R2_fn)
-
-    return temp_dir, template_fn, R1_fn, R2_fn
-
-def cleanup_fifos(temp_dir, R1_fn, R2_fn):
-    os.remove(R1_fn)
-    if R2_fn != None:
-        os.remove(R2_fn)
-    os.rmdir(temp_dir)
-
-def prep_bowtie2_command(index_prefix,
-                         R1_fn,
-                         R2_fn,
-                         custom_binary,
-                         **options):
+def launch_bowtie2(index_prefix,
+                   R1_fn,
+                   R2_fn,
+                   output_file_name,
+                   error_file_name,
+                   bam_output,
+                   custom_binary,
+                   **options):
     kwarg_to_bowtie2_argument = [
         ('aligned_reads_file_name',   ['--al', options.get('aligned_reads_file_name')]),
         ('unaligned_reads_file_name', ['--un', options.get('unaligned_reads_file_name')]),
@@ -223,21 +211,14 @@ def prep_bowtie2_command(index_prefix,
     else:
         bowtie2_command.extend(['-U', R1_fn])
 
-    return bowtie2_command
-
-def launch_bowtie2_pipeline(bowtie2_command,
-                            output_file_name,
-                            error_file_name,
-                            bam_output,
-                           ):
     error_file = open(error_file_name, 'w')
     if not bam_output:
         bowtie2_command.extend(['-S', output_file_name])
-        
+
         bowtie2_process = subprocess.Popen(bowtie2_command,
                                            stderr=error_file,
                                           )
-        last_process = bowtie2_process
+        process_to_return = bowtie2_process
     else:
         bowtie2_process = subprocess.Popen(bowtie2_command,
                                            stdout=subprocess.PIPE,
@@ -258,132 +239,141 @@ def launch_bowtie2_pipeline(bowtie2_command,
                                        )
         bowtie2_process.stdout.close()
         view_process.stdout.close()
-        last_process = sort_process
+        process_to_return = sort_process
 
-    return last_process
+    return process_to_return
+
+def _map_bowtie2(index_prefix,
+                 R1_fn,
+                 R2_fn,
+                 output_file_name,
+                 error_file_name='/dev/null',
+                 custom_binary=False,
+                 bam_output=False,
+                 reads=None,
+                 read_pairs=None,
+                 yield_mappings=False,
+                 yield_unaligned=False,
+                 **options):
+    using_input_fifos = reads != None or read_pairs != None
+    is_paired = R2_fn != None or read_pairs != None
+
+    if reads:
+        input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
+    elif read_pairs:
+        input_fifo_source = PairedTemporaryFifos()
+    else:
+        input_fifo_source = DoNothing()
+
+    if yield_unaligned:
+        if is_paired:
+            output_fifo_source = PairedTemporaryFifos()
+        else:
+            output_fifo_source = TemporaryFifo(name='unaligned_fifo.fastq')
+    elif yield_mappings:
+        output_fifo_source = TemporaryFifo(name='fifo.sam')
+    else:
+        output_fifo_source = DoNothing()
+    
+    with input_fifo_source, output_fifo_source:
+        if reads:
+            R1_fn = input_fifo_source.file_name
+            writer = ThreadFastqWriter(reads, R1_fn)
+        elif read_pairs:
+            R1_fn = input_fifo_source.R1_fn
+            R2_fn = input_fifo_source.R2_fn
+            writer = ThreadPairedFastqWriter(read_pairs, R1_fn, R2_fn)
+
+        if yield_unaligned:
+            if is_paired:
+                unal_template_fn = output_fifo_source.file_name_template
+                unal_R1_fn = output_fifo_source.R1_file_name
+                unal_R2_fn = output_fifo_source.R2_file_name
+                options['unaligned_pairs_file_name'] = unal_template_fn
+            else:
+                unal_R1_fn = output_fifo_source.file_name
+                options['unaligned_reads_file_name'] = unal_R1_fn
+        elif yield_mappings:
+            output_file_name = output_fifo_source.file_name
+
+        bowtie2_process = launch_bowtie2(index_prefix,
+                                         R1_fn,
+                                         R2_fn,
+                                         output_file_name,
+                                         error_file_name,
+                                         bam_output,
+                                         custom_binary,
+                                         **options)
+
+        if yield_unaligned:
+            if is_paired:
+                for read_pair in fastq.read_pairs(unal_R1_fn, unal_R2_fn):
+                    yield read_pair
+            else:
+                for read in fastq.reads(unal_R1_fn):
+                    yield read
+        elif yield_mappings:
+            sam_file = pysam.Samfile(output_file_name, 'r')
+            yield sam_file
+            for read in sam_file:
+                yield read
+
+        bowtie2_process.wait()
+        if bowtie2_process.returncode != 0:
+            raise subprocess.CalledProcessError(bowtie2_process.returncode,
+                                                bowtie2_command,
+                                               )
+        if bam_output:
+            sam.index_bam(output_file_name)
 
 def map_bowtie2(index_prefix,
-                R1_fn,
-                R2_fn,
-                output_file_name,
+                R1_fn=None,
+                R2_fn=None,
+                output_file_name=None,
+                bam_output=False,
                 error_file_name='/dev/null',
                 custom_binary=False,
-                bam_output=False,
-                unpaired_Reads=None,
-                paired_Reads=None,
+                reads=None,
+                read_pairs=None,
+                yield_mappings=False,
+                yield_unaligned=False,
                 **options):
-    if unpaired_Reads and paired_Reads:
+    if reads and read_pairs:
         raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
 
-    if paired_Reads and not custom_binary:
+    if read_pairs and not custom_binary:
         raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
 
-    using_input_fifos = (unpaired_Reads != None or paired_Reads != None)
-    is_paired = (R2_fn != None or paired_Reads != None)
+    if yield_unaligned and yield_mappings:
+        raise RuntimeError('Can\'t yield unaligned and mappings.')
 
-    try:
-        if using_input_fifos:
-            temp_input_dir, _, R1_fn, R2_fn = prep_fifos(is_paired)
-        
-        bowtie2_command = prep_bowtie2_command(index_prefix,
-                                               R1_fn,
-                                               R2_fn,
-                                               custom_binary,
-                                               **options)
+    if output_file_name == None and yield_mappings == False:
+        raise RuntimeError('Need to give output_file_name or yield_mappings')
 
-        last_process = launch_bowtie2_pipeline(bowtie2_command,
-                                               output_file_name,
-                                               error_file_name,
-                                               bam_output,
-                                              )
-
-        if using_input_fifos:
-            if not is_paired:
-                writer = ThreadWriter(R1_fn, unpaired_Reads)
-            else:
-                writer = PairedThreadWriter(R1_fn, R2_fn, paired_Reads)
-
-        last_process.wait()
-        if last_process.returncode != 0:
-            raise subprocess.CalledProcessError(bowtie2_command,
-                                                last_process.returncode,
-                                               )
-        if bam_output:
-            sam.index_bam(output_file_name)
-    finally:
-        if using_input_fifos:
-            cleanup_fifos(temp_input_dir, R1_fn, R2_fn)
-
-def map_bowtie2_yield_unaligned(index_prefix,
-                                R1_fn,
-                                R2_fn,
-                                output_file_name,
-                                error_file_name='/dev/null',
-                                custom_binary=False,
-                                bam_output=False,
-                                unpaired_Reads=None,
-                                paired_Reads=None,
-                                **options):
-    if unpaired_Reads and paired_Reads:
-        raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
-
-    if paired_Reads and not custom_binary:
-        raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
-
-    using_input_fifos = (unpaired_Reads != None or paired_Reads != None)
-    is_paired = (R2_fn != None or paired_Reads != None)
-
-    try:
-        if using_input_fifos:
-            temp_input_dir, _, R1_fn, R2_fn = prep_fifos(is_paired)
-        
-        temp_output_dir, unal_template_fn, unal_R1_fn, unal_R2_fn = prep_fifos(is_paired)
-        if not is_paired:
-            options['unaligned_reads_file_name'] = unal_R1_fn
-        else:
-            options['unaligned_pairs_file_name'] = unal_template_fn
-
-        bowtie2_command = prep_bowtie2_command(index_prefix,
-                                               R1_fn,
-                                               R2_fn,
-                                               custom_binary,
-                                               **options)
-
-        last_process = launch_bowtie2_pipeline(bowtie2_command,
-                                               output_file_name,
-                                               error_file_name,
-                                               bam_output,
-                                              )
-
-        if using_input_fifos:
-            if not is_paired:
-                writer = ThreadWriter(R1_fn, unpaired_Reads)
-            else:
-                writer = PairedThreadWriter(R1_fn, R2_fn, paired_Reads)
-
-        if not is_paired:
-            reader = ThreadReader(unal_R1_fn)
-            for read in reader.output():
-                yield read
-        else:
-            reader = PairedThreadReader(unal_R1_fn,
-                                        unal_R2_fn,
-                                       )
-            for read_pair in reader.output():
-                yield read_pair
-        
-        last_process.wait()
-        if last_process.returncode != 0:
-            raise subprocess.CalledProcessError(bowtie2_command,
-                                                last_process.returncode,
-                                               )
-        if bam_output:
-            sam.index_bam(output_file_name)
-    finally:
-        if using_input_fifos:
-            cleanup_fifos(temp_input_dir, R1_fn, R2_fn)
-
-        cleanup_fifos(temp_output_dir, unal_R1_fn, unal_R2_fn)
+    generator = _map_bowtie2(index_prefix,
+                             R1_fn=R1_fn,
+                             R2_fn=R2_fn,
+                             output_file_name=output_file_name,
+                             error_file_name=error_file_name,
+                             custom_binary=custom_binary,
+                             bam_output=bam_output,
+                             reads=reads,
+                             read_pairs=read_pairs,
+                             yield_mappings=yield_mappings,
+                             yield_unaligned=yield_unaligned,
+                             **options)
+    if yield_unaligned:
+        return generator
+    elif yield_mappings:
+        sam_file = generator.next()
+        return sam_file, generator
+    else:
+        # There isn't a real yield in generator, so calling next() is just
+        # executing the function.
+        try:
+            generator.next()
+        except StopIteration:
+            pass
 
 def map_tophat(reads_file_names,
                bowtie2_index,
@@ -412,6 +402,18 @@ def map_tophat(reads_file_names,
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
+            
+    # If there were no unmapped reads, tophat won't create a file. I want to be
+    # able to assume that one exists.
+    accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
+    unmapped_fn = '{0}/unmapped.bam'.format(tophat_dir)
+    if not os.path.exists(unmapped_fn):
+        template = pysam.Samfile(accepted_hits_fn)
+        empty_unmapped = pysam.Samfile(unmapped_fn, 'wb', template=template)
+        template.close()
+        empty_unmapped.close()
+
+    sam.index_bam(accepted_hits_fn)
 
 def map_tophat_paired(R1_fn,
                       R2_fn,
