@@ -142,7 +142,7 @@ class ThreadPairedFastqWriter(threading.Thread):
         self.start()
 
     def run(self):
-        with open(R1_fn, 'w') as R1_fh, open(R2_fn, 'w') as R2_fh:
+        with open(self.R1_fn, 'w') as R1_fh, open(self.R2_fn, 'w') as R2_fh:
             for R1, R2 in self.read_pairs:
                 R1_fh.write(str(R1))
                 R2_fh.write(str(R2))
@@ -280,8 +280,8 @@ def _map_bowtie2(index_prefix,
             R1_fn = input_fifo_source.file_name
             writer = ThreadFastqWriter(reads, R1_fn)
         elif read_pairs:
-            R1_fn = input_fifo_source.R1_fn
-            R2_fn = input_fifo_source.R2_fn
+            R1_fn = input_fifo_source.R1_file_name
+            R2_fn = input_fifo_source.R2_file_name
             writer = ThreadPairedFastqWriter(read_pairs, R1_fn, R2_fn)
 
         if yield_unaligned:
