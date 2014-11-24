@@ -20,7 +20,7 @@ def _sort_chunk(chunk, chunk_file_names):
             chunk_file.write(line)
 
 def external_sort(input_file, sorted_file, chunk_size=3e6):
-    ''' Writes the lines in file_handle in sorted order to sorted_file_name.
+    ''' Writes the lines in file_handle in sorted order to sorted_file.
         Never loads more than chunk_size lines into memory at the same time.
     '''
     chunk_file_names = []
