@@ -189,12 +189,12 @@ def contains_splicing_pysam(read):
 
 def contains_soft_clipping(parsed_line):
     cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
-    kinds = [k for l, k in cigar_blocks]
+    kinds = [k for k, l in cigar_blocks]
     return ('S' in kinds)
 
 def contains_soft_clipping_pysam(read):
-    kinds = [k for l, k in read.cigar]
-    return (4 in kinds)
+    kinds = [k for k, l in read.cigar]
+    return (BAM_CSOFT_CLIP in kinds)
 
 def cigar_blocks_to_string(cigar_blocks):
     """ Builds a CIGAR string out of a corresponding list of operations. """
