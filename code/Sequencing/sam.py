@@ -4,7 +4,7 @@ import utilities
 import re
 import subprocess
 from collections import Counter
-from itertools import izip
+from itertools import izip, chain
 import os
 import shutil
 import external_sort
@@ -41,64 +41,24 @@ def unmapped_aligned_read(qname):
 def splice_in_name(line, new_name):
     return '\t'.join([new_name] + line.split('\t')[1:])
 
-def count_header_lines(sam_file_name):
-    ''' Returns the total number of header lines in sam_file_name. '''
-    count = 0
-    with open(sam_file_name) as sam_file:
-        for line in sam_file:
-            if line.startswith('@'):
-                count += 1
-            else:
-                break
-    return count
-
-def get_header_lines(sam_file_name):
-    ''' Returns a list of all header lines in sam_file_name. '''
-    header_lines = []
-    with open(sam_file_name) as sam_file:
-        for line in sam_file:
-            if not line.startswith('@'):
-                break
-            else:
-                header_lines.append(line)
-    return header_lines
-
-def extract_seq_lengths(lines):
-    seq_lengths = {}
-    for line in lines:
-        if line.startswith('@SQ'):
-            split_line = line.split('\t')
-            
-            SN_tag = split_line[1]
-            seq_name = ':'.join(SN_tag.split(':')[1:])
-            
-            LN_tag = split_line[2]
-            seq_length = int(LN_tag.split(':')[1])
-            
-            seq_lengths[seq_name] = seq_length
+def open_to_reads(sam_line_source):
+    ''' Returns a list of header lines and an iterator over read lines. '''
+    if type(sam_line_source) == str:
+        all_lines = open(sam_line_source)
+    else:
+        all_lines = iter(sam_line_source)
     
-    return seq_lengths
+    header_lines = []
+    for line in all_lines:
+        if line.startswith('@'):
+            header_lines.append(line)
+        else:
+            first_read_line = [line]
+            break
 
-def get_sq_lines(sam_file_name):
-    ''' Returns a list of the SQ header lines in sam_file_name. '''
-    sq_lines = []
-    with open(sam_file_name) as sam_file:
-        for line in sam_file:
-            if not line.startswith('@'):
-                break
-            if line.startswith('@SQ'):
-                sq_lines.append(line)
-    return sq_lines
+    read_lines = chain(first_read_line, all_lines)
 
-def open_to_reads(sam_file_name):
-    ''' Returns an open file that has been advanced to the first read line in
-        sam_file_name (i.e. past all header lines.)
-    '''
-    header_line_count = count_header_lines(sam_file_name)
-    sam_file = open(sam_file_name)
-    for i in range(header_line_count):
-        sam_file.readline()
-    return sam_file
+    return header_lines, read_lines
 
 def mapped_reads(sam_file_name):
     ''' Returns an iterator over the lines of sam_file_name that correspond to
@@ -108,7 +68,7 @@ def mapped_reads(sam_file_name):
         parsed = parse_line(line)
         return parsed['mapped']
     
-    lines = open_to_reads(sam_file_name)
+    _, lines = open_to_reads(sam_file_name)
     mapped_lines = (line for line in lines if is_mapped(line))
     return mapped_lines
     
@@ -376,17 +336,17 @@ def line_groups(sam_file_name, key):
     ''' Yields (key value, list of consecutive lines from sam_file_name
         that are all transormed to key value).
     '''
-    sam_file = open_to_reads(sam_file_name)
+    _, sam_file = open_to_reads(sam_file_name)
     groups = utilities.group_by(sam_file, key)
     return groups
 
 def sort(input_file_name, output_file_name):
-    sq_lines = get_sq_lines(input_file_name)
-    input_file = open_to_reads(input_file_name)
+    header_lines, read_lines = open_to_reads(input_file_name)
     with open(output_file_name, 'w') as output_file:
-        for sq_line in sq_lines:
-            output_file.write(sq_line)
-        external_sort.external_sort(input_file, output_file)
+        for header_line in header_lines:
+            output_file.write(header_line)
+        
+        external_sort.external_sort(read_lines, output_file)
     
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     root, ext = os.path.splitext(output_file_name)
