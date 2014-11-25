@@ -4,6 +4,7 @@ import time
 import os
 import shutil
 import re
+import logging
 from . import split_file
 from . import launcher
 from Sequencing import Serialize
@@ -14,7 +15,8 @@ def extend_stages(whole_stages, specific_stages):
 
 class MapReduceExperiment(object):
     specific_results_files = [
-        ('log', Serialize.log, '{name}_log.txt')
+        ('summary', Serialize.log, '{name}_summary.txt'),
+        ('log', None, 'log.txt'),
     ]
     specific_figure_files = []
     specific_outputs = []
@@ -68,16 +70,21 @@ class MapReduceExperiment(object):
             extend_stages(self.cleanup, c.specific_cleanup)
     
         for stage in range(self.num_stages):
-            for kind in ['log_stage', 'timing']:
+            for kind in ['summary_stage', 'timing']:
                 key = '{0}_{1}'.format(kind, stage)
                 tail_template = '{{name}}_{0}_{1}.txt'.format(kind, stage)
                 self.results_files.append((key, Serialize.log, tail_template))
                 self.outputs[stage].append(key)
 
-        self.cleanup[-1].append('consolidate_logs')
+        self.cleanup[-1].append('consolidate_summaries')
 
         self.make_file_names()
-        self.log = []
+        self.summary = []
+
+        logging.basicConfig(filename=self.file_names['log'],
+                            level=logging.INFO,
+                            format='%(asctime)s %(message)s', 
+                           )
 
     @classmethod
     def from_description_file_name(cls, description_file_name, num_pieces=1, which_piece=-1):
@@ -103,10 +110,10 @@ class MapReduceExperiment(object):
         if self.which_piece == -1:
             self.file_names = self.merged_file_names
 
-    def consolidate_logs(self):
-        stage_file_names = [self.file_names['log_stage_{0}'.format(stage)]
+    def consolidate_summaries(self):
+        stage_file_names = [self.file_names['summary_stage_{0}'.format(stage)]
                             for stage in range(self.num_stages)]
-        Serialize.log.consolidate_stages(stage_file_names, self.file_names['log'])
+        Serialize.log.consolidate_stages(stage_file_names, self.file_names['summary'])
 
     def write_file(self, key, data):
         file_format = self.file_types[key]
@@ -124,15 +131,18 @@ class MapReduceExperiment(object):
         return data
 
     def do_work(self, stage):
+        logging.info('Beginning work for stage {0}'.format(stage))
+
         times = []
         for function_name in self.work[stage]:
+            logging.info('Starting function {0}'.format(function_name))
             start_time = time.time()
             self.__getattribute__(function_name)()
             end_time = time.time()
             times.append((function_name, end_time - start_time))
 
         self.write_file('timing_{0}'.format(stage), times)
-        self.write_file('log_stage_{0}'.format(stage), self.log)
+        self.write_file('summary_stage_{0}'.format(stage), self.summary)
 
     def do_cleanup(self, stage):
         times = []
@@ -306,8 +316,8 @@ def process(args, ExperimentClass):
     description = parse_description(description_file_name)
 
     experiment = ExperimentClass(num_pieces=args.num_pieces,
-                                             which_piece=args.which_piece,
-                                             **description)
+                                 which_piece=args.which_piece,
+                                 **description)
     experiment.do_work(args.stage)
 
 def finish(args, ExperimentClass):

@@ -14,7 +14,7 @@ def _write_pairs(pairs, log_file):
         else:
             to_string = '{:.2f}'.format
         value_string = ','.join(map(to_string, value))
-        log_file.write('{0}:{1}\n'.format(description, value_string))
+        log_file.write('{0}: {1}\n'.format(description, value_string))
 
 def write_file(pairs, log_file_name):
     with open(log_file_name, 'w') as log_file:
