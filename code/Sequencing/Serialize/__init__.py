@@ -36,6 +36,7 @@ def _merge_sam_files(input_file_names, merged_file_name, are_sorted=False):
                 shutil.copyfileobj(input_file, merged_file)
 
 special_mergers = {'bam': sam.merge_sorted_bam_files,
+                   'bam_by_name': partial(sam.merge_sorted_bam_files, by_name=True),
                    'sam_unsorted':  partial(_merge_sam_files, are_sorted=False),
                    'sam_sorted': partial(_merge_sam_files, are_sorted=True),
                    'fastq': _concatenate,
