@@ -41,13 +41,34 @@ def unmapped_aligned_read(qname):
 def splice_in_name(line, new_name):
     return '\t'.join([new_name] + line.split('\t')[1:])
 
-def open_to_reads(sam_line_source):
+def count_header_lines(sam_file_name):                                                                  
+    ''' Returns the total number of header lines in sam_file_name. '''                                  
+    count = 0                                                                                           
+    with open(sam_file_name) as sam_file:                                                               
+        for line in sam_file:                                                                           
+            if line.startswith('@'):                                                                    
+                count += 1                                                                              
+            else:                                                                                       
+                break                                                                                   
+    return count
+
+def open_to_reads(sam_file_name):                                                                       
+    ''' Returns an open file that has been advanced to the first read line in                           
+        sam_file_name (i.e. past all header lines.)                                                     
+    '''
+    header_line_count = count_header_lines(sam_file_name)
+    sam_file = open(sam_file_name)
+    for i in range(header_line_count):
+        sam_file.readline()
+    return sam_file
+
+def separate_header_and_read_lines(sam_line_source):
     ''' Returns a list of header lines and an iterator over read lines. '''
     if type(sam_line_source) == str:
         all_lines = open(sam_line_source)
     else:
         all_lines = iter(sam_line_source)
-    
+
     header_lines = []
     for line in all_lines:
         if line.startswith('@'):
@@ -68,7 +89,7 @@ def mapped_reads(sam_file_name):
         parsed = parse_line(line)
         return parsed['mapped']
     
-    _, lines = open_to_reads(sam_file_name)
+    lines = open_to_reads(sam_file_name)
     mapped_lines = (line for line in lines if is_mapped(line))
     return mapped_lines
     
@@ -141,11 +162,11 @@ def contains_indel(parsed_line):
 
 def contains_indel_pysam(read):
     kinds = [k for k, l in read.cigar]
-    return (1 in kinds or 2 in kinds)
+    return (BAM_CINS in kinds or BAM_CDEL in kinds)
 
 def contains_splicing_pysam(read):
     kinds = [k for k, l in read.cigar]
-    return (3 in kinds)
+    return (BAM_CREF_SKIP in kinds)
 
 def contains_soft_clipping(parsed_line):
     cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
@@ -336,12 +357,12 @@ def line_groups(sam_file_name, key):
     ''' Yields (key value, list of consecutive lines from sam_file_name
         that are all transormed to key value).
     '''
-    _, sam_file = open_to_reads(sam_file_name)
+    sam_file = open_to_reads(sam_file_name)
     groups = utilities.group_by(sam_file, key)
     return groups
 
 def sort(input_file_name, output_file_name):
-    header_lines, read_lines = open_to_reads(input_file_name)
+    header_lines, read_lines = separate_header_and_read_lines(input_file_name)
     with open(output_file_name, 'w') as output_file:
         for header_line in header_lines:
             output_file.write(header_line)
@@ -361,15 +382,20 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     samtools_process = subprocess.Popen(samtools_command)
     samtools_process.communicate()
 
-def merge_sorted_bam_files(input_file_names, merged_file_name):
+def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
     if len(input_file_names) == 1:
         shutil.copy(input_file_names[0], merged_file_name)
     else:
-        merge_command = ['samtools', 'merge', '-f', merged_file_name] + input_file_names
+        merge_command = ['samtools', 'merge', '-f']
+        if by_name:
+            merge_command.append('-n')
+        merge_command.extend([merged_file_name] + input_file_names)
         subprocess.check_call(merge_command)
-    index_bam(merged_file_name)
+    
+    if not by_name:
+        index_bam(merged_file_name)
 
-def make_sorted_bam(sam_file_name, bam_file_name):
+def sam_to_sorted_bam(sam_file_name, bam_file_name):
     bam_command = ['samtools', 'view', '-ubh', sam_file_name]
     sort_command = ['samtools', 'sort', '-T', bam_file_name, '-o', bam_file_name, '-']
     bam_process = subprocess.Popen(bam_command,
@@ -384,18 +410,21 @@ def make_sorted_bam(sam_file_name, bam_file_name):
     _, err_output = bam_process.communicate()
     if bam_process.returncode:
         raise RuntimeError(err_output)
+    
+    index_bam(bam_file_name)
+
+def bam_to_sorted_bam(input_file_name, sorted_file_name):
+    sort_command = ['samtools', 'sort', '-T', sorted_file_name, '-o', sorted_file_name, input_file_name]
+    subprocess.check_call(sort_command)
+    index_bam(sorted_file_name)
 
 def bam_to_sam(bam_file_name, sam_file_name):
-    view_command = ['samtools', 'view', '-o', sam_file_name, bam_file_name]
+    view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
     subprocess.check_call(view_command)
 
 def index_bam(bam_file_name):
     samtools_command = ['samtools', 'index', bam_file_name]
     subprocess.check_call(samtools_command)
-
-def make_sorted_indexed_bam(sam_file_name, bam_file_name):
-    make_sorted_bam(sam_file_name, bam_file_name)
-    index_bam(bam_file_name)
 
 def get_length_counts(bam_file_name, only_primary=True):
     bam_file = pysam.Samfile(bam_file_name)
