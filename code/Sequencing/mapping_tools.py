@@ -1,6 +1,7 @@
 import os
 import tempfile
-import subprocess
+import logging
+import subprocess32 as subprocess
 import threading
 import Queue
 from Sequencing import fastq
@@ -97,6 +98,9 @@ class TemporaryFifo(object):
         os.rmdir(self.temp_dir)
 
 class PairedTemporaryFifos(object):
+    def __init__(self, name='fifo'):
+        self.name = name
+
     def __enter__(self):
         self.temp_dir = tempfile.mkdtemp()
         
@@ -106,7 +110,7 @@ class PairedTemporaryFifos(object):
             os.rmdir(self.temp_dir)
             self.temp_dir = tempfile.mkdtemp()
         
-        self.file_name_template = '{0}/R%_fifo.fastq'.format(self.temp_dir)
+        self.file_name_template = '{0}/R%_{1}.fastq'.format(self.temp_dir, self.name)
 
         self.R1_file_name = self.file_name_template.replace('%', '1')
         os.mkfifo(self.R1_file_name)
@@ -241,7 +245,7 @@ def launch_bowtie2(index_prefix,
         view_process.stdout.close()
         process_to_return = sort_process
 
-    return process_to_return
+    return process_to_return, bowtie2_command
 
 def _map_bowtie2(index_prefix,
                  R1_fn,
@@ -261,17 +265,17 @@ def _map_bowtie2(index_prefix,
     if reads:
         input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
     elif read_pairs:
-        input_fifo_source = PairedTemporaryFifos()
+        input_fifo_source = PairedTemporaryFifos(name='input')
     else:
         input_fifo_source = DoNothing()
 
     if yield_unaligned:
         if is_paired:
-            output_fifo_source = PairedTemporaryFifos()
+            output_fifo_source = PairedTemporaryFifos(name='unaligned')
         else:
-            output_fifo_source = TemporaryFifo(name='unaligned_fifo.fastq')
+            output_fifo_source = TemporaryFifo(name='unaligned.fastq')
     elif yield_mappings:
-        output_fifo_source = TemporaryFifo(name='fifo.sam')
+        output_fifo_source = TemporaryFifo(name='output_fifo.sam')
     else:
         output_fifo_source = DoNothing()
     
@@ -296,14 +300,14 @@ def _map_bowtie2(index_prefix,
         elif yield_mappings:
             output_file_name = output_fifo_source.file_name
 
-        bowtie2_process = launch_bowtie2(index_prefix,
-                                         R1_fn,
-                                         R2_fn,
-                                         output_file_name,
-                                         error_file_name,
-                                         bam_output,
-                                         custom_binary,
-                                         **options)
+        bowtie2_process, bowtie2_command = launch_bowtie2(index_prefix,
+                                                          R1_fn,
+                                                          R2_fn,
+                                                          output_file_name,
+                                                          error_file_name,
+                                                          bam_output,
+                                                          custom_binary,
+                                                          **options)
 
         if yield_unaligned:
             if is_paired:
@@ -341,15 +345,18 @@ def map_bowtie2(index_prefix,
     if reads and read_pairs:
         raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
 
-    if read_pairs and not custom_binary:
-        raise RuntimeError('Can\'t used named pipes for paired Reads without custom binary because of buffer size mismatch')
-
     if yield_unaligned and yield_mappings:
         raise RuntimeError('Can\'t yield unaligned and mappings.')
 
     if output_file_name == None and yield_mappings == False:
         raise RuntimeError('Need to give output_file_name or yield_mappings')
+    
+    if read_pairs:
+        # Can't used named pipes for paired Reads without custom binary because
+        # of buffer size mismatch.
+        custom_binary = True
 
+    logging.info('About to get generator for {0}'.format(index_prefix))
     generator = _map_bowtie2(index_prefix,
                              R1_fn=R1_fn,
                              R2_fn=R2_fn,
