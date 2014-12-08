@@ -2,7 +2,7 @@
 
 import utilities
 import re
-import subprocess
+import subprocess32 as subprocess
 from collections import Counter
 from itertools import izip, chain
 import os
@@ -10,6 +10,8 @@ import shutil
 import external_sort
 import pysam
 import fastq
+import mapping_tools
+import logging
 
 BAM_CMATCH = 0 # M
 BAM_CINS = 1 # I
@@ -21,7 +23,39 @@ BAM_CPAD = 6 # P
 BAM_CEQUAL = 7 # =
 BAM_CDIFF = 8 # X
 
+op_to_char = {BAM_CMATCH: 'M',
+              BAM_CINS: 'I',
+              BAM_CDEL: 'D',
+              BAM_CREF_SKIP: 'N',
+              BAM_CSOFT_CLIP: 'S',
+              BAM_CHARD_CLIP: 'H',
+              BAM_CPAD: 'P',
+              BAM_CEQUAL: '=',
+              BAM_CDIFF: 'X',
+             }
+
+read_consuming_ops = {BAM_CMATCH,
+                      BAM_CINS,
+                      BAM_CSOFT_CLIP,
+                      BAM_CEQUAL,
+                      BAM_CDIFF,
+                     }
+
+ref_consuming_ops = {BAM_CMATCH,
+                     BAM_CDEL,
+                     BAM_CEQUAL,
+                     BAM_CDIFF,
+                     BAM_CREF_SKIP,
+                    }
+
 _unmapped_template = '{0}\t4\t*\t0\t0\t*\t*\t0\t0\t*\t*\n'.format
+
+def get_strand(mapping):
+    if mapping.is_reverse:
+        strand = '-'
+    else:
+        strand = '+'
+    return strand
 
 def unmapped_aligned_read(qname):
     aligned_read = pysam.AlignedRead()
@@ -41,16 +75,23 @@ def unmapped_aligned_read(qname):
 def splice_in_name(line, new_name):
     return '\t'.join([new_name] + line.split('\t')[1:])
 
-def count_header_lines(sam_file_name):                                                                  
-    ''' Returns the total number of header lines in sam_file_name. '''                                  
-    count = 0                                                                                           
+def get_header_lines(sam_file_name):                                                                  
+    ''' Returns the header lines in sam_file_name. '''                                  
+    
+    header_lines = []
+    
     with open(sam_file_name) as sam_file:                                                               
         for line in sam_file:                                                                           
             if line.startswith('@'):                                                                    
-                count += 1                                                                              
+                header_lines.append(line)
             else:                                                                                       
                 break                                                                                   
-    return count
+    
+    return header_lines
+
+def count_header_lines(sam_file_name):                                                                  
+    ''' Returns the total number of header lines in sam_file_name. '''                                  
+    return len(get_header_lines(sam_file_name))
 
 def open_to_reads(sam_file_name):                                                                       
     ''' Returns an open file that has been advanced to the first read line in                           
@@ -144,16 +185,15 @@ def parse_line(line):
 
 cigar_block = re.compile(r'(\d+)([MIDNSHP=X])')
 
-md_number = re.compile(r'[0-9]+')
-md_text = re.compile(r'[A-Z]+')
-
 def cigar_string_to_blocks(cigar_string):
     """ Decomposes a CIGAR string into a list of its operations. """
-    return [(int(l), k) for l, k in re.findall(cigar_block, cigar_string)]
+    return [(int(l), k) for l, k in cigar_block.findall(cigar_string)]
 
-def total_reference_nucs(cigar_blocks):
-    """ Returns the number of nucleotides from the reference involved in a list of CIGAR operations. """
-    return sum(l for l, k in cigar_blocks if k in ['M', '=', 'X', 'D'])
+def total_reference_nucs(cigar):
+    return sum(length for op, length in cigar if op in ref_consuming_ops)
+
+def total_read_nucs(cigar):
+    return sum(length for op, length in cigar if op in read_consuming_ops)
 
 def contains_indel(parsed_line):
     cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
@@ -198,23 +238,119 @@ def alignment_to_cigar_blocks(ref_aligned, read_aligned):
     sequence, counts = utilities.decompose_homopolymer_sequence(expanded_sequence)
     return [[count, char] for char, count in zip(sequence, counts)]
 
-def truncate_cigar_blocks(cigar_blocks, truncated_length):
+def aligned_pairs_to_cigar(aligned_pairs):
+    op_sequence = []
+    for read, ref in aligned_pairs:
+        if read == None:
+            op_sequence.append(BAM_CDEL)
+        elif ref == None:
+            op_sequence.append(BAM_CINS)
+        else:
+            op_sequence.append(BAM_CMATCH)
+
+    cigar = [(op, len(times)) for op, times in utilities.group_by(op_sequence)]
+
+    return cigar
+
+def cigar_to_aligned_pairs(cigar, start):
+    aligned_pairs = []
+
+    ref_pos = start
+    read_pos = 0
+    for op, length in cigar:
+        if op == BAM_CMATCH or op == BAM_CEQUAL or op == BAM_CDIFF:
+            for i in range(length):
+                aligned_pairs.append((read_pos, ref_pos))
+
+                ref_pos += 1
+                read_pos += 1
+
+        elif op == BAM_CDEL:
+            # Deletion results in gap in read
+            for i in range(length):
+                aligned_pairs.append((None, ref_pos))
+                
+                ref_pos += 1
+
+        elif op == BAM_CINS:
+            # Insertion results in gap in ref
+            for i in range(length):
+                aligned_pairs.append((read_pos, None))
+
+                read_pos += 1
+
+        else:
+            raise ValueError('Unsupported op', cigar)
+
+    return aligned_pairs
+
+def cigar_to_aligned_pairs_backwards(cigar, end, read_length):
+    aligned_pairs = []
+
+    ref_pos = end
+    read_pos = read_length - 1
+    for op, length in cigar[::-1]:
+        if op == BAM_CMATCH or op == BAM_CEQUAL or op == BAM_CDIFF:
+            for i in range(length):
+                aligned_pairs.append((read_pos, ref_pos))
+
+                ref_pos -= 1
+                read_pos -= 1
+
+        elif op == BAM_CDEL:
+            # Deletion results in gap in read
+            for i in range(length):
+                aligned_pairs.append((None, ref_pos))
+                
+                ref_pos -= 1
+
+        elif op == BAM_CINS:
+            # Insertion results in gap in ref
+            for i in range(length):
+                aligned_pairs.append((read_pos, None))
+
+                read_pos -= 1
+
+        else:
+            raise ValueError('Unsupported op', cigar)
+
+    return aligned_pairs
+
+def truncate_cigar_blocks_up_to(cigar_blocks, truncated_length):
     ''' Given pysam-style cigar_blocks, truncates the blocks to explain
         truncated_length read bases.
     '''
     bases_so_far = 0
     truncated_blocks = []
 
-    consuming_operation = set([0, 1, 7, 8])
     for operation, length in cigar_blocks:
-        if bases_so_far == truncated_length:
+        # If the next block wouldn't consume anything, we want to include it.
+        if bases_so_far == truncated_length and operation in read_consuming_ops:
             break
-        if operation in consuming_operation:
+
+        if operation in read_consuming_ops:
             length_to_use = min(truncated_length - bases_so_far, length)
             bases_so_far += length_to_use
         else:
             length_to_use = length
+
         truncated_blocks.append((operation, length_to_use))
+
+        # If we didn't use the whole block, need to break because the next loop
+        # will try to use the next block if it is non-consuming.
+        if length_to_use < length:
+            break
+
+    return truncated_blocks
+
+def truncate_cigar_blocks_from_beginning(cigar_blocks, truncated_length):
+    ''' Removes cigar operations from the beginning of cigar_blocks so that
+    truncated_length total read bases remain accounted for.
+    '''
+    flipped_truncated_blocks = truncate_cigar_blocks_up_to(cigar_blocks[::-1],
+                                                           truncated_length,
+                                                          )
+    truncated_blocks = flipped_truncated_blocks[::-1]
     return truncated_blocks
 
 def alignment_to_cigar_string(ref_aligned, read_aligned):
@@ -222,11 +358,15 @@ def alignment_to_cigar_string(ref_aligned, read_aligned):
     cigar_blocks = alignment_to_cigar_blocks(ref_aligned, read_aligned)
     return cigar_blocks_to_string(cigar_blocks)
 
+md_number = re.compile(r'[0-9]+')
+md_text = re.compile(r'[A-Z]+')
+
 def md_string_to_ops_string(md_string):
     ''' Converts an MD string into a list of operations for supplying reference
         characters, either '=' if equal to the read, or any other char if equal
         to that char.
     '''
+    # In the presence of a CIGAR string, the '^' character seems extraneous.
     md_string = md_string.translate(None, '^')
     
     match_lengths = map(int, re.findall(md_number, md_string))
@@ -239,66 +379,259 @@ def md_string_to_ops_string(md_string):
     
     return ops_string
 
-def produce_alignment(parsed_sam_line, from_pysam=False):
+def md_string_to_ops_string(md_string):
+    ''' Converts an MD string into a list of operations for supplying reference
+        characters, either '=' if equal to the read, or any other char if equal
+        to that char.
+    '''
+    # In the presence of a CIGAR string, the '^' character seems extraneous.
+    md_string = md_string.translate(None, '^')
+    
+    match_lengths = map(int, re.findall(md_number, md_string))
+    text_blocks = re.findall(md_text, md_string)
+    
+    # The standard calls for a number to start and end, zero if necessary,
+    # so after removing the initial number, there must be the same number of 
+    # match_lengths and text_blocks.
+    if len(text_blocks) != len(match_lengths) - 1:
+        raise ValueError(md_string)
+    
+    ops_string = '='*match_lengths[0]
+    for text_block, match_length in zip(text_blocks, match_lengths[1:]):
+        ops_string += text_block
+        ops_string += '='*match_length
+    
+    return ops_string
+
+md_item_pattern = re.compile(r'[0-9]+|[TCAGN^]+')
+
+def int_if_possible(string):
+    try:
+        int_value = int(string)
+        return int_value
+    except ValueError:
+        return string
+
+def md_string_to_items(md_string):
+    items = [int_if_possible(item) for item in md_item_pattern.findall(md_string)]
+    return items
+
+def md_items_to_md_string(items):
+    string = ''.join(str(item) for item in items)
+    return string
+
+def reverse_md_items(items):
+    reversed_items = []
+    for item in items[::-1]:
+        if isinstance(item, int):
+            reversed_items.append(item)
+        else:
+            if item.startswith('^'):
+                reversed_items.append('^' + item[:0:-1])
+            else:
+                reversed_items.append(item[::-1])
+    return reversed_items
+
+def truncate_md_items(md_items, truncated_length):
+    if truncated_length == 0:
+        truncated_items = [0]
+    else:
+        bases_so_far = 0
+        truncated_items = []
+
+        for item in md_items:
+            if bases_so_far == truncated_length:
+                break
+
+            if isinstance(item, int):
+                length_to_use = min(truncated_length - bases_so_far, item)
+                bases_so_far += length_to_use
+                truncated_items.append(length_to_use)
+            else:
+                if item.startswith('^'):
+                    truncated_item = ['^']
+                    item = item[1:]
+                else:
+                    truncated_item = []
+
+                for c in item:
+                    if c == '^':
+                        raise ValueError
+                    
+                    if bases_so_far == truncated_length:
+                        break
+
+                    truncated_item.append(c)
+                    bases_so_far += 1
+
+                truncated_items.append(''.join(truncated_item))
+
+        # Ensure that it starts and ends with a number
+        if not isinstance(truncated_items[0], int):
+            truncated_items = [0] + truncated_items
+        if not isinstance(truncated_items[-1], int):
+            truncated_items = truncated_items + [0]
+
+    return truncated_items
+
+def combine_md_strings(first_string, second_string):
+    if first_string == '':
+        return second_string
+    if second_string == '':
+        return first_string
+
+    first_items = md_string_to_items(first_string)
+    second_items = md_string_to_items(second_string)
+    before = first_items[:-1]
+    after = second_items[1:]
+
+    if isinstance(first_items[-1], int):
+        if isinstance(second_items[0], int):
+            interface = [first_items[-1] + second_items[0]]
+        else:
+            interface = [first_items[-1], second_items[0]]
+    else:
+        if isinstance(second_items[0], int):
+            interface = [first_items[-1], second_items[0]]
+        else:
+            if first_items[-1].startswith('^'):
+                if second_items[0].startswith('^'):
+                    interface = [first_items[-1] + second_items[0][1:]]
+                else:
+                    interface = [first_items[-1], 0, second_items[0]]
+            else:
+                if second_items[0].startswith('^'):
+                    interface = [first_items[-1], 0, second_items[0]]
+                else:
+                    interface = [first_items[-1] + second_items[0]]
+
+    combined_items = before + interface + after
+
+    combined_string = md_items_to_md_string(combined_items)
+    
+    return combined_string
+
+def truncate_md_string_up_to(md_string, truncated_length):
+    ''' Truncates from the end of md_string so that the result only consumes
+    truncated_length ref characters.
+    '''
+    md_items = md_string_to_items(md_string)
+    truncated_items = truncate_md_items(md_items, truncated_length)
+    return md_items_to_md_string(truncated_items)
+
+def truncate_md_string_from_beginning(md_string, truncated_length):
+    ''' Truncates from the beginning of md_string so that the result only
+    consumes truncated_length ref characters.
+    '''
+    md_items = md_string_to_items(md_string)
+    reversed_items = reverse_md_items(md_items)
+    reversed_truncated_items = truncate_md_items(reversed_items, truncated_length)
+    truncated_items = reverse_md_items(reversed_truncated_items)
+    return md_items_to_md_string(truncated_items)
+    
+def produce_alignment(mapping):
     ''' Returns a list of (ref_char, read_char, qual_char, ref_pos, read_pos)
         tuples.
     '''
-    if from_pysam:
-        read_seq = parsed_sam_line.seq
-        read_quals = parsed_sam_line.qual
-        MD_string = dict(parsed_sam_line.tags)['MD']
-        CIGAR_string = parsed_sam_line.cigarstring
-        POS = parsed_sam_line.pos
-    else:
-        read_seq = parsed_sam_line['SEQ']
-        read_quals = parsed_sam_line['QUAL']
-        MD_string = parsed_sam_line['MD']
-        CIGAR_string = parsed_sam_line['CIGAR']
-        POS = parsed_sam_line['POS']
+    read_seq = mapping.seq
+    if read_seq == None:
+        read_seq = ''
     
-    columns = []
-    read_seq_iter = iter(read_seq)
-    read_quals_iter = iter(fastq.decode_sanger(read_quals))
+    read_quals = mapping.qual
+    if read_quals == None:
+        read_quals = ''
+    
+    MD_string = dict(mapping.tags)['MD']
+    
+    read_quals = fastq.decode_sanger(read_quals)
 
     ref_ops = iter(md_string_to_ops_string(MD_string))
-    cigar_blocks = cigar_string_to_blocks(CIGAR_string)
+    
+    columns = []
 
-    ref_pos = POS
+    ref_pos = mapping.pos
     read_pos = 0
-    for (length, kind) in cigar_blocks:
-        if kind == 'M' or kind == '=' or kind == 'X':
+    for op, length in mapping.cigar:
+        if op == BAM_CMATCH or op == BAM_CEQUAL or op == BAM_CDIFF:
             for i in range(length):
-                read_char = read_seq_iter.next()
+                read_char = read_seq[read_pos]
+                
                 ref_op = ref_ops.next()
                 if ref_op == '=':
                     ref_char = read_char
                 else:
                     ref_char = ref_op
-                qual = read_quals_iter.next()
+                
+                qual = read_quals[read_pos]
+                
                 column = (ref_char, read_char, qual, ref_pos, read_pos)
                 columns.append(column)
+
                 ref_pos += 1
                 read_pos += 1
-        elif kind == 'D':
+
+        elif op == BAM_CDEL:
             # Deletion results in gap in read
             for i in range(length):
                 read_char = '-'
                 ref_char = ref_ops.next()
                 qual = 0 
+                
                 column = (ref_char, read_char, qual, ref_pos, read_pos)
                 columns.append(column)
+                
                 ref_pos += 1
-        elif kind == 'I' or kind == 'S':
-            # Insertion or soft-clipping results in gap in ref
+
+        elif op == BAM_CINS:
+            # Insertion results in gap in ref
             for i in range(length):
-                read_char = read_seq_iter.next()
+                read_char = read_seq[read_pos]
                 ref_char = '-'
-                qual = read_quals_iter.next()
+                qual = read_quals[read_pos]
                 column = (ref_char, read_char, qual, ref_pos, read_pos)
                 columns.append(column)
+
                 read_pos += 1
+
+        elif op == BAM_CREF_SKIP:
+            ref_pos += length
+
+        elif op == BAM_CSOFT_CLIP:
+            read_pos += length
     
     return columns
+
+def ref_dict_from_mapping(mapping):
+    ''' Build a dictionary mapping reference positions to base identities from
+    the cigar and MD tag of a mapping.
+    '''
+    alignment = produce_alignment(mapping)
+    ref_dict = {}
+    for ref_char, _, _, ref_position, _ in alignment:
+        if ref_char == '-':
+            continue
+
+        if ref_position in ref_dict:
+            # A ref_position shouldn't appear more than once
+            raise ValueError(mapping)
+
+        ref_dict[ref_position] = ref_char
+
+    return ref_dict
+
+def merge_ref_dicts(first_dict, second_dict):
+    ''' Merge dictionaries mapping reference positions to base identities. '''
+    merged_dict = {}
+    merged_dict.update(first_dict)
+    for position, base in second_dict.items():
+        if position in merged_dict:
+            if merged_dict[position] != base:
+                # contradiction
+                raise ValueError(first_dict, second_dict)
+        else:
+            merged_dict[position] = base
+
+    return merged_dict
 
 def alignment_to_MD_string(ref_aligned, read_aligned):
     ''' Produce an MD string from an alignment. '''
@@ -457,3 +790,47 @@ def sam_to_fastq(sam_file_name):
         yield read
 
 bam_to_fastq = sam_to_fastq
+
+class AlignmentSorter(object):
+    ''' Context manager that handles writing AlignedSegments into a samtools
+    sort process.
+    '''
+    def __init__(self,
+                 reference_names,
+                 reference_lengths,
+                 output_file_name,
+                 by_name=False,
+                ):
+        self.reference_names = reference_names
+        self.reference_lengths = reference_lengths
+        self.output_file_name = output_file_name
+        self.by_name = by_name
+        self.fifo = mapping_tools.TemporaryFifo(name='unsorted_fifo.bam')
+
+    def __enter__(self):
+        self.fifo.__enter__()
+        sort_command = ['samtools', 'sort']
+        if self.by_name:
+            sort_command.append('-n')
+
+        sort_command.extend(['-T', self.output_file_name,
+                             '-o', self.output_file_name,
+                             self.fifo.file_name,
+                            ])
+        self.sort_process = subprocess.Popen(sort_command)
+
+        self.sam_file = pysam.Samfile(self.fifo.file_name,
+                                      'wbu',
+                                      referencenames=self.reference_names,
+                                      referencelengths=self.reference_lengths
+                                     )
+
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.sam_file.close()
+        self.sort_process.wait()
+        self.fifo.__exit__(exception_type, exception_value, exception_traceback)
+
+    def write(self, alignment):
+        self.sam_file.write(alignment)
