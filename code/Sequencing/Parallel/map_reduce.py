@@ -81,9 +81,16 @@ class MapReduceExperiment(object):
         self.make_file_names()
         self.summary = []
 
+        if self.which_piece == -1:
+            piece_string = ' '
+        else:
+            piece_string = ' {0:{length}} / {1} '.format(self.which_piece, self.num_pieces, length=len(str(self.num_pieces)))
+
+        format_string = '%(asctime)s{0}%(message)s'.format(piece_string)
+
         logging.basicConfig(filename=self.file_names['log'],
                             level=logging.INFO,
-                            format='%(asctime)s %(message)s', 
+                            format=format_string, 
                            )
 
     @classmethod
