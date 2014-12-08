@@ -4,8 +4,8 @@ import logging
 import subprocess32 as subprocess
 import threading
 import Queue
-from Sequencing import fastq
-from Sequencing import sam
+import fastq
+import sam
 import pysam
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
@@ -356,7 +356,6 @@ def map_bowtie2(index_prefix,
         # of buffer size mismatch.
         custom_binary = True
 
-    logging.info('About to get generator for {0}'.format(index_prefix))
     generator = _map_bowtie2(index_prefix,
                              R1_fn=R1_fn,
                              R2_fn=R2_fn,
