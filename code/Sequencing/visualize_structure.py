@@ -64,6 +64,7 @@ def produce_bowtie2_alignments(reads,
     mapping_groups = utilities.group_by(mappings, lambda m: m.qname)
     
     for qname, group in mapping_groups:
+        group = sorted(group, key=lambda m: (m.tid, m.pos))
         alignments = [mapping_to_alignment(mapping, sam_file, region_fetcher)
                       for mapping in group if not mapping.is_unmapped]
         yield qname, alignments
