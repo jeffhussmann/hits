@@ -126,14 +126,14 @@ class MapReduceExperiment(object):
         file_format = self.file_types[key]
         file_format.write_file(data, self.file_names[key])
 
-    def read_file(self, key, merged=False):
+    def read_file(self, key, merged=False, **kwargs):
         if merged == False:
             file_name = self.file_names[key]
         else:
             file_name = self.merged_file_names[key]
         
         file_format = self.file_types[key]
-        data = file_format.read_file(file_name)
+        data = file_format.read_file(file_name, **kwargs)
 
         return data
 
@@ -344,10 +344,6 @@ def finish(args, ExperimentClass):
         piece_file_names = [piece.file_names[key] for piece in pieces]
         merged_file_name = merged.merged_file_names[key]
 
-        # WARNING: continue is sometimes uncommented here to suppress
-        # merging. This could cause extreme headaches if left uncommented
-        # accidentally.
-        #continue
         start_time = time.time()
         Serialize.merge_files(piece_file_names,
                               merged_file_name,
