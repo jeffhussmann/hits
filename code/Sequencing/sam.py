@@ -12,6 +12,7 @@ import pysam
 import fastq
 import mapping_tools
 import logging
+import heapq
 
 BAM_CMATCH = 0 # M
 BAM_CINS = 1 # I
