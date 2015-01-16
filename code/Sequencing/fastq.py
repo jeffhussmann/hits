@@ -39,6 +39,20 @@ for q in range(-5, MAX_EXPECTED_QUAL + 1):
 def solexa_to_sanger(qual):
     return ''.join(_solexa_to_sanger_table[c] for c in qual)
 
+# If a qname for a paired mapping ends in '/1', '/2', or '/3', bowtie2 chops off
+# the last two characters of the qname. If qual strings of trimmed portions of
+# reads are to be put in qnames, '/' needs to be downgraded to
+# chr(ord('/') - 1). 
+# '_' is used as a field separator in annotations, so similarly needs to be
+# downgraded to chr(ord('_') - 1).
+_chars_to_sanitize = '/_'
+_sanitized_chars = ''.join(chr(ord(c) - 1) for c in _chars_to_sanitize)
+_sanitize_table = string.maketrans(_chars_to_sanitize, _sanitized_chars)
+
+def sanitize_qual(qual):
+    sanitized = qual.translate(_sanitize_table)
+    return sanitized
+
 def quality_and_complexity(reads, max_read_length):
     q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
     c_array = np.zeros((max_read_length, 256), int)
