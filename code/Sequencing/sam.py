@@ -834,3 +834,17 @@ class AlignmentSorter(object):
 
     def write(self, alignment):
         self.sam_file.write(alignment)
+
+def merge_by_name(*mapping_iterators):
+    ''' Merges iterators over mappings that are sorted by name. Use case is to
+    combine accepted_hits.bam and unmapped.bam from tophat output.
+    '''
+    wrapped_iterators = [((m.qname, m) for m in mappings) for mappings in mapping_iterators]
+    merged_wrapped = heapq.merge(*wrapped_iterators)
+    last_qname = None
+    for (qname, mapping) in merged_wrapped:
+        if last_qname and qname < last_qname:
+            raise ValueError('Attempted to merge unsorted mapping iterators')
+
+        last_qname = qname
+        yield mapping
