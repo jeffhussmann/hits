@@ -342,6 +342,7 @@ def map_bowtie2(index_prefix,
                 yield_mappings=False,
                 yield_unaligned=False,
                 **options):
+
     if reads and read_pairs:
         raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
 
@@ -419,7 +420,8 @@ def map_tophat(reads_file_names,
         template.close()
         empty_unmapped.close()
 
-    sam.index_bam(accepted_hits_fn)
+    if not no_sort:
+        sam.index_bam(accepted_hits_fn)
 
 def map_tophat_paired(R1_fn,
                       R2_fn,
