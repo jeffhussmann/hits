@@ -235,7 +235,7 @@ def get_read_name_standardizer(read_name):
 
     return standardizer
 
-_standardize = '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}:{4:0>1.1s}'.format
+_standardize = '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}'.format
 _standardize_SRA = '{0:0>9.9s}:{1:0>10.10s}'.format
 _standardize_paired_SRA = '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}'.format
 
