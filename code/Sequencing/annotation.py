@@ -36,16 +36,22 @@ def Annotation_factory(fields, read_only=False, **kwargs):
         def identifier(self):
             return template(**self)
 
+        def __str__(self):
+            return template(**self)
+
     return Annotation
 
 def make_convertor(encoded_as, convert_to):
-    ''' Returns a function that takes a SAM line, interprets the QNAME field as
-        an identifier for an encoded_as Annotation, and converts this to a
-        convert_to Annotation.
+    ''' Returns a function that takes a SAM line or AlignedSegment, interprets
+        the QNAME field as an identifier for an encoded_as Annotation, and
+        converts this to a convert_to Annotation.
     '''
     def converter(line):
-        QNAME, rest = line.split('\t', 1)
-        encoded = encoded_as.from_identifier(QNAME)
+        if isinstance(line, str): 
+            qname = line.split('\t')[0]
+        else:
+            qname = line.qname
+        encoded = encoded_as.from_identifier(qname)
         converted = convert_to.from_annotation(encoded)
         return converted
 
