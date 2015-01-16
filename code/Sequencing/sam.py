@@ -204,7 +204,7 @@ def contains_indel_pysam(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CINS in kinds or BAM_CDEL in kinds)
 
-def contains_splicing_pysam(read):
+def contains_splicing(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CREF_SKIP in kinds)
 
