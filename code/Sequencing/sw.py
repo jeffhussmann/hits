@@ -162,22 +162,23 @@ def generate_alignments(query,
                                 )
     cells_seen = set()
     if force_edge_end:
-        possible_ends = propose_edge_ends(matrices['score'], cells_seen, min_score)
+        possible_ends = propose_edge_ends(matrices['scores'], cells_seen, min_score)
     else:
-        possible_ends = propose_all_ends(matrices['score'], cells_seen, min_score)
+        possible_ends = propose_all_ends(matrices['scores'], cells_seen, min_score)
 
     alignments = []
-    for possible_end in possible_ends:
+    for end_row, end_col in possible_ends:
         #print possible_end, matrices['score'][possible_end],
-        alignment = backtrack(query,
-                              target,
-                              matrices,
-                              cells_seen,
-                              possible_end,
-                              force_query_start,
-                              force_target_start,
-                              force_either_start,
-                             )
+        alignment = backtrack_cython(query,
+                                     target,
+                                     matrices,
+                                     cells_seen,
+                                     end_row,
+                                     end_col,
+                                     force_query_start,
+                                     force_target_start,
+                                     force_either_start,
+                                    )
         if alignment != None:
             alignments.append(alignment)
             #print alignment['path']
@@ -190,15 +191,30 @@ def generate_alignments(query,
 
     return alignments
 
-def propose_edge_ends(score_matrix, cells_seen, min_score=None):
+def propose_edge_ends(score_matrix,
+                      cells_seen,
+                      min_score=None,
+                      max_alignments=1,
+                     ):
     num_rows, num_cols = score_matrix.shape
-    right_edge = [(i, num_cols - 1) for i in range(num_rows)]
-    bottom_edge = [(num_rows - 1, i) for i in range(num_cols)]
-    edge_cells = right_edge + bottom_edge
-    sorted_edge_cells = sorted(edge_cells,
-                               key=lambda cell: score_matrix[cell],
-                               reverse=True,
-                              )
+    if max_alignments == 1:
+        max_row = np.argmax(score_matrix[:, num_cols - 1])
+        max_row_score = score_matrix[max_row, num_cols -1]
+        max_col = np.argmax(score_matrix[num_rows - 1, :])
+        max_col_score = score_matrix[num_rows - 1, max_col]
+        if max_row_score > max_col_score:
+            sorted_edge_cells = [(max_row, num_cols - 1)]
+        else:
+            sorted_edge_cells = [(num_rows - 1, max_col)]
+    else:
+        right_edge = [(i, num_cols - 1) for i in range(num_rows)]
+        # Note: range(num_cols - 1) prevents including the corner twice
+        bottom_edge = [(num_rows - 1, i) for i in range(num_cols - 1)]
+        edge_cells = right_edge + bottom_edge
+        sorted_edge_cells = sorted(edge_cells,
+                                   key=lambda cell: score_matrix[cell],
+                                   reverse=True,
+                                  )
     for cell in sorted_edge_cells:
         if min_score != None and score_matrix[cell] < min_score:
             break
@@ -220,95 +236,6 @@ def propose_all_ends(score_matrix, cells_seen, min_score):
             continue
 
         yield cell
-
-def backtrack(query,
-              target,
-              matrices,
-              cells_seen,
-              end_cell,
-              force_query_start,
-              force_target_start,
-              force_either_start,
-             ):
-    query_mappings = np.ones(len(query), int) * SOFT_CLIPPED
-    target_mappings = np.ones(len(target), int) * SOFT_CLIPPED
-
-    path = []
-    insertions = set()
-    deletions = set()
-    mismatches = set()
-    
-    unconstrained_start = not(force_query_start or force_target_start or force_either_start)
-
-    row, col = end_cell
-    if row == 0 or col == 0:
-        # There are no query or target bases involved in a path that ends on
-        # the top or the left edge.
-        reached_end = True
-    else:
-        reached_end = False
-
-    while not reached_end:
-        if (row, col) in cells_seen:
-            #print (row, col), 'was already seen'
-            return None
-        cells_seen.add((row, col))
-
-        next_col = col + matrices['col_direction'][row, col]
-        next_row = row + matrices['row_direction'][row, col]
-        if next_col == col:
-            target_index = GAP
-            insertions.add(row - 1)
-        else:
-            target_index = col - 1
-        if next_row == row:
-            query_index = GAP
-            deletions.add(col - 1)
-        else:
-            query_index = row - 1
-        
-        if target_index != GAP:
-            target_mappings[target_index] = query_index
-        if query_index != GAP:
-            query_mappings[query_index] = target_index
-        if target_index != GAP and query_index != GAP and query[query_index] != target[target_index]:
-            mismatches.add((query_index, target_index))
-
-        path.append((query_index, target_index))
-
-        row = next_row
-        col = next_col
-
-        if unconstrained_start:
-            if matrices['score'][row, col] <= 0:
-                reached_end = True
-        elif force_query_start and force_target_start:
-            if row == 0 and col == 0:
-                reached_end = True
-        elif force_either_start:
-            if row == 0 or col == 0:
-                reached_end = True
-        elif force_query_start:
-            if row == 0:
-                reached_end = True
-        elif force_target_start:
-            if col == 0:
-                reached_end = True
-
-    path = path[::-1]
-
-    alignment = {'score': matrices['score'][end_cell],
-                 'path': path,
-                 'query_mappings': query_mappings,
-                 'target_mappings': target_mappings,
-                 'insertions': insertions,
-                 'deletions': deletions,
-                 'mismatches': mismatches,
-                 'XM': len(mismatches),
-                 'XO': len(insertions) + len(deletions),
-                }
-
-    return alignment
 
 def infer_insert_length(R1, R2, before_R1, before_R2):
     ''' Infer the length of the insert represented by R1 and R2 by performing
@@ -407,20 +334,3 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment):
     print sorted(alignment['mismatches'])
     for q, t in sorted(alignment['mismatches']):
         print '\t', extended_R1[q], extended_R2[t]
-    
-if __name__ == '__main__':
-    R1_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/smaller_R1.fastq'
-    R2_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/data/smaller_R2.fastq'
-    
-    R1_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/smaller_R1_trimmed.fastq'
-    R2_trimmed_fn = '/home/jah/projects/mutations/experiments/shiroguchi/E_coli_transcriptome_1/results/smaller_R2_trimmed.fastq'
-    primer_type = 'PE'
-    index_sequence = ''
-    
-    read_pairs = fastq.read_pairs(R1_fn, R2_fn)
-    
-    with open(R1_trimmed_fn, 'w') as R1_trimmed_fh, open(R2_trimmed_fn, 'w') as R2_trimmed_fh:
-        trimmed_pairs = trim_pairs(read_pairs, index_sequence, primer_type)
-        for R1_trimmed_record, R2_trimmed_record in trimmed_pairs:
-            R1_trimmed_fh.write(R1_trimmed_record)
-            R2_trimmed_fh.write(R2_trimmed_record)
