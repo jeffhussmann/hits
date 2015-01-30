@@ -38,11 +38,17 @@ def enhanced_scatter(x_list,
                      lims=None,
                      color_by_density=True,
                      do_fit=True,
+                     force_aspect=True,
+                     show_p_value=True,
                     ):
     same_lists = np.allclose(x_list, y_list)
 
     if color_by_density and not same_lists:
-        sampled_points = np.vstack([x_list[:10000], y_list[:10000]])
+        indices = np.arange(len(x_list))
+        np.random.shuffle(indices)
+        random_indices = indices[:1000]
+
+        sampled_points = np.vstack([x_list[random_indices], y_list[random_indices]])
         points = np.vstack([x_list, y_list])
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
@@ -72,14 +78,6 @@ def enhanced_scatter(x_list,
         ax_scatter.plot(xs, fit_function(xs), color='black', alpha=0.5)
         ax_scatter.set_xlim(min(x_list), max(x_list))
         
-        r, p = scipy.stats.pearsonr(x_list, y_list)
-        ax_scatter.annotate('r = {:0.2f}, p={:0.2e}'.format(r, p),
-                            xy=(1, 0),
-                            xycoords='axes fraction',
-                            xytext=(-10, 15),
-                            textcoords='offset points',
-                            horizontalalignment='right',
-                           )
         ax_scatter.annotate(r'$\beta$ = {:0.2f}'.format(beta),
                             xy=(1, 0),
                             xycoords='axes fraction',
@@ -88,7 +86,23 @@ def enhanced_scatter(x_list,
                             horizontalalignment='right',
                            )
     
-    ax_scatter.set_aspect(1.)
+    r, p = scipy.stats.pearsonr(x_list, y_list)
+    if show_p_value:
+        text = 'r = {:0.2f}, p={:0.2e}'.format(r, p)
+    else:
+        text = 'r = {:0.2f}'.format(r)
+
+    ax_scatter.annotate(text,
+                        xy=(1, 0),
+                        xycoords='axes fraction',
+                        xytext=(-10, 15),
+                        textcoords='offset points',
+                        horizontalalignment='right',
+                       )
+    
+    if force_aspect:
+        ax_scatter.set_aspect(1.)
+
     if lims:
         ax_scatter.set_xlim(*lims)
         ax_scatter.set_ylim(*lims)
