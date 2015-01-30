@@ -129,3 +129,9 @@ def all_consecutive(s):
         if y - x != 1:
             return False
     return True
+
+def empirical_cdf(values):
+    ''' From stackoverflow. '''
+    sorted_values = np.sort(values)
+    cumulative = np.true_divide(np.arange(len(sorted_values)), len(sorted_values))
+    return sorted_values, cumulative
