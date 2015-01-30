@@ -31,6 +31,7 @@ def find_adapter(char *adapter, int max_distance, char *seq):
     cdef int seq_length = len(seq)
     cdef int adapter_length = len(adapter)
     cdef int distance, start
+    cdef int max_long_prefix_distance = min(max_distance, 1)
         
     for start in range(seq_length - adapter_length + 1):
         distance = adapter_hamming_distance(seq,
@@ -51,7 +52,7 @@ def find_adapter(char *adapter, int max_distance, char *seq):
                                            )
         if distance == 0:
             return start
-        elif seq_length - start >= 10 and distance <= 1:
+        elif seq_length - start >= 10 and distance <= max_long_prefix_distance:
             return start
     
     # Convention: position of seq_length means no position was found
