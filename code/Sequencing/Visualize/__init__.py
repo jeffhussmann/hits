@@ -31,14 +31,9 @@ def add_commas_to_yticks(ax):
 
 def enhanced_scatter(x_list,
                      y_list,
-                     x_label,
-                     y_label,
-                     title,
                      ax_scatter,
-                     lims=None,
                      color_by_density=True,
                      do_fit=True,
-                     force_aspect=True,
                      show_p_value=True,
                     ):
     same_lists = np.allclose(x_list, y_list)
@@ -64,11 +59,6 @@ def enhanced_scatter(x_list,
              }
 
     ax_scatter.scatter(x_list, y_list, c=colors, **kwargs)
-
-    ax_scatter.set_xlabel(x_label)
-    ax_scatter.set_ylabel(y_label)
-
-    ax_scatter.set_title(title)
 
     if do_fit:
         fit = np.polyfit(x_list, y_list, 1)
@@ -99,10 +89,3 @@ def enhanced_scatter(x_list,
                         textcoords='offset points',
                         horizontalalignment='right',
                        )
-    
-    if force_aspect:
-        ax_scatter.set_aspect(1.)
-
-    if lims:
-        ax_scatter.set_xlim(*lims)
-        ax_scatter.set_ylim(*lims)
