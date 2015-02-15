@@ -35,6 +35,7 @@ def enhanced_scatter(x_list,
                      color_by_density=True,
                      do_fit=True,
                      show_p_value=True,
+                     draw_diagonal=False,
                     ):
     same_lists = np.allclose(x_list, y_list)
 
@@ -88,4 +89,11 @@ def enhanced_scatter(x_list,
                         xytext=(-10, 15),
                         textcoords='offset points',
                         horizontalalignment='right',
+                       )
+
+    if draw_diagonal:
+        ax_scatter.plot([0, 1], [0, 1],
+                        transform=ax_scatter.transAxes,
+                        color='black',
+                        alpha=0.5,
                        )
