@@ -5,6 +5,7 @@ import os
 import shutil
 import re
 import logging
+import pickle
 from . import split_file
 from . import launcher
 from Sequencing import Serialize
@@ -124,7 +125,13 @@ class MapReduceExperiment(object):
 
     def write_file(self, key, data):
         file_format = self.file_types[key]
-        file_format.write_file(data, self.file_names[key])
+        file_name = self.file_names[key]
+
+        if file_format == 'pickle':
+            with open(file_name, 'wb') as file_handle:
+                pickle.dump(data, file_handle)
+        else:
+            file_format.write_file(data, file_name)
 
     def read_file(self, key, merged=False, **kwargs):
         if merged == False:
@@ -133,7 +140,11 @@ class MapReduceExperiment(object):
             file_name = self.merged_file_names[key]
         
         file_format = self.file_types[key]
-        data = file_format.read_file(file_name, **kwargs)
+
+        if file_format == 'pickle':
+            data = pickle.load(open(file_name, 'rb'))
+        else:
+            data = file_format.read_file(file_name, **kwargs)
 
         return data
 
