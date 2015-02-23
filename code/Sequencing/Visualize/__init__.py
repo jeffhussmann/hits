@@ -29,27 +29,25 @@ def add_commas_to_yticks(ax):
     tick_formatter = matplotlib.ticker.FuncFormatter(commas_formatter)
     ax.yaxis.set_major_formatter(tick_formatter)
 
-def enhanced_scatter(x_list,
-                     y_list,
-                     ax_scatter,
+def enhanced_scatter(xs, ys, ax,
                      color_by_density=True,
                      do_fit=True,
                      show_p_value=True,
-                     draw_diagonal=False,
+                     hists_height=0,
                     ):
-    same_lists = np.allclose(x_list, y_list)
+    same_lists = np.allclose(xs, ys)
 
     if color_by_density and not same_lists:
-        indices = np.arange(len(x_list))
+        indices = np.arange(len(xs))
         np.random.shuffle(indices)
         random_indices = indices[:1000]
 
-        sampled_points = np.vstack([x_list[random_indices], y_list[random_indices]])
-        points = np.vstack([x_list, y_list])
+        sampled_points = np.vstack([xs[random_indices], ys[random_indices]])
+        points = np.vstack([xs, ys])
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
     else:
-        colors = np.ones_like(x_list)
+        colors = np.ones_like(xs)
 
     if same_lists:
         do_fit = False
@@ -59,17 +57,17 @@ def enhanced_scatter(x_list,
               'linewidths' : (0.1,),
              }
 
-    ax_scatter.scatter(x_list, y_list, c=colors, **kwargs)
+    ax.scatter(xs, ys, c=colors, **kwargs)
 
     if do_fit:
-        fit = np.polyfit(x_list, y_list, 1)
+        fit = np.polyfit(xs, ys, 1)
         beta, _ = fit
         fit_function = np.poly1d(fit)
-        xs = ax_scatter.get_xlim()
-        ax_scatter.plot(xs, fit_function(xs), color='black', alpha=0.5)
-        ax_scatter.set_xlim(min(x_list), max(x_list))
+        x_lims = ax.get_xlim()
+        ax.plot(x_lims, fit_function(x_lims), color='black', alpha=0.5)
+        ax.set_xlim(min(xs), max(xs))
         
-        ax_scatter.annotate(r'$\beta$ = {:0.2f}'.format(beta),
+        ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
                             xy=(1, 0),
                             xycoords='axes fraction',
                             xytext=(-10, 30),
@@ -77,23 +75,33 @@ def enhanced_scatter(x_list,
                             horizontalalignment='right',
                            )
     
-    r, p = scipy.stats.pearsonr(x_list, y_list)
+    r, p = scipy.stats.pearsonr(xs, ys)
     if show_p_value:
         text = 'r = {:0.2f}, p={:0.2e}'.format(r, p)
     else:
         text = 'r = {:0.2f}'.format(r)
 
-    ax_scatter.annotate(text,
-                        xy=(1, 0),
-                        xycoords='axes fraction',
-                        xytext=(-10, 15),
-                        textcoords='offset points',
-                        horizontalalignment='right',
-                       )
+    ax.annotate(text,
+                xy=(1, 0),
+                xycoords='axes fraction',
+                xytext=(-10, 15),
+                textcoords='offset points',
+                horizontalalignment='right',
+               )
 
-    if draw_diagonal:
-        ax_scatter.plot([0, 1], [0, 1],
-                        transform=ax_scatter.transAxes,
-                        color='black',
-                        alpha=0.5,
-                       )
+    if hists_height > 0:
+        ax_x = ax.twinx()
+        ax_x.hist(xs, alpha=0.3, histtype='step', bins=100)
+        y_min, y_max = ax_x.get_ylim()
+        ax_x.set_ylim(ymax=y_max / hists_height)
+
+        ax_y = ax.twiny()
+        ax_y.hist(ys, alpha=0.3, histtype='step', bins=100, orientation='horizontal')
+        x_min, x_max = ax_y.get_xlim()
+        ax_y.set_xlim(xmax=x_max / hists_height)
+
+        ax_x.set_yticks([])
+        ax_y.set_xticks([])
+        
+def draw_diagonal(ax):
+    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color='black', alpha=0.5)
