@@ -163,8 +163,11 @@ class MapReduceExperiment(object):
         self.write_file('summary_stage_{0}'.format(stage), self.summary)
 
     def do_cleanup(self, stage):
+        logging.info('Beginning cleanup for stage {0}'.format(stage))
+
         times = []
         for function_name in self.cleanup[stage]:
+            logging.info('Starting function {0}'.format(function_name))
             start_time = time.time()
             self.__getattribute__(function_name)()
             end_time = time.time()
@@ -355,6 +358,7 @@ def finish(args, ExperimentClass):
         piece_file_names = [piece.file_names[key] for piece in pieces]
         merged_file_name = merged.merged_file_names[key]
 
+        logging.info('Merging file {0}'.format(key))
         start_time = time.time()
         Serialize.merge_files(piece_file_names,
                               merged_file_name,
