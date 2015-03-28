@@ -1,20 +1,12 @@
 import numpy as np
-cimport numpy as np
 cimport cython
-
-DTYPEINT = np.int
-ctypedef np.int_t DTYPEINT_t
 
 cdef int SANGER_OFFSET_typed = 33
 SANGER_OFFSET = SANGER_OFFSET_typed
 
 @cython.boundscheck(False)
-def process_read(char* seq,
-                 char* qual,
-                 np.ndarray[DTYPEINT_t, ndim=2] q_array,
-                 np.ndarray[DTYPEINT_t, ndim=2] c_array,
-                ):
-    cdef int i, q, b, seq_length
+def process_read(char* seq, char* qual, long[:, ::1] q_array, long[:, ::1] c_array):
+    cdef unsigned int i, q, b, seq_length
     cdef float average_q = 0
 
     seq_length = len(seq)
@@ -29,6 +21,7 @@ def process_read(char* seq,
 
     if seq_length != 0:
         average_q /= seq_length
+
     return average_q
 
 def RSQCI_length(char *quals, int length):
