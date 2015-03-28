@@ -37,7 +37,7 @@ def enhanced_scatter(xs, ys, ax,
                     ):
     same_lists = np.allclose(xs, ys)
 
-    if color_by_density and not same_lists:
+    if color_by_density and not same_lists and len(xs) > 2:
         indices = np.arange(len(xs))
         np.random.shuffle(indices)
         random_indices = indices[:1000]
