@@ -34,10 +34,16 @@ def enhanced_scatter(xs, ys, ax,
                      do_fit=True,
                      show_p_value=True,
                      hists_height=0,
+                     marker_size=4,
+                     text_size=14,
+                     text_location='lower right',
+                     fit_line_kwargs={'color': 'black',
+                                      'alpha': 0.5,
+                                     },
                     ):
     same_lists = np.allclose(xs, ys)
 
-    if color_by_density and not same_lists:
+    if color_by_density and not same_lists and len(xs) > 2:
         indices = np.arange(len(xs))
         np.random.shuffle(indices)
         random_indices = indices[:1000]
@@ -53,27 +59,50 @@ def enhanced_scatter(xs, ys, ax,
         do_fit = False
 
     kwargs = {'cmap': matplotlib.cm.jet,
-              's': 4,
+              's': marker_size,
               'linewidths' : (0.1,),
              }
 
     ax.scatter(xs, ys, c=colors, **kwargs)
 
+    if 'left' in text_location:
+        x = 0
+        x_sign = 1
+        horizontal_alignment = 'left'
+    elif 'right' in text_location:
+        x = 1
+        x_sign = -1
+        horizontal_alignment = 'right'
+
+    if 'upper' in text_location:
+        y = 1
+        y_sign = -1
+        vertical_alignment = 'top'
+    elif 'lower' in text_location:
+        y = 0
+        y_sign = 1
+        vertical_alignment = 'bottom'
+
+    text_kwargs = {'xy': (x, y),
+                   'xycoords': 'axes fraction',
+                   'textcoords': 'offset points',
+                   'horizontalalignment': horizontal_alignment,
+                   'verticalalignment': vertical_alignment,
+                   'fontsize': text_size,
+                   'family': 'serif',
+                  }
+    
     if do_fit:
         fit = np.polyfit(xs, ys, 1)
         beta, _ = fit
         fit_function = np.poly1d(fit)
         x_lims = ax.get_xlim()
-        ax.plot(x_lims, fit_function(x_lims), color='black', alpha=0.5)
-        ax.set_xlim(min(xs), max(xs))
+        ax.plot(x_lims, fit_function(x_lims), **fit_line_kwargs)
+        ax.set_xlim(*x_lims)
         
         ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
-                            xy=(1, 0),
-                            xycoords='axes fraction',
-                            xytext=(-10, 30),
-                            textcoords='offset points',
-                            horizontalalignment='right',
-                           )
+                    xytext=(x_sign * 10, y_sign * 30),
+                    **text_kwargs)
     
     r, p = scipy.stats.pearsonr(xs, ys)
     if show_p_value:
@@ -82,12 +111,8 @@ def enhanced_scatter(xs, ys, ax,
         text = 'r = {:0.2f}'.format(r)
 
     ax.annotate(text,
-                xy=(1, 0),
-                xycoords='axes fraction',
-                xytext=(-10, 15),
-                textcoords='offset points',
-                horizontalalignment='right',
-               )
+                xytext=(x_sign * 10, y_sign * 15),
+                **text_kwargs)
 
     if hists_height > 0:
         ax_x = ax.twinx()
@@ -103,5 +128,5 @@ def enhanced_scatter(xs, ys, ax,
         ax_x.set_yticks([])
         ax_y.set_xticks([])
         
-def draw_diagonal(ax):
-    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color='black', alpha=0.5)
+def draw_diagonal(ax, color='black', alpha=0.9, **kwargs):
+    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color=color, alpha=alpha, **kwargs)
