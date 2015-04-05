@@ -29,11 +29,12 @@ def encode_solexa(ints):
     return ''.join(chr(i + SOLEXA_OFFSET) for i in ints)
 
 _solexa_to_sanger_table = {}
-for q in range(-5, MAX_EXPECTED_QUAL + 1):
+for q in range(ord('!') - SOLEXA_OFFSET, MAX_EXPECTED_QUAL + 1):
     # Old solexa encoding was -10 log(p / (1 - p)), which could be negative.
     # Character encodings of negative values cause problems, and we don't really
     # care about fine distinctions in low quality scores, so just set to a
     # minimum of zero.
+    # Some files assign ! to N's, so this range needs to go down to ord('!').
     _solexa_to_sanger_table[chr(q + SOLEXA_OFFSET)] = chr(max(q, 0) + SANGER_OFFSET)
 
 def solexa_to_sanger(qual):
