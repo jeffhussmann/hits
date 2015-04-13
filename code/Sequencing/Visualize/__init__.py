@@ -83,6 +83,19 @@ def enhanced_scatter(xs, ys, ax,
         y_sign = 1
         vertical_alignment = 'bottom'
 
+    if text_location == 'above':
+        x = 0.5
+        y = 1
+        x_sign = 1
+        y_sign = 1.05
+        vertical_alignment = 'bottom'
+        horizontal_alignment = 'center'
+        x_offset = 0
+        y_offset = 0
+    else:
+        x_offset = 10
+        y_offset = 15
+
     text_kwargs = {'xy': (x, y),
                    'xycoords': 'axes fraction',
                    'textcoords': 'offset points',
@@ -101,7 +114,7 @@ def enhanced_scatter(xs, ys, ax,
         ax.set_xlim(*x_lims)
         
         ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
-                    xytext=(x_sign * 10, y_sign * 30),
+                    xytext=(x_sign * x_offset, y_sign * y_offset * 2),
                     **text_kwargs)
     
     r, p = scipy.stats.pearsonr(xs, ys)
@@ -111,7 +124,7 @@ def enhanced_scatter(xs, ys, ax,
         text = 'r = {:0.2f}'.format(r)
 
     ax.annotate(text,
-                xytext=(x_sign * 10, y_sign * 15),
+                xytext=(x_sign * x_offset, y_sign * y_offset),
                 **text_kwargs)
 
     if hists_height > 0:
