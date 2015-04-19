@@ -53,7 +53,7 @@ def enhanced_scatter(xs, ys, ax,
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
     else:
-        colors = np.ones_like(xs)
+        colors = 'black'
 
     if same_lists:
         do_fit = False
