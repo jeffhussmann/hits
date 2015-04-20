@@ -36,7 +36,9 @@ def enhanced_scatter(xs, ys, ax,
                      hists_height=0,
                      marker_size=4,
                      text_size=14,
+                     text_weight='normal',
                      text_location='lower right',
+                     color_by_correlation=False,
                      fit_line_kwargs={'color': 'black',
                                       'alpha': 0.5,
                                      },
@@ -103,6 +105,7 @@ def enhanced_scatter(xs, ys, ax,
                    'verticalalignment': vertical_alignment,
                    'fontsize': text_size,
                    'family': 'serif',
+                   'weight': text_weight,
                   }
     
     if do_fit:
@@ -122,6 +125,9 @@ def enhanced_scatter(xs, ys, ax,
         text = 'r = {:0.2f}, p={:0.2e}'.format(r, p)
     else:
         text = 'r = {:0.2f}'.format(r)
+
+    if color_by_correlation:
+        text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
 
     ax.annotate(text,
                 xytext=(x_sign * x_offset, y_sign * y_offset),
