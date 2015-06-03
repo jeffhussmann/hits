@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 from Sequencing import utilities, fastq, adapters, annotation
 from sw_cython import *
 
@@ -69,11 +70,9 @@ def make_char_pairs(index_pairs, query, target):
         char_pairs.append((q_char, t_char))
     return char_pairs
 
-def print_local_alignment(query, target, alignment_path):
+def print_local_alignment(query, target, alignment_path, fh=sys.stdout):
     if alignment_path == []:
-        print query
-        print
-        print target
+        fh.write('{0}\n\n{1}\n'.format(query, target))
         return
 
     def index_to_char(seq, index):
@@ -108,8 +107,8 @@ def print_local_alignment(query, target, alignment_path):
     query_string.extend([' ', right_query])
     target_string.extend([' ', right_target])
 
-    print 'query ', ''.join(query_string)
-    print 'target', ''.join(target_string)
+    fh.write('query\t{0}\n'.format(''.join(query_string)))
+    fh.write('target\t{0}\n'.format(''.join(target_string)))
 
 trimmed_annotation_fields = [
     ('original_name', 's'),
@@ -320,17 +319,17 @@ def infer_insert_length(R1, R2, before_R1, before_R2):
 
     return status, insert_length, alignment
 
-def print_diagnostic(R1, R2, before_R1, before_R2, alignment):
+def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     extended_R1 = before_R1.lower() + R1.seq
     extended_R2 = utilities.reverse_complement(before_R2.lower() + R2.seq)
-    print R1.name
-    print R1.qual
-    print R2.qual
-    print alignment['score'], len(alignment['path']) * 2, alignment['score'] - len(alignment['path']) * 2
-    print alignment['path']
-    print_local_alignment(extended_R1, extended_R2, alignment['path'])
-    print alignment['insertions']
-    print alignment['deletions']
-    print sorted(alignment['mismatches'])
+    fh.write(R1.name + '\n')
+    fh.write(R1.qual + '\n')
+    fh.write(R2.qual + '\n')
+    fh.write('{0}\t{1}\t{2}\n'.format(alignment['score'], len(alignment['path']) * 2, alignment['score'] - len(alignment['path']) * 2))
+    fh.write(str(alignment['path']) + '\n')
+    print_local_alignment(extended_R1, extended_R2, alignment['path'], fh=fh)
+    fh.write(str(alignment['insertions']) + '\n')
+    fh.write(str(alignment['deletions']) + '\n')
+    fh.write(str(sorted(alignment['mismatches'])) + '\n')
     for q, t in sorted(alignment['mismatches']):
-        print '\t', extended_R1[q], extended_R2[t]
+        fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
