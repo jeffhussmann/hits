@@ -36,7 +36,9 @@ def enhanced_scatter(xs, ys, ax,
                      hists_height=0,
                      marker_size=4,
                      text_size=14,
+                     text_weight='normal',
                      text_location='lower right',
+                     color_by_correlation=False,
                      fit_line_kwargs={'color': 'black',
                                       'alpha': 0.5,
                                      },
@@ -53,7 +55,7 @@ def enhanced_scatter(xs, ys, ax,
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
     else:
-        colors = np.ones_like(xs)
+        colors = 'black'
 
     if same_lists:
         do_fit = False
@@ -83,6 +85,19 @@ def enhanced_scatter(xs, ys, ax,
         y_sign = 1
         vertical_alignment = 'bottom'
 
+    if text_location == 'above':
+        x = 0.5
+        y = 1
+        x_sign = 1
+        y_sign = 1.05
+        vertical_alignment = 'bottom'
+        horizontal_alignment = 'center'
+        x_offset = 0
+        y_offset = 0
+    else:
+        x_offset = 10
+        y_offset = 15
+
     text_kwargs = {'xy': (x, y),
                    'xycoords': 'axes fraction',
                    'textcoords': 'offset points',
@@ -90,6 +105,7 @@ def enhanced_scatter(xs, ys, ax,
                    'verticalalignment': vertical_alignment,
                    'fontsize': text_size,
                    'family': 'serif',
+                   'weight': text_weight,
                   }
     
     if do_fit:
@@ -101,7 +117,7 @@ def enhanced_scatter(xs, ys, ax,
         ax.set_xlim(*x_lims)
         
         ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
-                    xytext=(x_sign * 10, y_sign * 30),
+                    xytext=(x_sign * x_offset, y_sign * y_offset * 2),
                     **text_kwargs)
     
     r, p = scipy.stats.pearsonr(xs, ys)
@@ -110,8 +126,11 @@ def enhanced_scatter(xs, ys, ax,
     else:
         text = 'r = {:0.2f}'.format(r)
 
+    if color_by_correlation:
+        text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
+
     ax.annotate(text,
-                xytext=(x_sign * 10, y_sign * 15),
+                xytext=(x_sign * x_offset, y_sign * y_offset),
                 **text_kwargs)
 
     if hists_height > 0:
