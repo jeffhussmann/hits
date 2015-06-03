@@ -205,6 +205,14 @@ def contains_indel_pysam(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CINS in kinds or BAM_CDEL in kinds)
 
+def indel_distance_from_edge(cigar):
+    indel_indices = [i for i, (k, l) in enumerate(cigar) if k == BAM_CINS or k == BAM_CDEL]
+    first_indel_index = min(indel_indices)
+    ref_nucs_before = total_reference_nucs(cigar[:first_indel_index])
+    last_indel_index = max(indel_indices)
+    ref_nucs_after = total_reference_nucs(cigar[last_indel_index + 1:])
+    return min(ref_nucs_before, ref_nucs_after)
+
 def contains_splicing(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CREF_SKIP in kinds)
@@ -774,21 +782,21 @@ def get_mapq_counts(bam_file_name):
     mapq_counts = Counter(ar.mapq for ar in bam_file)
     return mapq_counts
 
+def mapping_to_Read(mapping):
+    if mapping.is_unmapped or not mapping.is_reverse:
+        seq = mapping.seq
+        qual = mapping.qual
+    else:
+        seq = utilities.reverse_complement(mapping.seq)
+        qual = mapping.qual[::-1]
+
+    read = fastq.Read(mapping.qname, seq, qual)
+    return read
+
 def sam_to_fastq(sam_file_name):
     sam_file = pysam.Samfile(sam_file_name)
     for mapping in sam_file:
-        if mapping.is_unmapped:
-            seq = mapping.seq
-            qual = mapping.qual
-        elif mapping.is_reverse:
-            seq = utilities.reverse_complement(mapping.seq)
-            qual = mapping.qual[::-1]
-        else:
-            seq = mapping.seq
-            qual = mapping.qual
-
-        read = fastq.Read(mapping.qname, seq, qual)
-        yield read
+        yield mapping_to_Read(mapping)
 
 bam_to_fastq = sam_to_fastq
 
