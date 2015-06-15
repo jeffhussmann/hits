@@ -120,6 +120,7 @@ def get_local_alignments(read, targets):
                                                 target.seq,
                                                 'local',
                                                 min_score=min_score,
+                                                max_alignments=3,
                                                )
             for alignment in alignments:
                 if alignment['score'] >= 0.5 * 2 * len(alignment['path']):
@@ -130,7 +131,7 @@ def get_local_alignments(read, targets):
 
     return all_alignments
 
-def get_overlap_alignments(read, targets):
+def get_edge_alignments(read, targets):
     seq = read.seq
     seq_rc = utilities.reverse_complement(read.seq)
     all_alignments = []
@@ -139,11 +140,11 @@ def get_overlap_alignments(read, targets):
         for query, is_reverse in [(seq, False), (seq_rc, True)]:
             alignments = sw.generate_alignments(query,
                                                 target.seq,
-                                                'overlap',
+                                                'unpaired_adapter',
                                                 min_score=min_score,
                                                )
             for alignment in alignments:
-                if alignment['score'] >= 0.5 * 2 * len(alignment['path']):
+                if alignment['score'] >= 2 * len(alignment['path']):
                     alignment['query'] = query
                     alignment['rname'] = target.name
                     alignment['is_reverse'] = is_reverse
@@ -164,7 +165,7 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets):
     targets.extend(extra_targets)
 
     for read in reads:
-        alignments = get_local_alignments(read, targets)
+        alignments = get_local_alignments(read, targets) + get_edge_alignments(read, targets)
         # bowtie2 only retains up to the first space in a qname, so do the same
         # here to allow qnames to be compared
         sanitized_name = up_to_first_space(read.name)
