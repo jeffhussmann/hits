@@ -435,37 +435,29 @@ def visualize_paired_end_mappings(R1_fn,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
-                                  results_dir,
+                                  output_fn,
                                  ):
 
     R1_alignment_groups_list = []
     R2_alignment_groups_list = []
 
     def get_R1_reads():
-        for i, R1 in izip(xrange(100), fastq.reads(R1_fn)):
-            yield R1
+        return islice(fastq.reads(R1_fn), 100)
     
     def get_R2_rc_reads():
-        for i, R2_rc in izip(xrange(100), fastq.reverse_complement_reads(R2_fn)):
-            yield R2_rc
+        return islice(fastq.reverse_complement_reads(R2_fn), 100)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
-        _, short_name = os.path.split(index_prefix)
-        
-        R1_sam_fn = '{0}/R1_{1}_local.sam'.format(results_dir, short_name)
-        R1_alignment_groups = produce_bowtie2_alignments_old(get_R1_reads(),
-                                                         R1_sam_fn,
+        R1_alignment_groups = produce_bowtie2_alignments(get_R1_reads(),
                                                          index_prefix,
                                                          genome_dir,
                                                          score_min,
                                                         )
         R1_alignment_groups_list.append(R1_alignment_groups)
         
-        R2_sam_fn = '{0}/R2_{1}_local.sam'.format(results_dir, short_name)
         # Design decisions made in the parsing make it easier if R2 reads are
         # reverse complemented before mapping.
-        R2_alignment_groups = produce_bowtie2_alignments_old(get_R2_rc_reads(),
-                                                         R2_sam_fn,
+        R2_alignment_groups = produce_bowtie2_alignments(get_R2_rc_reads(),
                                                          index_prefix,
                                                          genome_dir,
                                                          score_min,
