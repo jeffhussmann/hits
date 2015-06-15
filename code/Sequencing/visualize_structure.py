@@ -198,7 +198,19 @@ def find_best_offset(R1_seq, R2_rc_seq):
     within_fractions = (periodicity.compute_within_fractions(R1_seq) + periodicity.compute_within_fractions(R2_rc_seq)) / 2
     period, period_fraction = periodicity.best_period(within_fractions)
 
-    if first_offset_fraction >= second_offset_fraction:
+    # Heuristic - if both offset fractions are very high, use the one with the
+    # most overlap, which is the one with the smaller offset.
+    if first_offset_fraction > 0.9 and second_offset_fraction > 0.9:
+        if first_offset < second_offset:
+            which = 'first'
+        else:
+            which = 'second'
+    elif first_offset_fraction >= second_offset_fraction:
+        which = 'first'
+    else:
+        which = 'second'
+
+    if which == 'first':
         offset = first_offset
         if period_fraction > 0.7:
             offset = offset % period
