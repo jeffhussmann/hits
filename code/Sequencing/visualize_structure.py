@@ -14,6 +14,7 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
     # Convert them to be absolute indices in seq.
     path = []
     mismatches = set()
+    deletions = set()
     rname = sam_file.getrname(mapping.tid)
     for read_i, ref_i in mapping.aligned_pairs:
         if read_i != None:
@@ -22,17 +23,20 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
                 ref_i = sw.GAP
             else:
                 read_base = mapping.seq[read_i]
-                ref_base = region_fetcher(rname, ref_i, ref_i + 1)
+                ref_base = region_fetcher(rname, ref_i, ref_i + 1).upper()
                 if read_base != ref_base:
                     mismatches.add((read_i, ref_i))
 
             path.append((read_i, ref_i))
+        else:
+            deletions.add(ref_i)
 
     alignment = {'path': path,
                  'XO': mapping.opt('XO'),
                  'XM': mapping.opt('XM'),
                  'is_reverse': mapping.is_reverse,
                  'mismatches': mismatches,
+                 'deletions': deletions,
                  'rname': rname,
                  'query': mapping.seq,
                 }
@@ -224,6 +228,11 @@ def represent_alignment(alignment):
             if ref_i != sw.GAP:
                 if (read_i, ref_i) in alignment['mismatches']:
                     match = 'x'
+
+                if ref_i - 1 in alignment['deletions']:
+                    match = '\\'
+                elif ref_i + 1 in alignment['deletions']:
+                    match = '/'
 
                 read_positions[absolute_read_position] = match
                 read_to_ref[absolute_read_position] = ref_i
