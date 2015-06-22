@@ -40,9 +40,11 @@ def enhanced_scatter(xs, ys, ax,
                      text_location='lower right',
                      color_by_correlation=False,
                      fit_line_kwargs={'color': 'black',
-                                      'alpha': 0.5,
+                                      'alpha': 0.3,
                                      },
                      r_digits=2,
+                     variance=False,
+                     in_log_space=False,
                     ):
     same_lists = np.allclose(xs, ys)
 
@@ -121,11 +123,23 @@ def enhanced_scatter(xs, ys, ax,
                     xytext=(x_sign * x_offset, y_sign * y_offset * 2),
                     **text_kwargs)
     
-    r, p = scipy.stats.pearsonr(xs, ys)
-    if show_p_value:
-        text = 'r = {:0.{digits}f}, p={:0.2e}'.format(r, p, digits=r_digits)
+    if in_log_space:
+        # Values have been log'ed before being passed in, so exponentiate them
+        # to recover correct correlation.
+        r, p = scipy.stats.pearsonr(2**xs, 2**ys)
     else:
-        text = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
+        r, p = scipy.stats.pearsonr(xs, ys)
+
+    if variance:
+        r_part = 'r$^2$ = {:0.{digits}f}'.format(r**2, digits=r_digits)
+    else:
+        r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
+    if show_p_value:
+        p_part = ', p={:0.2e}'.format(p)
+    else:
+        p_part = ''
+
+    text = r_part + p_part
 
     if color_by_correlation:
         text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
