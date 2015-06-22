@@ -14,6 +14,7 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
     # Convert them to be absolute indices in seq.
     path = []
     mismatches = set()
+    deletions = set()
     rname = sam_file.getrname(mapping.tid)
     for read_i, ref_i in mapping.aligned_pairs:
         if read_i != None:
@@ -22,17 +23,20 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
                 ref_i = sw.GAP
             else:
                 read_base = mapping.seq[read_i]
-                ref_base = region_fetcher(rname, ref_i, ref_i + 1)
+                ref_base = region_fetcher(rname, ref_i, ref_i + 1).upper()
                 if read_base != ref_base:
                     mismatches.add((read_i, ref_i))
 
             path.append((read_i, ref_i))
+        else:
+            deletions.add(ref_i)
 
     alignment = {'path': path,
                  'XO': mapping.opt('XO'),
                  'XM': mapping.opt('XM'),
                  'is_reverse': mapping.is_reverse,
                  'mismatches': mismatches,
+                 'deletions': deletions,
                  'rname': rname,
                  'query': mapping.seq,
                 }
@@ -116,6 +120,7 @@ def get_local_alignments(read, targets):
                                                 target.seq,
                                                 'local',
                                                 min_score=min_score,
+                                                max_alignments=3,
                                                )
             for alignment in alignments:
                 if alignment['score'] >= 0.5 * 2 * len(alignment['path']):
@@ -126,7 +131,7 @@ def get_local_alignments(read, targets):
 
     return all_alignments
 
-def get_overlap_alignments(read, targets):
+def get_edge_alignments(read, targets):
     seq = read.seq
     seq_rc = utilities.reverse_complement(read.seq)
     all_alignments = []
@@ -135,11 +140,11 @@ def get_overlap_alignments(read, targets):
         for query, is_reverse in [(seq, False), (seq_rc, True)]:
             alignments = sw.generate_alignments(query,
                                                 target.seq,
-                                                'overlap',
+                                                'unpaired_adapter',
                                                 min_score=min_score,
                                                )
             for alignment in alignments:
-                if alignment['score'] >= 0.5 * 2 * len(alignment['path']):
+                if alignment['score'] >= 2 * len(alignment['path']):
                     alignment['query'] = query
                     alignment['rname'] = target.name
                     alignment['is_reverse'] = is_reverse
@@ -160,7 +165,7 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets):
     targets.extend(extra_targets)
 
     for read in reads:
-        alignments = get_local_alignments(read, targets)
+        alignments = get_local_alignments(read, targets) + get_edge_alignments(read, targets)
         # bowtie2 only retains up to the first space in a qname, so do the same
         # here to allow qnames to be compared
         sanitized_name = up_to_first_space(read.name)
@@ -193,7 +198,19 @@ def find_best_offset(R1_seq, R2_rc_seq):
     within_fractions = (periodicity.compute_within_fractions(R1_seq) + periodicity.compute_within_fractions(R2_rc_seq)) / 2
     period, period_fraction = periodicity.best_period(within_fractions)
 
-    if first_offset_fraction >= second_offset_fraction:
+    # Heuristic - if both offset fractions are very high, use the one with the
+    # most overlap, which is the one with the smaller offset.
+    if first_offset_fraction > 0.9 and second_offset_fraction > 0.9:
+        if first_offset < second_offset:
+            which = 'first'
+        else:
+            which = 'second'
+    elif first_offset_fraction >= second_offset_fraction:
+        which = 'first'
+    else:
+        which = 'second'
+
+    if which == 'first':
         offset = first_offset
         if period_fraction > 0.7:
             offset = offset % period
@@ -224,6 +241,11 @@ def represent_alignment(alignment):
             if ref_i != sw.GAP:
                 if (read_i, ref_i) in alignment['mismatches']:
                     match = 'x'
+
+                if ref_i - 1 in alignment['deletions']:
+                    match = '\\'
+                elif ref_i + 1 in alignment['deletions']:
+                    match = '/'
 
                 read_positions[absolute_read_position] = match
                 read_to_ref[absolute_read_position] = ref_i
@@ -413,37 +435,29 @@ def visualize_paired_end_mappings(R1_fn,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
-                                  results_dir,
+                                  output_fn,
                                  ):
 
     R1_alignment_groups_list = []
     R2_alignment_groups_list = []
 
     def get_R1_reads():
-        for i, R1 in izip(xrange(100), fastq.reads(R1_fn)):
-            yield R1
+        return islice(fastq.reads(R1_fn), 100)
     
     def get_R2_rc_reads():
-        for i, R2_rc in izip(xrange(100), fastq.reverse_complement_reads(R2_fn)):
-            yield R2_rc
+        return islice(fastq.reverse_complement_reads(R2_fn), 100)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
-        _, short_name = os.path.split(index_prefix)
-        
-        R1_sam_fn = '{0}/R1_{1}_local.sam'.format(results_dir, short_name)
-        R1_alignment_groups = produce_bowtie2_alignments_old(get_R1_reads(),
-                                                         R1_sam_fn,
+        R1_alignment_groups = produce_bowtie2_alignments(get_R1_reads(),
                                                          index_prefix,
                                                          genome_dir,
                                                          score_min,
                                                         )
         R1_alignment_groups_list.append(R1_alignment_groups)
         
-        R2_sam_fn = '{0}/R2_{1}_local.sam'.format(results_dir, short_name)
         # Design decisions made in the parsing make it easier if R2 reads are
         # reverse complemented before mapping.
-        R2_alignment_groups = produce_bowtie2_alignments_old(get_R2_rc_reads(),
-                                                         R2_sam_fn,
+        R2_alignment_groups = produce_bowtie2_alignments(get_R2_rc_reads(),
                                                          index_prefix,
                                                          genome_dir,
                                                          score_min,
