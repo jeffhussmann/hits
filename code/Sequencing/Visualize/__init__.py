@@ -162,5 +162,12 @@ def enhanced_scatter(xs, ys, ax,
         ax_x.set_yticks([])
         ax_y.set_xticks([])
         
-def draw_diagonal(ax, color='black', alpha=0.9, **kwargs):
-    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color=color, alpha=alpha, **kwargs)
+def draw_diagonal(ax, anti=False, color='black', **kwargs):
+    if anti:
+        xs, ys = [0, 1], [1, 0]
+    else:
+        xs, ys = [0, 1], [0, 1]
+    ax.plot(xs, ys,
+            transform=ax.transAxes,
+            color=color,
+            **kwargs)
