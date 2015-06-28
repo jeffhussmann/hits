@@ -33,6 +33,7 @@ def enhanced_scatter(xs, ys, ax,
                      color_by_density=True,
                      do_fit=True,
                      show_p_value=True,
+                     show_beta=True,
                      hists_height=0,
                      marker_size=4,
                      text_size=14,
@@ -70,6 +71,13 @@ def enhanced_scatter(xs, ys, ax,
 
     ax.scatter(xs, ys, c=colors, **kwargs)
 
+    if isinstance(text_location, tuple):
+        x, y = text_location
+        horizontal_alignment = 'center'
+        vertical_alignment = 'top'
+        x_sign = 1
+        y_sign = -1
+
     if 'left' in text_location:
         x = 0
         x_sign = 1
@@ -99,7 +107,7 @@ def enhanced_scatter(xs, ys, ax,
         y_offset = 0
     else:
         x_offset = 10
-        y_offset = 15
+        y_offset = 0.5 * text_size
 
     text_kwargs = {'xy': (x, y),
                    'xycoords': 'axes fraction',
@@ -113,16 +121,21 @@ def enhanced_scatter(xs, ys, ax,
     
     if do_fit:
         fit = np.polyfit(xs, ys, 1)
-        beta, _ = fit
+        beta, constant = fit
         fit_function = np.poly1d(fit)
         x_lims = ax.get_xlim()
         ax.plot(x_lims, fit_function(x_lims), **fit_line_kwargs)
         ax.set_xlim(*x_lims)
         
-        ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
-                    xytext=(x_sign * x_offset, y_sign * y_offset * 2),
-                    **text_kwargs)
-    
+        if show_beta == 'fit':
+            ax.annotate(r'$y = {0:0.2f} x {2:s} {1:0.2f}$'.format(beta, abs(constant), '+' if constant > 0 else '-'),
+                        xytext=(x_sign * x_offset, y_sign * y_offset * 4),
+                        **text_kwargs)
+        elif show_beta:
+            ax.annotate(r'$\beta$ = {:0.2f}'.format(beta),
+                        xytext=(x_sign * x_offset, y_sign * y_offset * 4),
+                        **text_kwargs)
+
     if in_log_space:
         # Values have been log'ed before being passed in, so exponentiate them
         # to recover correct correlation.
@@ -131,7 +144,7 @@ def enhanced_scatter(xs, ys, ax,
         r, p = scipy.stats.pearsonr(xs, ys)
 
     if variance:
-        r_part = 'r$^2$ = {:0.{digits}f}'.format(r**2, digits=r_digits)
+        r_part = '$r^2 = {:0.{digits}f}$'.format(r**2, digits=r_digits)
     else:
         r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
     if show_p_value:
@@ -167,6 +180,9 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
         xs, ys = [0, 1], [1, 0]
     else:
         xs, ys = [0, 1], [0, 1]
+        if ax.get_xlim() != ax.get_ylim():
+            raise ValueError('diagonal in non-equal axes')
+    
     ax.plot(xs, ys,
             transform=ax.transAxes,
             color=color,
