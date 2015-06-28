@@ -162,5 +162,11 @@ def enhanced_scatter(xs, ys, ax,
         ax_x.set_yticks([])
         ax_y.set_xticks([])
         
-def draw_diagonal(ax, color='black', alpha=0.9, **kwargs):
-    ax.plot([0, 1], [0, 1], transform=ax.transAxes, color=color, alpha=alpha, **kwargs)
+def draw_diagonal(ax, color='black', **kwargs):
+    if ax.get_xlim() != ax.get_ylim():
+        raise ValueError('diagonal in non-equal axes')
+
+    ax.plot([0, 1], [0, 1],
+            transform=ax.transAxes,
+            color=color,
+            **kwargs)
