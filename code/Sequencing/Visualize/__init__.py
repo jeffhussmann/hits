@@ -46,6 +46,8 @@ def enhanced_scatter(xs, ys, ax,
                      r_digits=2,
                      variance=False,
                      in_log_space=False,
+                     big_fit_line=False,
+                     color_list=None,
                     ):
     same_lists = np.allclose(xs, ys)
 
@@ -58,6 +60,8 @@ def enhanced_scatter(xs, ys, ax,
         points = np.vstack([xs, ys])
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
+    elif color_list:
+        colors = np.asarray(color_list)
     else:
         colors = 'black'
 
@@ -124,7 +128,11 @@ def enhanced_scatter(xs, ys, ax,
         beta, constant = fit
         fit_function = np.poly1d(fit)
         x_lims = ax.get_xlim()
-        ax.plot(x_lims, fit_function(x_lims), **fit_line_kwargs)
+        if big_fit_line:
+            plot_lims = (min(xs) - (max(xs) - min(xs)), max(xs) + (max(xs) - min(xs)))
+        else:
+            plot_lims = x_lims
+        ax.plot(plot_lims, fit_function(plot_lims), **fit_line_kwargs)
         ax.set_xlim(*x_lims)
         
         if show_beta == 'fit':
