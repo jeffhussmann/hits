@@ -28,6 +28,10 @@ def piece(file_name, num_pieces, which_piece, file_format, key=None):
     elif file_format == 'sam':
         find_next_chunk = partial(_find_next_sam_chunk, key=key)
 
+    if which_piece == -1:
+        # Sentinel value indicating merged experimnt
+        which_piece = 0
+
     this_start = _find_start(file_name,
                              num_pieces,
                              which_piece,
