@@ -73,42 +73,6 @@ def produce_bowtie2_alignments(reads,
                       for mapping in group if not mapping.is_unmapped]
         yield qname, alignments
 
-def produce_bowtie2_alignments_old(reads,
-                                   sam_fn,
-                                   index_prefix,
-                                   genome_dir,
-                                   score_min,
-                                  ):
-
-    bowtie2_options = {'local': True,
-                       #'report_all': True,
-                       'report_up_to': 10,
-                       'seed_mismatches': 1,
-                       'seed_interval_function': 'C,1,0',
-                       'seed_length': 10,
-                       #'threads': 12,
-                      }
-
-   
-    mapping_tools.map_bowtie2(index_prefix,
-                              None,
-                              None,
-                              sam_fn,
-                              unpaired_Reads=reads,
-                              custom_binary=True,
-                              score_min=score_min,
-                              **bowtie2_options)
-    
-    sam_file = pysam.Samfile(sam_fn)
-    region_fetcher = genomes.build_region_fetcher(genome_dir, load_references=True)
-
-    mapping_groups = utilities.group_by(sam_file, lambda m: m.qname)
-    
-    for qname, group in mapping_groups:
-        alignments = [mapping_to_alignment(mapping, sam_file, region_fetcher)
-                      for mapping in group if not mapping.is_unmapped]
-        yield qname, alignments
-       
 def get_local_alignments(read, targets):
     seq = read.seq
     seq_rc = utilities.reverse_complement(read.seq)
