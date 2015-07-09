@@ -120,7 +120,7 @@ def up_to_first_space(string):
     beginning = string.split(' ')[0]
     return beginning
 
-def produce_sw_alignments(reads, genome_dirs, extra_targets):
+def produce_sw_alignments(reads, genome_dirs, extra_targets, max_to_report=5):
     targets = []
     for genome_dir in genome_dirs:
         fasta_fns = genomes.get_all_fasta_file_names(genome_dir)
@@ -132,6 +132,9 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets):
         alignments = get_local_alignments(read, targets) + get_edge_alignments(read, targets)
         # bowtie2 only retains up to the first space in a qname, so do the same
         # here to allow qnames to be compared
+        alignments = sorted(alignments, key=lambda a: a['score'], reverse=True)
+        alignments = alignments[:max_to_report]
+
         sanitized_name = up_to_first_space(read.name)
         yield sanitized_name, alignments
 
