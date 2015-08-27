@@ -61,7 +61,10 @@ def enhanced_scatter(xs, ys, ax,
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
     elif color_list:
-        colors = np.asarray(color_list)
+        if isinstance(color_list, str):
+            colors = color_list
+        else:
+            colors = np.asarray(color_list)
     else:
         colors = 'black'
 
