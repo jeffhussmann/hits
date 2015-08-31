@@ -49,6 +49,9 @@ def enhanced_scatter(xs, ys, ax,
                      big_fit_line=False,
                      color_list=None,
                     ):
+    xs = np.asarray(xs)
+    ys = np.asarray(ys)
+
     same_lists = np.allclose(xs, ys)
 
     if color_by_density and not same_lists and len(xs) > 2:
