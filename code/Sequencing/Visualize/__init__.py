@@ -49,6 +49,9 @@ def enhanced_scatter(xs, ys, ax,
                      big_fit_line=False,
                      color_list=None,
                     ):
+    xs = np.asarray(xs)
+    ys = np.asarray(ys)
+
     same_lists = np.allclose(xs, ys)
 
     if color_by_density and not same_lists and len(xs) > 2:
@@ -172,19 +175,25 @@ def enhanced_scatter(xs, ys, ax,
                 xytext=(x_sign * x_offset, y_sign * y_offset),
                 **text_kwargs)
 
+    original_xlims = ax.get_xlim()
+    original_ylims = ax.get_ylim()
+
     if hists_height > 0:
         ax_x = ax.twinx()
-        ax_x.hist(xs, alpha=0.3, histtype='step', bins=100)
+        ax_x.hist(xs, alpha=0.9, histtype='step', bins=100)
         y_min, y_max = ax_x.get_ylim()
         ax_x.set_ylim(ymax=y_max / hists_height)
 
         ax_y = ax.twiny()
-        ax_y.hist(ys, alpha=0.3, histtype='step', bins=100, orientation='horizontal')
+        ax_y.hist(ys, alpha=0.9, histtype='step', bins=100, orientation='horizontal')
         x_min, x_max = ax_y.get_xlim()
         ax_y.set_xlim(xmax=x_max / hists_height)
 
         ax_x.set_yticks([])
         ax_y.set_xticks([])
+
+        ax.set_xlim(original_xlims)
+        ax.set_ylim(original_ylims)
         
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
