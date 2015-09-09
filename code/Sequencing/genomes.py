@@ -9,6 +9,10 @@ def get_all_fasta_file_names(genome_dir):
                         if not fn.endswith('.fai')]
     return fasta_file_names
 
+def get_all_fai_file_names(genome_dir):
+    fai_file_names = [fn for fn in glob.glob('{0}/*.fai'.format(genome_dir))]
+    return fai_file_names
+
 def make_fais(genome_dir):
     fasta_file_names = get_all_fasta_file_names(genome_dir)
     map(pysam.faidx, fasta_file_names)
@@ -32,10 +36,9 @@ def parse_fai(fai_file_name):
     return entries
 
 def get_genome_index(genome_dir):
-    fasta_file_names = get_all_fasta_file_names(genome_dir)
+    fai_file_names = get_all_fai_file_names(genome_dir)
     entries = {}
-    for fasta_file_name in fasta_file_names:
-        fai_file_name = fasta_file_name + '.fai'
+    for fai_file_name in fai_file_names:
         entries.update(parse_fai(fai_file_name))
     return entries
 
