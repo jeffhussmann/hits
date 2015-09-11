@@ -1,4 +1,4 @@
-from Sequencing import utilities, fastq, genomes, mapping_tools, sw
+from Sequencing import utilities, fastq, genomes, mapping_tools, sw, sam
 from Sequencing import fasta
 from Sequencing.Serialize import counts
 import pysam
@@ -8,22 +8,19 @@ from Circles import periodicity
 import numpy as np
 import os.path
 
-def mapping_to_alignment(mapping, sam_file, region_fetcher):
+def mapping_to_alignment(mapping, sam_file, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
-    # The read indices in AlignedRead's aligned_pairs are relative to qstart.
-    # Convert them to be absolute indices in seq.
     path = []
     mismatches = set()
     deletions = set()
-    rname = sam_file.getrname(mapping.tid)
-    for read_i, ref_i in mapping.aligned_pairs:
+
+    for read_i, ref_i in sam.aligned_pairs_exclude_soft_clipping(mapping):
         if read_i != None:
-            read_i = read_i + mapping.qstart
             if ref_i == None:
                 ref_i = sw.GAP
             else:
                 read_base = mapping.seq[read_i]
-                ref_base = region_fetcher(rname, ref_i, ref_i + 1).upper()
+                ref_base = base_lookup(mapping.tid, ref_i).upper()
                 if read_base != ref_base:
                     mismatches.add((read_i, ref_i))
 
@@ -37,7 +34,7 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
                  'is_reverse': mapping.is_reverse,
                  'mismatches': mismatches,
                  'deletions': deletions,
-                 'rname': rname,
+                 'rname': sam_file.get_reference_name(mapping.tid),
                  'query': mapping.seq,
                 }
     return alignment
@@ -63,13 +60,13 @@ def produce_bowtie2_alignments(reads,
                                                    yield_mappings=True,
                                                    **bowtie2_options)
 
-    region_fetcher = genomes.build_region_fetcher(genome_dir, load_references=True)
+    base_lookup = genomes.build_base_lookup(genome_dir, sam_file)
 
     mapping_groups = utilities.group_by(mappings, lambda m: m.qname)
     
     for qname, group in mapping_groups:
         group = sorted(group, key=lambda m: (m.tid, m.pos))
-        alignments = [mapping_to_alignment(mapping, sam_file, region_fetcher)
+        alignments = [mapping_to_alignment(mapping, sam_file, base_lookup)
                       for mapping in group if not mapping.is_unmapped]
         yield qname, alignments
 

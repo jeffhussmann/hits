@@ -857,3 +857,15 @@ def merge_by_name(*mapping_iterators):
 
         last_qname = qname
         yield mapping
+
+def aligned_pairs_exclude_soft_clipping(mapping):
+    cigar = mapping.cigartuples
+    aligned_pairs = mapping.aligned_pairs
+    first_op, first_length = cigar[0]
+    if first_op == BAM_CSOFT_CLIP:
+        aligned_pairs = aligned_pairs[first_length:]
+    if len(cigar) > 1:
+        last_op, last_length = cigar[-1]
+        if last_op == BAM_CSOFT_CLIP:
+            aligned_pairs = aligned_pairs[:-last_length]
+    return aligned_pairs
