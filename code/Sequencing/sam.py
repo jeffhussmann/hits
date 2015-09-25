@@ -61,7 +61,7 @@ def get_strand(mapping):
 def unmapped_aligned_read(qname):
     aligned_read = pysam.AlignedRead()
     aligned_read.qname = qname
-    aligned_read.flag = 0x10
+    aligned_read.flag = 0x4
     aligned_read.rname = -1
     aligned_read.pos = -1
     aligned_read.mapq = 0
