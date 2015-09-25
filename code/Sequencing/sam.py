@@ -247,7 +247,7 @@ def alignment_to_cigar_blocks(ref_aligned, read_aligned):
     sequence, counts = utilities.decompose_homopolymer_sequence(expanded_sequence)
     return [[count, char] for char, count in zip(sequence, counts)]
 
-def aligned_pairs_to_cigar(aligned_pairs):
+def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     op_sequence = []
     for read, ref in aligned_pairs:
         if read == None:
@@ -258,6 +258,22 @@ def aligned_pairs_to_cigar(aligned_pairs):
             op_sequence.append(BAM_CMATCH)
 
     cigar = [(op, len(times)) for op, times in utilities.group_by(op_sequence)]
+
+    if guide:
+        guide_cigar, from_side = guide
+
+        if from_side == 'right':
+            cigar = cigar[::-1]
+            guide_cigar = guide_cigar[::-1]
+
+        for i in range(min(len(cigar), len(guide_cigar))):
+            op, length = cigar[i]
+            guide_op, guide_length = guide_cigar[i]
+            cigar[i] = (guide_op, length)
+        
+        if from_side == 'right':
+            cigar = cigar[::-1]
+            guide_cigar = guide_cigar[::-1]
 
     return cigar
 
