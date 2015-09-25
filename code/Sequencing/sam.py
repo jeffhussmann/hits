@@ -822,11 +822,14 @@ class AlignmentSorter(object):
         if self.by_name:
             sort_command.append('-n')
 
+        self.dev_null = open(os.devnull, 'w')
         sort_command.extend(['-T', self.output_file_name,
                              '-o', self.output_file_name,
                              self.fifo.file_name,
                             ])
-        self.sort_process = subprocess.Popen(sort_command)
+        self.sort_process = subprocess.Popen(sort_command,
+                                             stderr=self.dev_null,
+                                            )
 
         self.sam_file = pysam.Samfile(self.fifo.file_name,
                                       'wbu',
@@ -839,7 +842,13 @@ class AlignmentSorter(object):
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.sam_file.close()
         self.sort_process.wait()
+        self.dev_null.close()
         self.fifo.__exit__(exception_type, exception_value, exception_traceback)
+        if self.sort_process.returncode:
+            raise RuntimeError(err_output)
+
+        if not self.by_name:
+            index_bam(self.output_file_name)
 
     def write(self, alignment):
         self.sam_file.write(alignment)
