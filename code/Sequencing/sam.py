@@ -274,7 +274,7 @@ def cigar_to_aligned_pairs(cigar, start):
                 ref_pos += 1
                 read_pos += 1
 
-        elif op == BAM_CDEL:
+        elif op == BAM_CDEL or op == BAM_CREF_SKIP:
             # Deletion results in gap in read
             for i in range(length):
                 aligned_pairs.append((None, ref_pos))
@@ -306,7 +306,7 @@ def cigar_to_aligned_pairs_backwards(cigar, end, read_length):
                 ref_pos -= 1
                 read_pos -= 1
 
-        elif op == BAM_CDEL:
+        elif op == BAM_CDEL or op == BAM_CREF_SKIP:
             # Deletion results in gap in read
             for i in range(length):
                 aligned_pairs.append((None, ref_pos))
