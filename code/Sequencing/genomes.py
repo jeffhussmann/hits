@@ -42,6 +42,24 @@ def get_genome_index(genome_dir):
         entries.update(parse_fai(fai_file_name))
     return entries
 
+def build_base_lookup(genome_dir, sam_file):
+    ''' Returns a memoized function for looking up single bases from reference.
+    '''
+    genome_index = get_genome_index(genome_dir)
+    references = {}
+
+    def base_lookup(tid, position):
+        if tid not in references:
+            seq_name = sam_file.getrname(tid)
+            fasta_file_name = genome_index[seq_name].file_name
+            with pysam.Fastafile(fasta_file_name) as fasta_file:
+                references[tid] = fasta_file.fetch(reference=seq_name)
+
+        base = references[tid][position]
+        return base
+
+    return base_lookup
+
 def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
     ''' Returns a function for fetching regions from the genome in genome_dir.
         If load_references == True, loads entire reference sequences into memory

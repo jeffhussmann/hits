@@ -1,4 +1,4 @@
-from Sequencing import utilities, fastq, genomes, mapping_tools, sw
+from Sequencing import utilities, fastq, genomes, mapping_tools, sw, sam
 from Sequencing import fasta
 from Sequencing.Serialize import counts
 import pysam
@@ -8,22 +8,19 @@ from Circles import periodicity
 import numpy as np
 import os.path
 
-def mapping_to_alignment(mapping, sam_file, region_fetcher):
+def mapping_to_alignment(mapping, sam_file, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
-    # The read indices in AlignedRead's aligned_pairs are relative to qstart.
-    # Convert them to be absolute indices in seq.
     path = []
     mismatches = set()
     deletions = set()
-    rname = sam_file.getrname(mapping.tid)
-    for read_i, ref_i in mapping.aligned_pairs:
+
+    for read_i, ref_i in sam.aligned_pairs_exclude_soft_clipping(mapping):
         if read_i != None:
-            read_i = read_i + mapping.qstart
             if ref_i == None:
                 ref_i = sw.GAP
             else:
                 read_base = mapping.seq[read_i]
-                ref_base = region_fetcher(rname, ref_i, ref_i + 1).upper()
+                ref_base = base_lookup(mapping.tid, ref_i).upper()
                 if read_base != ref_base:
                     mismatches.add((read_i, ref_i))
 
@@ -37,7 +34,7 @@ def mapping_to_alignment(mapping, sam_file, region_fetcher):
                  'is_reverse': mapping.is_reverse,
                  'mismatches': mismatches,
                  'deletions': deletions,
-                 'rname': rname,
+                 'rname': sam_file.get_reference_name(mapping.tid),
                  'query': mapping.seq,
                 }
     return alignment
@@ -63,52 +60,16 @@ def produce_bowtie2_alignments(reads,
                                                    yield_mappings=True,
                                                    **bowtie2_options)
 
-    region_fetcher = genomes.build_region_fetcher(genome_dir, load_references=True)
+    base_lookup = genomes.build_base_lookup(genome_dir, sam_file)
 
     mapping_groups = utilities.group_by(mappings, lambda m: m.qname)
     
     for qname, group in mapping_groups:
         group = sorted(group, key=lambda m: (m.tid, m.pos))
-        alignments = [mapping_to_alignment(mapping, sam_file, region_fetcher)
+        alignments = [mapping_to_alignment(mapping, sam_file, base_lookup)
                       for mapping in group if not mapping.is_unmapped]
         yield qname, alignments
 
-def produce_bowtie2_alignments_old(reads,
-                                   sam_fn,
-                                   index_prefix,
-                                   genome_dir,
-                                   score_min,
-                                  ):
-
-    bowtie2_options = {'local': True,
-                       #'report_all': True,
-                       'report_up_to': 10,
-                       'seed_mismatches': 1,
-                       'seed_interval_function': 'C,1,0',
-                       'seed_length': 10,
-                       #'threads': 12,
-                      }
-
-   
-    mapping_tools.map_bowtie2(index_prefix,
-                              None,
-                              None,
-                              sam_fn,
-                              unpaired_Reads=reads,
-                              custom_binary=True,
-                              score_min=score_min,
-                              **bowtie2_options)
-    
-    sam_file = pysam.Samfile(sam_fn)
-    region_fetcher = genomes.build_region_fetcher(genome_dir, load_references=True)
-
-    mapping_groups = utilities.group_by(sam_file, lambda m: m.qname)
-    
-    for qname, group in mapping_groups:
-        alignments = [mapping_to_alignment(mapping, sam_file, region_fetcher)
-                      for mapping in group if not mapping.is_unmapped]
-        yield qname, alignments
-       
 def get_local_alignments(read, targets):
     seq = read.seq
     seq_rc = utilities.reverse_complement(read.seq)
@@ -156,7 +117,7 @@ def up_to_first_space(string):
     beginning = string.split(' ')[0]
     return beginning
 
-def produce_sw_alignments(reads, genome_dirs, extra_targets):
+def produce_sw_alignments(reads, genome_dirs, extra_targets, max_to_report=5):
     targets = []
     for genome_dir in genome_dirs:
         fasta_fns = genomes.get_all_fasta_file_names(genome_dir)
@@ -168,6 +129,9 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets):
         alignments = get_local_alignments(read, targets) + get_edge_alignments(read, targets)
         # bowtie2 only retains up to the first space in a qname, so do the same
         # here to allow qnames to be compared
+        alignments = sorted(alignments, key=lambda a: a['score'], reverse=True)
+        alignments = alignments[:max_to_report]
+
         sanitized_name = up_to_first_space(read.name)
         yield sanitized_name, alignments
 
