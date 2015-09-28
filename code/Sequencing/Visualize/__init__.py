@@ -1,4 +1,5 @@
 import igv_colors
+import itertools
 import scipy.stats
 import numpy as np
 import matplotlib
@@ -207,3 +208,73 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
             transform=ax.transAxes,
             color=color,
             **kwargs)
+
+def label_scatter_plot(ax, xs, ys, labels, to_label,
+                       vector='orthogonal',
+                       initial_distance=50,
+                       arrow_alpha=0.2,
+                       manual_ratios=None,
+                       manual_alignments=None,
+                       text_kwargs={'size': 10},
+                      ):
+    def attempt_text(x, y, site, distance):
+        if vector == 'orthogonal':
+            x_offset = np.sign(x - y) * distance
+            y_offset = -np.sign(x - y) * distance
+            ha = 'center'
+            va = 'top' if y_offset < 0 else 'bottom'
+        elif vector == 'radial':
+            norm = np.linalg.norm([x, y])
+            x_offset = x * distance / norm
+            y_offset = y * distance / norm
+            ha, va = manual_alignments
+        elif vector == 'sideways':
+            x_offset = distance
+            y_offset = 0
+            ha, va = 'center', 'top'
+        elif vector == 'manual':
+            x_ratio, y_ratio = manual_ratios
+            ha, va = manual_alignments
+            x_offset = distance * x_ratio
+            y_offset = distance * y_ratio
+
+        text = ax.annotate(site,
+                           xy=(x, y),
+                           xycoords=('data', 'data'),
+                           xytext=(x_offset, y_offset),
+                           textcoords='offset points',
+                           ha=ha,
+                           va=va,
+                           **text_kwargs)
+        ax.figure.canvas.draw()
+
+        return text, text.get_window_extent(), (x, y, x_offset, y_offset)
+
+    ax.figure.canvas.draw()
+    starting_labels = [ax.xaxis.get_label(), ax.yaxis.get_label()] + ax.get_yticklabels() + ax.get_xticklabels()
+    bboxes = [label.get_window_extent() for label in starting_labels]
+
+    tuples = itertools.izip(np.asarray(xs)[to_label],
+                            np.asarray(ys)[to_label],
+                            np.asarray(labels)[to_label],
+                            )
+    for x, y, label in tuples:
+        distance = initial_distance
+        text, bbox, coords = attempt_text(x, y, label, distance)
+        while any(bbox.fully_overlaps(other_bbox) for other_bbox in bboxes):
+            text.remove()
+            distance += 10
+            text, bbox, coords = attempt_text(x, y, label, distance)
+            if distance >= 500:
+                break
+        
+        x, y, x_offset, y_offset = coords
+        ax.annotate('',
+                    xy=(x, y),
+                    xycoords=('data', 'data'),
+                    xytext=(x_offset, y_offset),
+                    textcoords=('offset points', 'offset points'),
+                    arrowprops={'arrowstyle': '->', 'alpha': 0.5},
+                   )
+
+        bboxes.append(bbox)
