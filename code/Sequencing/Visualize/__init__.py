@@ -278,3 +278,16 @@ def label_scatter_plot(ax, xs, ys, labels, to_label,
                    )
 
         bboxes.append(bbox)
+
+def evenly_spaced_jet_colors(n):
+    jet_colors = [matplotlib.cm.jet(x) for x in np.linspace(0, 1, n)]
+    return jet_colors
+
+def assign_colors_by_ranks(key_to_ranks, by_last=False):
+    colors = evenly_spaced_jet_colors(len(key_to_ranks))
+    if by_last:
+        index = -1
+    else:
+        index = 0
+    key_to_color = {key: colors[key_to_ranks[key][index]] for key in key_to_ranks}
+    return key_to_color
