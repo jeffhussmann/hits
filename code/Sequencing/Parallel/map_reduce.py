@@ -25,6 +25,7 @@ class MapReduceExperiment(object):
     specific_cleanup = []
 
     def __init__(self, **kwargs):
+        self.group = kwargs.get('group', '')
         self.name = kwargs['name']
         self.work_prefix = kwargs['work_prefix'].rstrip('/')
         self.scratch_prefix = kwargs['scratch_prefix'].rstrip('/')
