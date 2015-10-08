@@ -114,7 +114,6 @@ def backtrack_cython(char* query,
 
     while not reached_end:
         if (row, col) in cells_seen:
-            #print (row, col), 'was already seen'
             return None
         cells_seen.add((row, col))
 

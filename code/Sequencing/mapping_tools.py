@@ -430,6 +430,7 @@ def map_tophat_paired(R1_fn,
                       transcriptome_index,
                       tophat_dir,
                       num_threads=1,
+                      no_sort=False,
                      ):
     tophat_command = ['tophat2',
                       '--GTF', gtf_file_name,
@@ -444,3 +445,7 @@ def map_tophat_paired(R1_fn,
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
+    
+    accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
+    if not no_sort:
+        sam.index_bam(accepted_hits_fn)

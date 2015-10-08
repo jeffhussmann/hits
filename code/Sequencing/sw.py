@@ -167,7 +167,6 @@ def generate_alignments(query,
 
     alignments = []
     for end_row, end_col in possible_ends:
-        #print possible_end, matrices['score'][possible_end],
         alignment = backtrack_cython(query,
                                      target,
                                      matrices,
@@ -180,12 +179,9 @@ def generate_alignments(query,
                                     )
         if alignment != None:
             alignments.append(alignment)
-            #print alignment['path']
-            #print_local_alignment(query, target, alignment['path'])
             if len(alignments) == max_alignments:
                 break
         else:
-            #print 'collision'
             pass
 
     return alignments

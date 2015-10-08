@@ -212,6 +212,8 @@ def get_read_name_parser(read_name):
             parser = parse_SRA_read_name
         elif len(read_name.split('.')) == 3:
             parser = parse_paired_SRA_read_name
+    elif read_name.startswith('ERR'):
+        parser = parse_ERR_read_name
     else:
         num_words = len(read_name.split())
         if num_words == 2:
@@ -230,7 +232,7 @@ def get_read_name_standardizer(read_name):
         standardizer.
     '''
     parser = get_read_name_parser(read_name)
-    if parser == parse_SRA_read_name:
+    if parser == parse_SRA_read_name or parser == parse_ERR_read_name:
         def standardizer(read_name):
             accession, number = parser(read_name)
             standardized = _standardize_SRA(accession, number)
@@ -252,6 +254,7 @@ def get_read_name_standardizer(read_name):
 
 _standardize = '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}'.format
 _standardize_SRA = '{0:0>9.9s}:{1:0>10.10s}'.format
+_standardize_ERR = _standardize_SRA
 _standardize_paired_SRA = '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}'.format
 
 def parse_new_illumina_read_name(read_name):
@@ -281,6 +284,12 @@ def parse_paired_SRA_read_name(read_name):
     # Remove the leading 'SRR'
     accession = accession[3:]
     return accession, number, member
+
+def parse_ERR_read_name(read_name):
+    accession, number = read_name.split()[0].split('.')
+    # Remove the leading 'SRR'
+    accession = accession[3:]
+    return accession, number
 
 def coordinates_from_standardized(standardized):
     coordinates = standardized.split(':')[:-1]
