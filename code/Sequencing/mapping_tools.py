@@ -240,6 +240,7 @@ def launch_bowtie2(index_prefix,
                                        )
         sort_process = subprocess.Popen(sort_command,
                                         stdin=view_process.stdout,
+                                        stderr=subprocess.PIPE,
                                        )
         bowtie2_process.stdout.close()
         view_process.stdout.close()
@@ -322,10 +323,11 @@ def _map_bowtie2(index_prefix,
             for read in sam_file:
                 yield read
 
-        bowtie2_process.wait()
+        _, err_output = bowtie2_process.communicate()
         if bowtie2_process.returncode != 0:
             raise subprocess.CalledProcessError(bowtie2_process.returncode,
                                                 bowtie2_command,
+                                                err_output,
                                                )
         if bam_output:
             sam.index_bam(output_file_name)

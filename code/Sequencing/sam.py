@@ -754,9 +754,9 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
         index_bam(merged_file_name)
 
 def sam_to_sorted_bam(sam_file_name, bam_file_name):
-    bam_command = ['samtools', 'view', '-ubh', sam_file_name]
+    view_command = ['samtools', 'view', '-ubh', sam_file_name]
     sort_command = ['samtools', 'sort', '-T', bam_file_name, '-o', bam_file_name, '-']
-    bam_process = subprocess.Popen(bam_command,
+    bam_process = subprocess.Popen(view_command,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE,
                                   )
@@ -844,7 +844,7 @@ class AlignmentSorter(object):
                              self.fifo.file_name,
                             ])
         self.sort_process = subprocess.Popen(sort_command,
-                                             stderr=self.dev_null,
+                                             stderr=subprocess.PIPE,
                                             )
 
         self.sam_file = pysam.Samfile(self.fifo.file_name,
@@ -857,9 +857,10 @@ class AlignmentSorter(object):
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.sam_file.close()
-        self.sort_process.wait()
+        _, err_output = self.sort_process.communicate()
         self.dev_null.close()
         self.fifo.__exit__(exception_type, exception_value, exception_traceback)
+        
         if self.sort_process.returncode:
             raise RuntimeError(err_output)
 
