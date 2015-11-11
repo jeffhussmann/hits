@@ -3,7 +3,7 @@ from Sequencing import fasta
 from Sequencing.Serialize import counts
 import pysam
 import string
-from itertools import izip, izip_longest, chain
+from itertools import izip, izip_longest, chain, islice
 from Circles import periodicity
 import numpy as np
 import os.path
@@ -46,7 +46,6 @@ def produce_bowtie2_alignments(reads,
                               ):
 
     bowtie2_options = {'local': True,
-                       #'report_all': True,
                        'report_up_to': 10,
                        'seed_mismatches': 1,
                        'seed_interval_function': 'C,1,0',
@@ -84,7 +83,7 @@ def get_local_alignments(read, targets):
                                                 max_alignments=3,
                                                )
             for alignment in alignments:
-                if alignment['score'] >= 0.5 * 2 * len(alignment['path']):
+                if alignment['score'] >= 0.7 * 2 * len(alignment['path']):
                     alignment['query'] = query
                     alignment['rname'] = target.name
                     alignment['is_reverse'] = is_reverse
@@ -96,7 +95,7 @@ def get_edge_alignments(read, targets):
     seq = read.seq
     seq_rc = utilities.reverse_complement(read.seq)
     all_alignments = []
-    min_score = 12
+    min_score = 10
     for target in targets:
         for query, is_reverse in [(seq, False), (seq_rc, True)]:
             alignments = sw.generate_alignments(query,
@@ -151,6 +150,8 @@ def produce_representations(alignment_groups_list):
         yield qname, representations
 
 def find_best_offset(R1_seq, R2_rc_seq):
+    print R1_seq
+    print R2_rc_seq
     first_between_fractions = periodicity.compute_between_fractions(R1_seq, R2_rc_seq) 
     first_offset = np.argmax(first_between_fractions)
     first_offset_fraction = first_between_fractions[first_offset]
@@ -266,8 +267,11 @@ def represent_alignment(alignment):
     mismatch_chars = list(string.center(mismatch_string, width))
     extent_chars = mismatch_chars
 
-    extent_chars[left_edge_slice] = list(left_ref_edge_string)
-    extent_chars[right_edge_slice] = list(right_ref_edge_string)
+    left_start, left_stop, _ = left_edge_slice.indices(len(extent_chars))
+    right_start, right_stop, _ = right_edge_slice.indices(len(extent_chars))
+    if left_stop < right_start:
+        extent_chars[left_edge_slice] = list(left_ref_edge_string)
+        extent_chars[right_edge_slice] = list(right_ref_edge_string)
     extent_line = before_left + ''.join(extent_chars) + after_right
     
     read_positions_chars = [' ']*query_length
@@ -346,23 +350,23 @@ def visualize_unpaired_alignments(get_reads,
                                   bowtie2_targets,
                                   output_fn,
                                  ):
-    reads = []
-    for _, read in izip(xrange(100), get_reads()):
-        reads.append(read)
+
+    if isinstance(get_reads, str):
+        R1_fn = get_reads
+        def get_reads():
+            return islice(fastq.reads(R1_fn), 1000)
 
     R1_alignment_groups_list = []
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
-        _, short_name = os.path.split(index_prefix)
-        
-        R1_alignment_groups = produce_bowtie2_alignments(reads,
+        R1_alignment_groups = produce_bowtie2_alignments(get_reads(),
                                                          index_prefix,
                                                          genome_dir,
                                                          score_min,
                                                         )
         R1_alignment_groups_list.append(R1_alignment_groups)
         
-    R1_sw_alignment_groups = produce_sw_alignments(reads,
+    R1_sw_alignment_groups = produce_sw_alignments(get_reads(),
                                                    sw_genome_dirs,
                                                    extra_targets,
                                                   )
@@ -370,9 +374,7 @@ def visualize_unpaired_alignments(get_reads,
     
     R1_representation_groups = produce_representations(R1_alignment_groups_list)
 
-    R1_reads = reads
-
-    everything = [R1_reads,
+    everything = [get_reads(),
                   R1_representation_groups,
                  ]
 
@@ -455,8 +457,6 @@ def visualize_paired_end_mappings(R1_fn,
                   R2_representation_groups,
                  ]
     
-    output_fn = '{0}/visualized_mappings.txt'.format(results_dir)
-
     with open(output_fn, 'w') as output_fh:
         for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in izip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
@@ -538,7 +538,6 @@ if __name__ == '__main__1':
     
     R1_fn = '/home/jah/projects/mutations/experiments/miseq_UT_2014_09_02/CH/data/R1_contains.fastq'
     R2_fn = '/home/jah/projects/mutations/experiments/miseq_UT_2014_09_02/CH/data/R2_contains.fastq'
-    results_dir = '/home/jah/projects/mutations/experiments/miseq_UT_2014_09_02/CH/results'
     output_fn = '/home/jah/projects/mutations/experiments/miseq_UT_2014_09_02/CH/results/new_visualized_mappings.txt'
   
     with open(output_fn, 'w') as output_fh:
@@ -547,33 +546,73 @@ if __name__ == '__main__1':
                                  sw_genome_dirs,
                                  extra_targets,
                                  bowtie2_targets,
-                                 results_dir,
+                                 output_fn,
                                 )
+
+if __name__ == '__main__1':
+    bowtie2_targets = [('/home/jah/genomes/saccharomyces_cerevisiae', '/home/jah/bowtie2/saccharomyces_cerevisiae', 'C,20,0'),
+                      ]
+    sw_genome_dirs = ['/home/jah/genomes/truseq',
+                      #'/home/jah/projects/ribosomes/data/guydosh_markers/',
+                     ]
+    extra_targets = [fasta.Read('smRNA_linker', 'CTGTAGGCACCATCAAT'),
+                    ]
+    
+    R1_fn = '/home/jah/projects/ribosomes/experiments/guydosh_cell/wild-type_CHX/data/SRR1042853.fastq'
+    
+    output_fn = '/home/jah/projects/ribosomes/experiments/guydosh_cell/wild-type_CHX/results/wild-type_CHX_structures.txt'
+
+    def get_reads():
+        return islice(fastq.reads(R1_fn), 1000)
+
+
+    visualize_unpaired_alignments(get_reads,
+                                  sw_genome_dirs,
+                                  extra_targets,
+                                  bowtie2_targets,
+                                  output_fn,
+                                 )
+
+if __name__ == '__main__1':
+    bowtie2_targets = [('/home/jah/genomes/pCEP4_plus_contaminants/', '/home/jah/bowtie2/pCEP4_plus_contaminants', 'C,20,0'),
+                       ('/home/jah/genomes/hg19/', '/home/jah/bowtie2/hg19', 'C,50,0'),
+                      ]
+    sw_genome_dirs = ['/home/jah/genomes/truseq',
+                     ]
+    extra_targets = [fasta.Read('UTBC52', 'AACATA'),
+                    ]
+    
+    R1_unmapped_fn = '/home/jah/scratch/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/results.12.00/S2_R1_unmapped.fastq'
+    R2_unmapped_fn = '/home/jah/scratch/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/results.12.00/S2_R2_unmapped.fastq'
+    #R1_unmapped_fn = '/home/jah/scratch/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/results.12.00/test_R1.fastq'
+    #R2_unmapped_fn = '/home/jah/scratch/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/results.12.00/test_R2.fastq'
+    #R1_unmapped_fn = '/home/jah/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/data/small_R1.fastq'
+    #R2_unmapped_fn = '/home/jah/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/data/small_R2.fastq'
+    output_fn = '/home/jah/scratch/projects/lnt/experiments/hiseq_UT_2015_02_03/S2/results.12.00/'
+
+    visualize_paired_end_mappings(R1_unmapped_fn,
+                                  R2_unmapped_fn,
+                                  sw_genome_dirs,
+                                  extra_targets,
+                                  bowtie2_targets,
+                                  output_fn,
+                                 )
 
 if __name__ == '__main__':
     bowtie2_targets = [('/home/jah/genomes/saccharomyces_cerevisiae', '/home/jah/bowtie2/saccharomyces_cerevisiae', 'C,20,0'),
                       ]
     sw_genome_dirs = ['/home/jah/genomes/truseq',
-                      '/home/jah/projects/ribosomes/data/stephanie_markers',
-                      #'/home/jah/projects/ribosomes/data/organisms/saccharomyces_cerevisiae/EF4/contaminant/fasta',
-                      #'/home/jah/genomes/yeast_2_micron'
+                      #'/home/jah/projects/ribosomes/data/guydosh_markers/',
                      ]
     extra_targets = [fasta.Read('smRNA_linker', 'CTGTAGGCACCATCAAT'),
                     ]
     
-    unmapped_fn = '/home/jah/projects/ribosomes/experiments/belgium_2014_12_10/WT_1_mRNA/results/WT_1_mRNA_common_unmapped.txt'
+    R1_fn = '/home/jah/projects/ribosomes/experiments/pelechano_cell/by_chx_1_r/data/SRR1919065.fastq'
+    R2_fn = '/home/jah/projects/ribosomes/experiments/pelechano_cell/by_chx_1_p/data/SRR1646644_2.fastq'
+    
+    output_fn = '/home/jah/projects/ribosomes/experiments/pelechano_cell/by_chx_1_p/results/test.txt'
 
-    def get_reads():
-        for i, (seq, count) in enumerate(counts.read_file(unmapped_fn).most_common()):
-            read = fastq.Read('{0}_{1}'.format(i, count),
-                              seq,
-                              fastq.encode_sanger([40]*len(seq)),
-                             )
-            yield read
-
-    results_dir = '/home/jah/projects/ribosomes/experiments/belgium_2014_12_10/WT_1_mRNA/results/'
-  
-    visualize_unpaired_alignments(get_reads,
+    visualize_unpaired_alignments(R1_fn,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
