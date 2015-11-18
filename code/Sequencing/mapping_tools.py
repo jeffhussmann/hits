@@ -432,16 +432,20 @@ def map_tophat_paired(R1_fn,
                       num_threads=1,
                       no_sort=False,
                      ):
-    tophat_command = ['tophat2',
-                      '--GTF', gtf_file_name,
-                      '--no-novel-juncs',
-                      '--num-threads', str(num_threads),
-                      '--output-dir', tophat_dir,
-                      '--transcriptome-index', transcriptome_index,
-                      bowtie2_index,
-                      R1_fn,
-                      R2_fn,
-                     ]
+    options = [
+        '--GTF', gtf_file_name,
+        '--no-novel-juncs',
+        '--num-threads', str(num_threads),
+        '--output-dir', tophat_dir,
+        '--transcriptome-index', transcriptome_index,
+        '--report-secondary-alignments',
+        '--read-realign-edit-dist', '0',
+    ]
+    if no_sort:
+        options.append('--no-sort-bam')
+
+    tophat_command = ['tophat2'] + options + [bowtie2_index, R1_fn, R2_fn]
+
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
