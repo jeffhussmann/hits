@@ -309,7 +309,7 @@ def launch(args, script_path, num_stages):
         )
         output = subprocess.check_output([submitter, launcher_file_name])
         this_job_id = get_job_id(output)
-        print 'Launched stage {0} with jid {1}'.format(stage, this_job_id)
+        print '\tLaunched stage {0} with jid {1}'.format(stage, this_job_id)
 
         for stage in range(1, num_stages):
             previous_job_id = this_job_id
@@ -322,14 +322,14 @@ def launch(args, script_path, num_stages):
             )
             output = subprocess.check_output([submitter, launcher_file_name])
             this_job_id = get_job_id(output)
-            print 'Launched stage {0} with jid {1}, holding on {2}'.format(stage,
+            print '\tLaunched stage {0} with jid {1}, holding on {2}'.format(stage,
                                                                            this_job_id,
                                                                            previous_job_id,
                                                                           )
         os.chdir(starting_path)
     else:
         for stage in range(num_stages):
-            print 'Launched stage {0} with parallel'.format(stage)
+            print '\tLaunched stage {0} with parallel'.format(stage)
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)
 

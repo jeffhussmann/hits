@@ -97,14 +97,12 @@ def line_count(file_name):
     count = int(count)
     return count
 
-def progress_bar(max_val, iterable=None):
+def progress_bar(iterable):
     if progressbar == None:
         # If the module wasn't imported
-        if iterable:
-            return iterable
-        else:
-            return xrange(max_val)
+        return iterable
     else:
+        max_val = len(iterable)
         max_str = str(len(str(max_val)))
         format_string = '%(value)' + max_str + 'd / %(max)d'
         widgets = [progressbar.Bar('='),
@@ -114,10 +112,7 @@ def progress_bar(max_val, iterable=None):
                    progressbar.ETA(),
                   ]
         bar = progressbar.ProgressBar(widgets=widgets, maxval=max_val)
-        if iterable is not None:
-            return bar(iterable)
-        else:
-            return bar(xrange(max_val))
+        return bar(iterable)
 
 def pairwise(s):
     """ Returns the elements of s in overlapping pairs. """
