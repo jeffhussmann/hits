@@ -191,7 +191,7 @@ def launch_bowtie2(index_prefix,
     ]
 
     if custom_binary:
-        bowtie2_command = ['/home/jah/src/bowtie2-dev/bowtie2']
+        bowtie2_command = ['/home/jah/.local/src/bowtie2-dev/bowtie2']
     else:
         bowtie2_command = ['bowtie2']
 
