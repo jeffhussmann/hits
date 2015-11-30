@@ -30,12 +30,17 @@ def add_commas_to_yticks(ax):
     tick_formatter = matplotlib.ticker.FuncFormatter(commas_formatter)
     ax.yaxis.set_major_formatter(tick_formatter)
 
+@optional_ax
 def enhanced_scatter(xs, ys, ax,
+                     data=None,
+                     x_transform='{}',
+                     y_transform='{}',
+                     color_transform='{}',
                      color_by_density=True,
                      do_fit=True,
                      show_p_value=True,
                      show_beta=True,
-                     hists_height=0,
+                     hists_location=None,
                      marker_size=4,
                      text_size=14,
                      text_weight='normal',
@@ -50,8 +55,22 @@ def enhanced_scatter(xs, ys, ax,
                      big_fit_line=False,
                      color_list=None,
                     ):
+
+    if data is not None:
+        x_label = x_transform.format(xs)
+        y_label = y_transform.format(ys)
+        color_label = color_transform.format(color_list)
+        xs = data[xs]
+        ys = data[ys]
+        if color_list is not None:
+            color_list = data[color_list]
+
     xs = np.asarray(xs)
     ys = np.asarray(ys)
+
+    xs = eval(x_transform.format('xs'))
+    ys = eval(y_transform.format('ys'))
+    color_list = eval(color_transform.format('color_list'))
 
     same_lists = np.allclose(xs, ys)
 
@@ -64,7 +83,7 @@ def enhanced_scatter(xs, ys, ax,
         points = np.vstack([xs, ys])
         kernel = scipy.stats.gaussian_kde(sampled_points)
         colors = kernel(points)
-    elif color_list:
+    elif color_list is not None:
         if isinstance(color_list, str):
             colors = color_list
         else:
@@ -77,10 +96,25 @@ def enhanced_scatter(xs, ys, ax,
 
     kwargs = {'cmap': matplotlib.cm.jet,
               's': marker_size,
-              'linewidths' : (0.1,),
+              #'linewidths' : (0.1,),
+              'linewidths' : (0,),
              }
 
-    ax.scatter(xs, ys, c=colors, **kwargs)
+    scatter = ax.scatter(xs, ys, c=colors, **kwargs)
+    ax.set_xlabel(x_label, size=16)
+    ax.set_ylabel(y_label, size=16)
+    fig = ax.figure
+    ax_position = ax.get_position()
+
+    if color_list is not None:
+        cax = fig.add_axes((ax_position.x0 + ax_position.width * 0.07,
+                            ax_position.y1 - ax_position.height * 0.4,
+                            ax_position.width * 0.03,
+                            ax_position.height * 0.35,
+                           ),
+                          )
+        fig.colorbar(scatter, cax=cax)
+        cax.set_title(color_label)
 
     if isinstance(text_location, tuple):
         x, y = text_location
@@ -179,22 +213,30 @@ def enhanced_scatter(xs, ys, ax,
     original_xlims = ax.get_xlim()
     original_ylims = ax.get_ylim()
 
-    if hists_height > 0:
-        ax_x = ax.twinx()
-        ax_x.hist(xs, alpha=0.9, histtype='step', bins=100)
-        y_min, y_max = ax_x.get_ylim()
-        ax_x.set_ylim(ymax=y_max / hists_height)
+    if hists_location is not None:
+        if hists_location == 'inside':
+            bottom = ax_position.y0
+            left = ax_position.x0
+        elif hists_location == 'outside':
+            bottom = ax_position.y1
+            left = ax_position.x1
+        
+        common_kwargs = {'alpha': 0.2,
+                         'histtype': 'stepfilled',
+                         'bins': 100,
+                         'color': 'black',
+                        }
 
-        ax_y = ax.twiny()
-        ax_y.hist(ys, alpha=0.9, histtype='step', bins=100, orientation='horizontal')
-        x_min, x_max = ax_y.get_xlim()
-        ax_y.set_xlim(xmax=x_max / hists_height)
+        ax_x = fig.add_axes((ax_position.x0, bottom, ax_position.width, ax_position.height * 0.1), sharex=ax)
+        ax_x.hist(xs, range=(min(xs), max(xs)), **common_kwargs)
+        ax_x.axis('off')
 
-        ax_x.set_yticks([])
-        ax_y.set_xticks([])
+        ax_y = fig.add_axes((left, ax_position.y0, ax_position.width * 0.1, ax_position.height), sharey=ax)
+        ax_y.hist(ys, range=(min(ys), max(ys)), orientation='horizontal', **common_kwargs)
+        ax_y.axis('off')
 
-        ax.set_xlim(original_xlims)
-        ax.set_ylim(original_ylims)
+        #ax.set_xlim(original_xlims)
+        #ax.set_ylim(original_ylims)
         
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
