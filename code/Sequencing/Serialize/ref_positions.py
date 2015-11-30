@@ -1,6 +1,8 @@
 from Sequencing import utilities
 from Circles import variants
 
+extension = 'txt'
+
 def _consolidate_counts(positions_list):
     positions_list = sorted(positions_list)
     consolidated_list = []

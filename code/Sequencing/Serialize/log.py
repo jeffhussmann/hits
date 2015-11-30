@@ -1,6 +1,8 @@
 import itertools
 import collections
 
+extension = 'txt'
+
 def _write_pairs(pairs, log_file):
     ''' Writes pairs to a scalar log file. Each line has the form
         description:value

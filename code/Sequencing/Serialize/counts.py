@@ -1,5 +1,7 @@
 from collections import Counter
 
+extension = 'txt'
+
 def write_file(dict_of_counters, file_name):
     with open(file_name, 'w') as fh:
         for name, counter in sorted(dict_of_counters.items()):

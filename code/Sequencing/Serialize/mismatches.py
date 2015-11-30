@@ -1,6 +1,6 @@
 import numpy as np
-from Sequencing.utilities import base_order, base_to_index
-from Circles import variants
+
+extension = 'npy'
 
 def write_file(type_counts, mismatch_file_name):
     if not mismatch_file_name.endswith('.npy'):

@@ -1,8 +1,6 @@
-import pysam
 import shutil
 from functools import partial
 from Sequencing import external_sort, sam
-import subprocess
 from . import log
 
 def _concatenate(input_file_names, output_file_name):

@@ -1,5 +1,7 @@
 import numpy as np
 
+extension = 'npy'
+
 def write_file(array, file_name):
     ''' Writes a 3D array into a text file.
     '''

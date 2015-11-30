@@ -16,8 +16,8 @@ def extend_stages(whole_stages, specific_stages):
 
 class MapReduceExperiment(object):
     specific_results_files = [
-        ('summary', Serialize.log, '{name}_summary.txt'),
-        ('log', None, 'log.txt'),
+        ('summary', Serialize.log),
+        ('log', '', 'log.txt'),
     ]
     specific_figure_files = []
     specific_outputs = []
@@ -105,15 +105,26 @@ class MapReduceExperiment(object):
         self.merged_file_names = {}
         self.file_types = {}
 
-        for key, serialize_type, tail_template in self.results_files:
-            file_tail = tail_template.format(name=self.name)
-            self.file_names[key] = '{0}/{1}'.format(self.scratch_results_dir, file_tail)
-            self.merged_file_names[key] = '{0}/{1}'.format(self.work_results_dir, file_tail)
+        for file_info in self.results_files:
+            if len(file_info) == 3:
+                key, serialize_type, tail_template = file_info
+            else:
+                key, serialize_type = file_info
+                tail_template = '{name}_{key}.{extension}'
+
+            if isinstance(serialize_type, str):
+                extension = serialize_type
+            else:
+                extension = serialize_type.extension
+
+            file_tail = tail_template.format(name=self.name, key=key, extension=extension)
+            self.file_names[key] = '/'.join([self.scratch_results_dir, file_tail])
+            self.merged_file_names[key] = '/'.join([self.work_results_dir, file_tail])
             self.file_types[key] = serialize_type
 
         self.figure_file_names = {}
         for key, tail_template in self.figure_files:
-            file_tail = tail_template.format(name=self.name)
+            file_tail = tail_template.format(name=self.name, key=key)
             self.figure_file_names[key] = '{0}/{1}'.format(self.work_results_dir, file_tail)
 
         if self.which_piece == -1:
