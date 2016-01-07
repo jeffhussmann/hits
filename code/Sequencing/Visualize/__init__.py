@@ -335,3 +335,6 @@ def color_labels(labels, name_to_color):
         color = name_to_color.get(label.get_text(), None)
         if color:
             label.set_color(color)
+
+def apply_alpha(color, alpha):
+    return matplotlib.colors.colorConverter.to_rgba(color, alpha=alpha)
