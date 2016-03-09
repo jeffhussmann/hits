@@ -10,7 +10,7 @@ import string
 # SANGER_OFFSET is imported from fastq_cython
 SOLEXA_OFFSET = 64
 MAX_QUAL = 93
-MAX_EXPECTED_QUAL = 41
+MAX_EXPECTED_QUAL = 42
 
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
