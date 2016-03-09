@@ -178,6 +178,8 @@ def generate_alignments(query,
                                      force_either_start,
                                     )
         if alignment != None:
+            alignment['query'] = query
+            alignment['target'] = target
             alignments.append(alignment)
             if len(alignments) == max_alignments:
                 break
