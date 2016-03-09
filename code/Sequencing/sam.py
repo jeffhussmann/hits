@@ -250,9 +250,9 @@ def alignment_to_cigar_blocks(ref_aligned, read_aligned):
 def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     op_sequence = []
     for read, ref in aligned_pairs:
-        if read == None:
+        if read == None or read == '-':
             op_sequence.append(BAM_CDEL)
-        elif ref == None:
+        elif ref == None or ref == '-':
             op_sequence.append(BAM_CINS)
         else:
             op_sequence.append(BAM_CMATCH)
@@ -851,9 +851,11 @@ class AlignmentSorter(object):
 
         self.sam_file = pysam.Samfile(self.fifo.file_name,
                                       'wbu',
-                                      referencenames=self.reference_names,
-                                      referencelengths=self.reference_lengths
+                                      reference_names=self.reference_names,
+                                      reference_lengths=self.reference_lengths
                                      )
+
+        self.get_tid = self.sam_file.get_tid
 
         return self
 
