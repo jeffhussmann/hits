@@ -784,9 +784,11 @@ def index_bam(bam_file_name):
     samtools_command = ['samtools', 'index', bam_file_name]
     subprocess.check_call(samtools_command)
 
-def get_length_counts(bam_file_name, only_primary=True):
+def get_length_counts(bam_file_name, only_primary=True, only_unique=False):
     bam_file = pysam.Samfile(bam_file_name)
-    if only_primary:
+    if only_unique:
+        qlen_counts = Counter(ar.qlen for ar in bam_file if ar.mapping_quality == 50)
+    elif only_primary:
         qlen_counts = Counter(ar.qlen for ar in bam_file if not ar.is_unmapped and not ar.is_secondary)
     else:
         qlen_counts = Counter(ar.qlen for ar in bam_file)
