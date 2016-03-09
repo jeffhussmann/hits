@@ -250,9 +250,9 @@ def alignment_to_cigar_blocks(ref_aligned, read_aligned):
 def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     op_sequence = []
     for read, ref in aligned_pairs:
-        if read == None:
+        if read == None or read == '-':
             op_sequence.append(BAM_CDEL)
-        elif ref == None:
+        elif ref == None or ref == '-':
             op_sequence.append(BAM_CINS)
         else:
             op_sequence.append(BAM_CMATCH)
