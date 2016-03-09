@@ -173,6 +173,8 @@ class MapReduceExperiment(object):
 
         self.write_file('timing_{0}'.format(stage), times)
         self.write_file('summary_stage_{0}'.format(stage), self.summary)
+        
+        logging.info('Done with work for stage {0}'.format(stage))
 
     def do_cleanup(self, stage):
         logging.info('Beginning cleanup for stage {0}'.format(stage))
@@ -186,15 +188,18 @@ class MapReduceExperiment(object):
             times.append((function_name, end_time - start_time))
         
         Serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
+        logging.info('Done with cleanup for stage {0}'.format(stage))
 
-def controller(ExperimentClass, script_path):
+def controller(ExperimentClass, script_path, **override):
     args = parse_arguments()
     if args.subparser_name == 'launch':
-        launch(args, script_path, ExperimentClass.num_stages)
+        if override:
+            print 'Launching with {0}'.format(override)
+        launch(args, script_path, ExperimentClass.num_stages, **override)
     elif args.subparser_name == 'process':
-        process(args, ExperimentClass)
+        process(args, ExperimentClass, **override)
     elif args.subparser_name == 'finish':
-        finish(args, ExperimentClass)
+        finish(args, ExperimentClass, **override)
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -236,12 +241,13 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
-def parse_description(description_fn):
+def parse_description(description_fn, **override):
     description = dict(line.strip().split() for line in open(description_fn)
                        if not line.startswith('#'))
+    description.update(override)
     return description
 
-def launch(args, script_path, num_stages):
+def launch(args, script_path, num_stages, **override):
     description_file_name = '{0}/description.txt'.format(args.job_dir)
     description = parse_description(description_file_name)
 
@@ -344,18 +350,18 @@ def launch(args, script_path, num_stages):
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)
 
-def process(args, ExperimentClass):
+def process(args, ExperimentClass, **override):
     description_file_name = '{0}/description.txt'.format(args.job_dir)
-    description = parse_description(description_file_name)
+    description = parse_description(description_file_name, **override)
 
     experiment = ExperimentClass(num_pieces=args.num_pieces,
                                  which_piece=args.which_piece,
                                  **description)
     experiment.do_work(args.stage)
 
-def finish(args, ExperimentClass):
+def finish(args, ExperimentClass, **override):
     description_file_name = '{0}/description.txt'.format(args.job_dir)
-    description = parse_description(description_file_name)
+    description = parse_description(description_file_name, **override)
     
     merged = ExperimentClass(num_pieces=args.num_pieces,
                              which_piece=-1,
