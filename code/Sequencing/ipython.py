@@ -1,19 +1,25 @@
 import ipywidgets
 
+# from http://chris-said.io/
 toggle = '''
 <script>
-code_show=true; 
-function code_toggle() {
- if (code_show){
- $('div.input').hide();
- } else {
- $('div.input').show();
- }
- code_show = !code_show
-} 
-$( document ).ready(code_toggle);
+  function code_toggle() {
+    if (code_shown){
+      $('div.input').hide('100');
+      $('#toggleButton').val('Show Code')
+    } else {
+      $('div.input').show('100');
+      $('#toggleButton').val('Hide Code')
+    }
+    code_shown = !code_shown
+  }
+
+  $( document ).ready(function(){
+    code_shown=false;
+    $('div.input').hide()
+  });
 </script>
-To toggle code, click <a href="javascript:code_toggle()">here</a>.
+<form action="javascript:code_toggle()"><input type="submit" id="toggleButton" value="Show Code"></form>
 '''
 
 def binary_widget(default=True):
