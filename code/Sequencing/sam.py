@@ -849,9 +849,11 @@ class AlignmentSorter(object):
 
         self.sam_file = pysam.Samfile(self.fifo.file_name,
                                       'wbu',
-                                      referencenames=self.reference_names,
-                                      referencelengths=self.reference_lengths
+                                      reference_names=self.reference_names,
+                                      reference_lengths=self.reference_lengths
                                      )
+
+        self.get_tid = self.sam_file.get_tid
 
         return self
 
