@@ -6,6 +6,7 @@ from .fastq_cython import *
 from .utilities import identity, base_order, reverse_complement
 import numpy as np
 import string
+import gzip
 
 # SANGER_OFFSET is imported from fastq_cython
 SOLEXA_OFFSET = 64
@@ -104,7 +105,10 @@ def quality_and_complexity_paired(read_pairs, max_read_length, composition):
 def get_line_groups(line_source):
     if type(line_source) == str:
         # line_source is a file name.
-        lines = open(line_source)
+        if line_source.endswith('.gz'):
+            lines = gzip.open(line_source)
+        else:
+            lines = open(line_source)
     else:
         # line_source is an open file.
         lines = iter(line_source)
