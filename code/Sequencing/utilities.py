@@ -1,4 +1,5 @@
-from itertools import izip, islice, groupby, cycle
+from __future__ import division
+from itertools import izip, islice, groupby, cycle, product
 import subprocess
 import re
 import numpy as np
@@ -130,3 +131,12 @@ def empirical_cdf(values):
     sorted_values = np.sort(values)
     cumulative = np.true_divide(np.arange(len(sorted_values)), len(sorted_values))
     return sorted_values, cumulative
+
+def mers(k):
+     return (''.join(mer) for mer in product('TCAG', repeat=k))
+
+def smooth(ys, window):
+    smoothed = ys.astype(float)
+    for i in range(window, len(ys) - window):
+        smoothed[i] = sum(ys[i - window:i + window + 1]) / float(2 * window + 1)
+    return smoothed
