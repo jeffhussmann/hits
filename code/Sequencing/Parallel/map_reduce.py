@@ -155,6 +155,8 @@ class MapReduceExperiment(object):
 
         if file_format == 'pickle':
             data = pickle.load(open(file_name, 'rb'))
+        elif file_format == 'txt':
+            data = open(file_name).read()
         else:
             data = file_format.read_file(file_name, **kwargs)
 
