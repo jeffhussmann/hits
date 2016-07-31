@@ -13,4 +13,3 @@ def reads(file_name):
     for record in Bio.SeqIO.parse(file_name, 'fasta'):
         read = Read(record.name, str(record.seq))
         yield read
-
