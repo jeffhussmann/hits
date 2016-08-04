@@ -96,8 +96,12 @@ class MapReduceExperiment(object):
                            )
 
     @classmethod
-    def from_description_file_name(cls, description_file_name, num_pieces=1, which_piece=-1):
+    def from_description_file_name(cls, description_file_name,
+                                   num_pieces=1,
+                                   which_piece=-1,
+                                   **extra_kwargs):
         description = parse_description(description_file_name)
+        description.update(extra_kwargs)
         return cls(num_pieces=num_pieces, which_piece=which_piece, **description)
 
     def make_file_names(self):
@@ -346,6 +350,7 @@ def launch(args, script_path, num_stages, **override):
         os.chdir(starting_path)
     else:
         for stage in range(num_stages):
+        #for stage in [2]:
             print '\tLaunched stage {0} with parallel'.format(stage)
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)
