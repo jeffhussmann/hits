@@ -132,8 +132,12 @@ def empirical_cdf(values):
     cumulative = np.true_divide(np.arange(len(sorted_values)), len(sorted_values))
     return sorted_values, cumulative
 
-def mers(k):
-     return (''.join(mer) for mer in product('TCAG', repeat=k))
+def mers(k, include_N=False):
+    if include_N:
+        chars = 'TCAGN'
+    else:
+        chars = 'TCAG'
+    return (''.join(mer) for mer in product(chars, repeat=k))
 
 def smooth(ys, window):
     smoothed = ys.astype(float)
