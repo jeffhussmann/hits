@@ -400,6 +400,7 @@ def map_tophat(reads_file_names,
                tophat_dir,
                num_threads=1,
                no_sort=False,
+               keep_temporary_files=False,
               ):
 
     joined_reads_names = ','.join(reads_file_names)
@@ -415,6 +416,8 @@ def map_tophat(reads_file_names,
     ]
     if no_sort:
         options.append('--no-sort-bam')
+    if keep_temporary_files:
+        options.append('--keep-tmp')
 
     tophat_command = ['tophat2'] + options + [bowtie2_index, joined_reads_names]
     # tophat maintains its own logs of everything that is written to the
