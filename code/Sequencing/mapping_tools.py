@@ -157,6 +157,7 @@ def launch_bowtie2(index_prefix,
                    output_file_name,
                    error_file_name,
                    bam_output,
+                   by_name,
                    custom_binary,
                    **options):
     kwarg_to_bowtie2_argument = [
@@ -232,8 +233,12 @@ def launch_bowtie2(index_prefix,
         sort_command = ['samtools', 'sort',
                         '-T', output_file_name,
                         '-o', output_file_name,
-                        '-',
                        ]
+        if by_name:
+            sort_command.append('-n')
+
+        sort_command.append('-')
+
         view_process = subprocess.Popen(view_command,
                                         stdin=bowtie2_process.stdout,
                                         stdout=subprocess.PIPE,
@@ -255,6 +260,7 @@ def _map_bowtie2(index_prefix,
                  error_file_name='/dev/null',
                  custom_binary=False,
                  bam_output=False,
+                 by_name=False,
                  reads=None,
                  read_pairs=None,
                  yield_mappings=False,
@@ -307,6 +313,7 @@ def _map_bowtie2(index_prefix,
                                                           output_file_name,
                                                           error_file_name,
                                                           bam_output,
+                                                          by_name,
                                                           custom_binary,
                                                           **options)
 
@@ -337,6 +344,7 @@ def map_bowtie2(index_prefix,
                 R2_fn=None,
                 output_file_name=None,
                 bam_output=False,
+                by_name=False,
                 error_file_name='/dev/null',
                 custom_binary=False,
                 reads=None,
@@ -366,6 +374,7 @@ def map_bowtie2(index_prefix,
                              error_file_name=error_file_name,
                              custom_binary=custom_binary,
                              bam_output=bam_output,
+                             by_name=by_name,
                              reads=reads,
                              read_pairs=read_pairs,
                              yield_mappings=yield_mappings,
