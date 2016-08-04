@@ -1,4 +1,5 @@
 import ipywidgets
+import IPython.display
 
 # from http://chris-said.io/
 toggle = '''
@@ -21,6 +22,8 @@ toggle = '''
 </script>
 <form action="javascript:code_toggle()"><input type="submit" id="toggleButton" value="Show Code"></form>
 '''
+
+toggle_cell = IPython.display.HTML(toggle)
 
 def binary_widget(default=True):
     values = [int(default), int(not default)]

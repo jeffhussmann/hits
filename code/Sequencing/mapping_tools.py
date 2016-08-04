@@ -203,8 +203,8 @@ def launch_bowtie2(index_prefix,
             if value:
                 bowtie2_command.extend(bowtie2_argument)
 
-    # options are getting popped, so if anything is left, then it was
-    # something that wasn't being looked for
+    # Options are getting popped, so if anything is left, then it was
+    # something that wasn't being looked for.
     if len(options) > 0:
         raise ValueError('Unknown keyword argument', options)
 
