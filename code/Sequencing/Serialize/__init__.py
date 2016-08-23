@@ -42,8 +42,10 @@ special_mergers = {'bam': sam.merge_sorted_bam_files,
                    'concatenate': _concatenate,
                   }
 
-def merge_files(input_file_names, output_file_name, file_format):
-    if isinstance(file_format, str):
+def merge_files(input_file_names, output_file_name, file_format, fast=False):
+    if fast:
+        file_format.fast_merge(input_file_names, output_file_name)
+    elif isinstance(file_format, str):
         special_mergers[file_format](input_file_names, output_file_name)
     else:
         processed_inputs = (file_format.read_file(fn) for fn in input_file_names)

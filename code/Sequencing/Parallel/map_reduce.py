@@ -382,12 +382,20 @@ def finish(args, ExperimentClass, **override):
     for key in merged.outputs[args.stage]:
         piece_file_names = [piece.file_names[key] for piece in pieces]
         merged_file_name = merged.merged_file_names[key]
+        file_type = merged.file_types[key]
+
+        try:
+            file_type.fast_merge
+            fast_merge_exists = True
+        except AttributeError:
+            fast_merge_exists = False
 
         logging.info('Merging file {0}'.format(key))
         start_time = time.time()
         Serialize.merge_files(piece_file_names,
                               merged_file_name,
-                              merged.file_types[key],
+                              file_type,
+                              fast=fast_merge_exists,
                              )
         end_time = time.time()
         merge_times.append(('Merging {}'.format(key), end_time - start_time))
