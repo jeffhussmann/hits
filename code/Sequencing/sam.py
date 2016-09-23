@@ -14,40 +14,47 @@ import mapping_tools
 import logging
 import heapq
 
-BAM_CMATCH = 0 # M
-BAM_CINS = 1 # I
-BAM_CDEL = 2 # D
-BAM_CREF_SKIP = 3 # N
+BAM_CMATCH = 0     # M
+BAM_CINS = 1       # I
+BAM_CDEL = 2       # D
+BAM_CREF_SKIP = 3  # N
 BAM_CSOFT_CLIP = 4 # S
 BAM_CHARD_CLIP = 5 # H
-BAM_CPAD = 6 # P
-BAM_CEQUAL = 7 # =
-BAM_CDIFF = 8 # X
+BAM_CPAD = 6       # P
+BAM_CEQUAL = 7     # =
+BAM_CDIFF = 8      # X
 
-op_to_char = {BAM_CMATCH: 'M',
-              BAM_CINS: 'I',
-              BAM_CDEL: 'D',
-              BAM_CREF_SKIP: 'N',
-              BAM_CSOFT_CLIP: 'S',
-              BAM_CHARD_CLIP: 'H',
-              BAM_CPAD: 'P',
-              BAM_CEQUAL: '=',
-              BAM_CDIFF: 'X',
-             }
+op_to_char = {
+    BAM_CMATCH:     'M',
+    BAM_CINS:       'I',
+    BAM_CDEL:       'D',
+    BAM_CREF_SKIP:  'N',
+    BAM_CSOFT_CLIP: 'S',
+    BAM_CHARD_CLIP: 'H',
+    BAM_CPAD:       'P',
+    BAM_CEQUAL:     '=',
+    BAM_CDIFF:      'X',
+}
+# Want to be able to lookup with int or char keys, so make every relevant char
+# return itself.
+for v in op_to_char.values():
+    op_to_char[v] = v
 
-read_consuming_ops = {BAM_CMATCH,
-                      BAM_CINS,
-                      BAM_CSOFT_CLIP,
-                      BAM_CEQUAL,
-                      BAM_CDIFF,
-                     }
+read_consuming_ops = {
+    BAM_CMATCH,
+    BAM_CINS,
+    BAM_CSOFT_CLIP,
+    BAM_CEQUAL,
+    BAM_CDIFF,
+}
 
-ref_consuming_ops = {BAM_CMATCH,
-                     BAM_CDEL,
-                     BAM_CEQUAL,
-                     BAM_CDIFF,
-                     BAM_CREF_SKIP,
-                    }
+ref_consuming_ops = {
+    BAM_CMATCH,
+    BAM_CDEL,
+    BAM_CEQUAL,
+    BAM_CDIFF,
+    BAM_CREF_SKIP,
+}
 
 _unmapped_template = '{0}\t4\t*\t0\t0\t*\t*\t0\t0\t*\t*\n'.format
 
