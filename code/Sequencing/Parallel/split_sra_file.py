@@ -5,7 +5,7 @@ import Sequencing.Parallel
 import download_GSE
 import sys
 
-def piece(srr_fn, num_pieces, which_piece):
+def piece(srr_fn, num_pieces, which_piece, paired=False):
     root, _ = os.path.splitext(srr_fn)
     xml_fn = '{0}.xml'.format(root)
     if not os.path.exists(xml_fn):
@@ -18,19 +18,29 @@ def piece(srr_fn, num_pieces, which_piece):
     first = bounds[which_piece] + 1
     last = bounds[which_piece + 1]
 
-    with dump_spots(srr_fn, first, last) as lines:
+    with dump_spots(srr_fn, first, last, paired) as lines:
         for line in lines:
             yield line
 
 @contextlib.contextmanager
-def dump_spots(srr_fn, first, last):
+def dump_spots(srr_fn, first, last, paired):
+    if paired:
+        name_format = '@$ac.$si.$ri'
+    else:
+        name_format = '@$ac.$si'
+
     command = ['fastq-dump',
-               '-N', str(first),
-               '-X', str(last),
-               '--defline-seq', '@$ac.$si',
-               '-Z',
+               '--dumpbase',
+               '--minSpotId', str(first),
+               '-maxSpotId', str(last),
+               '--defline-seq', name_format,
+               '--stdout',
                srr_fn,
               ]
+
+    if paired:
+        command.insert(1, '--split-spot')
+
     process = subprocess.Popen(command,
                                stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE,
