@@ -116,6 +116,11 @@ class MapReduceExperiment(object):
                 key, serialize_type = file_info
                 tail_template = '{name}_{key}.{extension}'
 
+            if isinstance(serialize_type, tuple):
+                serialize_type, fast_merge = serialize_type
+            else:
+                fast_merge = False
+
             if isinstance(serialize_type, str):
                 extension = serialize_type
             else:
@@ -124,7 +129,7 @@ class MapReduceExperiment(object):
             file_tail = tail_template.format(name=self.name, key=key, extension=extension)
             self.file_names[key] = '/'.join([self.scratch_results_dir, file_tail])
             self.merged_file_names[key] = '/'.join([self.work_results_dir, file_tail])
-            self.file_types[key] = serialize_type
+            self.file_types[key] = (serialize_type, fast_merge)
 
         self.figure_file_names = {}
         for key, tail_template in self.figure_files:
@@ -140,7 +145,7 @@ class MapReduceExperiment(object):
         Serialize.log.consolidate_stages(stage_file_names, self.file_names['summary'])
 
     def write_file(self, key, data):
-        file_format = self.file_types[key]
+        file_format, _ = self.file_types[key]
         file_name = self.file_names[key]
 
         if file_format == 'pickle':
@@ -155,7 +160,7 @@ class MapReduceExperiment(object):
         else:
             file_name = self.merged_file_names[key]
         
-        file_format = self.file_types[key]
+        file_format, _ = self.file_types[key]
 
         if file_format == 'pickle':
             data = pickle.load(open(file_name, 'rb'))
@@ -382,20 +387,14 @@ def finish(args, ExperimentClass, **override):
     for key in merged.outputs[args.stage]:
         piece_file_names = [piece.file_names[key] for piece in pieces]
         merged_file_name = merged.merged_file_names[key]
-        file_type = merged.file_types[key]
+        file_type, fast_merge = merged.file_types[key]
 
-        try:
-            file_type.fast_merge
-            fast_merge_exists = True
-        except AttributeError:
-            fast_merge_exists = False
-
-        logging.info('Merging file {0}'.format(key))
+        logging.info('Merging file {0} (fast_merge={1})'.format(key, fast_merge))
         start_time = time.time()
         Serialize.merge_files(piece_file_names,
                               merged_file_name,
                               file_type,
-                              fast=fast_merge_exists,
+                              fast=fast_merge,
                              )
         end_time = time.time()
         merge_times.append(('Merging {}'.format(key), end_time - start_time))
