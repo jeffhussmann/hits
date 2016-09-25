@@ -144,3 +144,10 @@ def smooth(ys, window):
     for i in range(window, len(ys) - window):
         smoothed[i] = sum(ys[i - window:i + window + 1]) / float(2 * window + 1)
     return smoothed
+
+def reverse_dictionary(d):
+    r = {v: k for k, v in d.iteritems()}
+    return r
+
+def split_nonempty(string, delim):
+    return [f for f in string.split(delim) if f]
