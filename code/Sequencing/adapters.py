@@ -2,17 +2,25 @@ from adapters_cython import *
 import numpy as np
 from Sequencing import utilities
 
-primers = {'tru_seq': {'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT',
-                       'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
-                      },
-           'PE': {'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
-                  'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
-                 },
-          }
+primers = {
+    'tru_seq': {
+        'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+    },
+    'PE': {
+        'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
+        'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
+    },
+    'nextera': {
+        'R1': 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+        'R2': 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+    },
+}
 
-flow_cell = {'P5': 'AATGATACGGCGACCACCGAGA',
-             'P7': 'CAAGCAGAAGACGGCATACGAGAT',
-            }
+flow_cell = {
+    'P5': 'AATGATACGGCGACCACCGAGA',
+    'P7': 'CAAGCAGAAGACGGCATACGAGAT',
+}
 
 A_tail = 'A' * 10
 
