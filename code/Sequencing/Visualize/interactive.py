@@ -71,8 +71,14 @@ def scatter(df, hover_keys=None, table_keys=None):
     fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
 
     if 'color' not in df:
-        scatter.selection_glyph = bokeh.models.Circle(fill_color="orange", line_color=None)
-    scatter.nonselection_glyph = bokeh.models.Circle(fill_color="black", line_color=None, fill_alpha=0.1)
+        scatter.selection_glyph = bokeh.models.Circle(fill_color="orange",
+                                                      line_color=None,
+                                                     )
+
+    scatter.nonselection_glyph = bokeh.models.Circle(fill_color="black",
+                                                     line_color=None,
+                                                     fill_alpha=0.1,
+                                                    )
 
     # Configure tooltips that pop up when hovering over a point.
     
@@ -108,9 +114,8 @@ def scatter(df, hover_keys=None, table_keys=None):
                                                  )
         columns.append(column)
 
-    filtered_data = {k: [] for k in table_col_names}
-    filtered_data['x'] = []
-    filtered_data['y'] = []
+    
+    filtered_data = {k: [] for k in list(df.columns) + [df.index.name, 'x', 'y']}
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data)
     
     labels = bokeh.models.LabelSet(x='x',
@@ -137,20 +142,20 @@ def scatter(df, hover_keys=None, table_keys=None):
     y_menu = bokeh.models.widgets.Select(title='Y', options=numerical_cols, value=y_name)
 
     menu_callback_code = """
-    var scatter_data = scatter_source.get('data');
-    var label_data = label_source.get('data');
+    var scatter_data = scatter_source.data;
+    var label_data = label_source.data;
     
-    var x_name = x_menu.get('value');
-    var y_name = y_menu.get('value');
+    var x_name = x_menu.value;
+    var y_name = y_menu.value;
     
-    scatter_data['x'] = scatter_data[x_name];
-    scatter_data['y'] = scatter_data[y_name];
+    scatter_data.x = scatter_data[x_name];
+    scatter_data.y = scatter_data[y_name];
     
-    label_data['x'] = label_data[x_name];
-    label_data['y'] = label_data[y_name];
+    label_data.x = label_data[x_name];
+    label_data.y = label_data[y_name];
     
-    xaxis.set('axis_label', x_name);
-    yaxis.set('axis_label', y_name);
+    xaxis.axis_label = x_name;
+    yaxis.axis_label = y_name;
     
     scatter_source.trigger('change');
     label_source.trigger('change');
@@ -170,15 +175,15 @@ def scatter(df, hover_keys=None, table_keys=None):
     # Set up callback to filter the table when selection changes.
 
     selection_callback_code = """
-    var data = source.get('data');
-    var filtered_source = table.get('source')
-    var filtered_data = filtered_source.get('data');
-    var inds = cb_obj.get('selected')['1d'].indices;
+    var full_data = source.data;
+    var filtered_source = table.source;
+    var filtered_data = filtered_source.data;
+    var inds = cb_obj.selected['1d'].indices;
 
-    for (var key in data) {
+    for (var key in full_data) {
         filtered_data[key] = []
         for (i = 0; i < inds.length; i++) {
-            filtered_data[key].push(data[key][inds[i]]);
+            filtered_data[key].push(full_data[key][inds[i]]);
         }
     }
 
@@ -191,7 +196,7 @@ def scatter(df, hover_keys=None, table_keys=None):
     
     # Button to toggle labels.
     
-    button = bokeh.models.widgets.Toggle(label="label selected points",
+    button = bokeh.models.widgets.Toggle(label='label selected points',
                                          width=50,
                                          active=True,
                                         )
