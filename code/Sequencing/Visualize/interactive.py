@@ -39,17 +39,21 @@ def scatter(df, hover_keys=None, table_keys=None):
         axis.axis_label_text_font_style = 'normal'
 
     scatter_source = bokeh.models.ColumnDataSource(data=df)
+
     scatter_source.data['x'] = scatter_source.data[x_name]
     scatter_source.data['y'] = scatter_source.data[y_name]
+
     if 'color' not in df:
         scatter_source.data['color'] = ['rgba(0, 0, 0, 0.5)' for _ in scatter_source.data['x']]
+
+    if df.index.name is None:
+        df.index.name = 'index'
     
     scatter = fig.scatter('x',
                           'y',
                           source=scatter_source,
                           size=6,
                           fill_color='color',
-                          #fill_alpha=0.5,
                           line_color=None,
                          )
     
@@ -83,7 +87,7 @@ def scatter(df, hover_keys=None, table_keys=None):
     fig.add_tools(hover)
 
     # Set up the table.
-    
+
     table_col_names = [df.index.name] + table_keys
     columns = []
     for col_name in table_col_names:
