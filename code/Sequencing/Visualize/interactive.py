@@ -1,8 +1,22 @@
 import numpy as np
 import bokeh.io
 import bokeh.plotting
+import pandas as pd
+import PIL.ImageColor
 
 def scatter(df, hover_keys=None, table_keys=None):
+    ''' Makes an interactive scatter plot using bokeh.
+
+    Args:
+            df: A pandas DataFrame with columns containing numerical data to plot.
+                If 'color' is a column, it will be used to color the points. 
+                Index values will be used as labels for points.
+            hover_keys: Names of columns in df to display in the tooltip that appears
+                when you hover over a point.
+            table_keys: Names of columns in df to display in the table below the plot
+                that is populated with the selected points from the figure.
+    '''
+
     if hover_keys is None:
         hover_keys = []
 
@@ -211,3 +225,13 @@ def scatter(df, hover_keys=None, table_keys=None):
     ]
     layout = bokeh.layouts.layout(grid)
     bokeh.io.show(layout)
+
+def hex_to_CSS(hex_string, alpha=1.):
+    ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
+    rgb = PIL.ImageColor.getrgb(hex_string)
+    CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
+    return CSS
+
+def example():
+    df = pd.read_csv('/home/jah/projects/sequencing/code/Sequencing/Visualize/example_df.txt', index_col='alias')
+    scatter(df, hover_keys=['short_description'], table_keys=['description'])
