@@ -4,7 +4,7 @@ import bokeh.plotting
 import pandas as pd
 import PIL.ImageColor
 
-def scatter(df, hover_keys=None, table_keys=None):
+def scatter(df, hover_keys=None, table_keys=None, size=900):
     ''' Makes an interactive scatter plot using bokeh.
 
     Args:
@@ -38,8 +38,8 @@ def scatter(df, hover_keys=None, table_keys=None):
         'save',
     ]
     
-    fig = bokeh.plotting.figure(plot_width=900,
-                                plot_height=900,
+    fig = bokeh.plotting.figure(plot_width=size,
+                                plot_height=size,
                                 tools=','.join(tools),
                                 lod_threshold=5000,
                                )
@@ -149,7 +149,7 @@ def scatter(df, hover_keys=None, table_keys=None):
     
     table = bokeh.models.widgets.DataTable(source=filtered_source,
                                            columns=columns,
-                                           width=900,
+                                           width=size,
                                            height=1000,
                                            sortable=False,
                                           )
