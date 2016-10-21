@@ -4,6 +4,8 @@ import bokeh.plotting
 import pandas as pd
 import PIL.ImageColor
 
+bokeh.io.output_notebook()
+
 def scatter(df, hover_keys=None, table_keys=None, size=900):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -23,7 +25,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     if table_keys is None:
         table_keys = []
 
-    bokeh.io.output_notebook()
 
     # Set up the actual scatter plot.
     
