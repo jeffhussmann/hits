@@ -41,7 +41,11 @@ def scatter(df, hover_keys=None, table_keys=None):
     fig = bokeh.plotting.figure(plot_width=900,
                                 plot_height=900,
                                 tools=','.join(tools),
+                                lod_threshold=5000,
                                )
+    
+    lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
+    fig.add_tools(lasso)
 
     numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
     x_name, y_name = numerical_cols[:2]
