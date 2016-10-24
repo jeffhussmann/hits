@@ -194,24 +194,19 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     # Set up callback to filter the table when selection changes.
 
     selection_callback_code = """
-    var full_data = source.data;
-    var filtered_source = table.source;
-    var filtered_data = filtered_source.data;
-    var inds = cb_obj.selected['1d'].indices;
+    full_data = source.data
+    filtered_data = table.source.data
+    indices = cb_obj.selected['1d'].indices
 
-    for (var key in full_data) {
-        filtered_data[key] = []
-        for (i = 0; i < inds.length; i++) {
-            filtered_data[key].push(full_data[key][inds[i]]);
-        }
-    }
+    for key, values of full_data
+        filtered_data[key] = (values[i] for i in indices)
 
-    table.trigger('change');
-    labels.trigger('change');
+    table.trigger('change')
+    labels.trigger('change')
     """
 
     selection_args = dict(source=scatter_source, table=table, labels=labels)
-    scatter_source.callback = bokeh.models.CustomJS(args=selection_args, code=selection_callback_code)
+    scatter_source.callback = bokeh.models.CustomJS.from_coffeescript(args=selection_args, code=selection_callback_code)
     
     # Button to toggle labels.
     
