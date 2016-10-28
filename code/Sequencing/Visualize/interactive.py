@@ -3,8 +3,21 @@ import bokeh.io
 import bokeh.plotting
 import pandas as pd
 import PIL.ImageColor
+import os.path
+import glob
 
 bokeh.io.output_notebook()
+
+# For easier editing, coffeescript callbacks are kept in separate files
+# in the same directory as this one. Load their contents into a dictionary.
+
+coffee_fns = glob.glob(os.path.join(os.path.dirname(__file__), '*.coffee'))
+callbacks = {}
+for fn in coffee_fns:
+    head, tail = os.path.split(fn)
+    root, ext = os.path.splitext(tail)
+    with open(fn) as fh:
+        callbacks[root] = fh.read()
 
 def scatter(df, hover_keys=None, table_keys=None, size=900):
     ''' Makes an interactive scatter plot using bokeh.
@@ -25,7 +38,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     if table_keys is None:
         table_keys = []
 
-
     # Set up the actual scatter plot.
     
     tools= [
@@ -33,7 +45,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
         'pan',
         'box_zoom',
         'box_select',
-        'poly_select',
         'tap',
         'wheel_zoom',
         'save',
@@ -44,11 +55,15 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                                 tools=','.join(tools),
                                 lod_threshold=5000,
                                )
+    fig.grid.visible = False
+    fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
     fig.add_tools(lasso)
 
     numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
+    nonnumerical_cols = [n for n in df.columns | [df.index.name] if n not in numerical_cols]
+
     x_name, y_name = numerical_cols[:2]
     
     fig.xaxis.axis_label = x_name
@@ -85,6 +100,10 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     
     initial = (overall_min - overhang, overall_max + overhang)
     bounds = (overall_min - max_overhang, overall_max + max_overhang)
+
+    fig.line(x=bounds, y=bounds, color='black', alpha=0.4, name='diagonal')
+    fig.line(x=bounds, y=np.array(bounds) + 1, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
+    fig.line(x=bounds, y=np.array(bounds) - 1, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
     
     fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
     fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
@@ -104,8 +123,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     hover = bokeh.models.HoverTool()
     hover.tooltips = [
         (df.index.name, '@{0}'.format(df.index.name)),
-        ('x', '@x'),
-        ('y', '@y'),
     ]
     for key in hover_keys:
         hover.tooltips.append((key, '@{0}'.format(key)))
@@ -133,7 +150,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                                                  )
         columns.append(column)
 
-    
     filtered_data = {k: [] for k in list(df.columns) + [df.index.name, 'x', 'y']}
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data)
     
@@ -157,28 +173,14 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     
     # Set up menus to select columns from df to put on x- and y-axis.
 
-    x_menu = bokeh.models.widgets.Select(title='X', options=numerical_cols, value=x_name)
-    y_menu = bokeh.models.widgets.Select(title='Y', options=numerical_cols, value=y_name)
-
-    menu_callback_code = """
-    var scatter_data = scatter_source.data;
-    var label_data = label_source.data;
-    
-    var x_name = x_menu.value;
-    var y_name = y_menu.value;
-    
-    scatter_data.x = scatter_data[x_name];
-    scatter_data.y = scatter_data[y_name];
-    
-    label_data.x = label_data[x_name];
-    label_data.y = label_data[y_name];
-    
-    xaxis.axis_label = x_name;
-    yaxis.axis_label = y_name;
-    
-    scatter_source.trigger('change');
-    label_source.trigger('change');
-    """
+    x_menu = bokeh.models.widgets.Select(title='X',
+                                         options=numerical_cols,
+                                         value=x_name,
+                                        )
+    y_menu = bokeh.models.widgets.Select(title='Y',
+                                         options=numerical_cols,
+                                         value=y_name,
+                                        )
 
     menu_args = dict(scatter_source=scatter.data_source,
                      label_source=labels.source,
@@ -187,26 +189,14 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                      xaxis=fig.xaxis[0],
                      yaxis=fig.yaxis[0],
                     )
-    menu_callback = bokeh.models.CustomJS(args=menu_args, code=menu_callback_code)
+    menu_callback = bokeh.models.CustomJS.from_coffeescript(args=menu_args, code=callbacks['scatter_menu'])
     x_menu.callback = menu_callback
     y_menu.callback = menu_callback
     
     # Set up callback to filter the table when selection changes.
 
-    selection_callback_code = """
-    full_data = source.data
-    filtered_data = table.source.data
-    indices = cb_obj.selected['1d'].indices
-
-    for key, values of full_data
-        filtered_data[key] = (values[i] for i in indices)
-
-    table.trigger('change')
-    labels.trigger('change')
-    """
-
     selection_args = dict(source=scatter_source, table=table, labels=labels)
-    scatter_source.callback = bokeh.models.CustomJS.from_coffeescript(args=selection_args, code=selection_callback_code)
+    scatter_source.callback = bokeh.models.CustomJS.from_coffeescript(args=selection_args, code=callbacks['scatter_selection'])
     
     # Button to toggle labels.
     
@@ -218,9 +208,20 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                                             code='labels.text_alpha = 1 - labels.text_alpha;',
                                            )
 
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1)
+    grid_options.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['scatter_grid'])
+
+    text_input = bokeh.models.widgets.TextInput(title='Search:')
+    text_input.callback = bokeh.models.CustomJS.from_coffeescript(callbacks['scatter_search'].format(columns=nonnumerical_cols),
+                                                                  args=dict(scatter_source=scatter.data_source,
+                                                                            labels=labels,
+                                                                            table=table,
+                                                                           ),
+                                                                 )
+
     grid = [
-        [x_menu, y_menu, button],
-        [fig],
+        [bokeh.layouts.widgetbox([x_menu, y_menu])],
+        [fig, bokeh.layouts.widgetbox([button, grid_options, text_input])],
         [table],
     ]
     layout = bokeh.layouts.layout(grid)
