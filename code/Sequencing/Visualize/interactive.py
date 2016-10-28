@@ -235,7 +235,8 @@ def hex_to_CSS(hex_string, alpha=1.):
     return CSS
 
 def example():
-    df = pd.read_csv('/home/jah/projects/sequencing/code/Sequencing/Visualize/example_df.txt', index_col='alias')
+    fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
+    df = pd.read_csv(fn, index_col='alias')
     scatter(df, hover_keys=['short_description'], table_keys=['description'])
 
 def lines(xs, ys, colors, groupings):
