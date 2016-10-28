@@ -5,6 +5,7 @@ import pandas as pd
 import PIL.ImageColor
 import os.path
 import glob
+from collections import defaultdict
 
 bokeh.io.output_notebook()
 
@@ -236,3 +237,110 @@ def hex_to_CSS(hex_string, alpha=1.):
 def example():
     df = pd.read_csv('/home/jah/projects/sequencing/code/Sequencing/Visualize/example_df.txt', index_col='alias')
     scatter(df, hover_keys=['short_description'], table_keys=['description'])
+
+def lines(xs, ys, colors, groupings):
+    sources = {}
+    data = defaultdict(dict)
+    for checkbox_name in sorted(ys):
+        source = bokeh.models.ColumnDataSource(ys[checkbox_name])
+        source.data['x'] = xs
+        source.data['y'] = source.data[sorted(ys[checkbox_name])[0]]
+        source.data['name'] = [checkbox_name] * len(xs)
+        sources[checkbox_name] = source
+    
+    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800)
+
+    fig.x_range = bokeh.models.Range1d(-25, 25, bounds=(-100, 100))
+    fig.y_range = bokeh.models.Range1d(0, 20, bounds=(-1, 50))
+
+    legend_items = []
+    lines = []
+    for checkbox_name, source in sources.items():
+        line = fig.line(x='x',
+                        y='y',
+                        color='black',
+                        source=source,
+                        line_width=1,
+                        line_alpha=0.6,
+                        line_join='round',
+                        hover_alpha=1.0,
+                        hover_color=colors[checkbox_name],
+                        legend=checkbox_name,
+                       )
+        line.hover_glyph.line_width = 4
+        line.name = 'line_{0}'.format(checkbox_name)
+        lines.append(line)
+        
+        circle = fig.circle(x='x',
+                            y='y',
+                            color='black',
+                            source=source,
+                            size=4,
+                            fill_alpha=0.9,
+                            line_alpha=0.9,
+                            visible=False,
+                            hover_alpha=1.0,
+                            hover_color=colors[checkbox_name],
+                           )
+        circle.hover_glyph.visible = True
+        circle.name = 'circle_{0}'.format(checkbox_name)
+        
+        legend_items.append((checkbox_name, [line]))
+        
+    fig.legend.name = 'legend'
+    fig.legend.items = []
+        
+    invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
+
+    hover = bokeh.models.HoverTool(line_policy='interp',
+                                   renderers=lines,
+                                  )
+    hover.tooltips = [('name', '@name')]
+    fig.add_tools(hover)
+
+    zero = bokeh.models.annotations.Span(location=0,
+                                         dimension='height',
+                                         line_color='black',
+                                         line_alpha=0.8,
+                                         line_dash='dashed',
+                                        )
+    fig.renderers.append(zero)
+
+    options = sorted(ys.values()[0].keys())
+    menu = bokeh.models.widgets.Select(options=options, value=options[0])
+    menu.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_menu'])
+
+    sub_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_sub_group'].format(str(colors)),
+                                                                 args=dict(invisible_legend=invisible_legend),
+                                                                )
+
+    top_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_top_group'],
+                                                                 args=dict(invisible_legend=invisible_legend),
+                                                                )
+
+    top_groups = []
+    sub_groups = []
+    width = 75 + max(len(l) for top_name in groupings for l in groupings[top_name]) * 5
+    for top_name, sub_names in sorted(groupings.items()):
+        top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
+                                                 active=[],
+                                                 width=width,
+                                                 name='top_{0}'.format(top_name),
+                                                 callback=top_group_callback,
+                                                )
+        top_groups.append(top)
+        sub = bokeh.models.widgets.CheckboxGroup(labels=sub_names,
+                                                 active=[],
+                                                 width=width,
+                                                 callback=sub_group_callback,
+                                                 name='sub_{0}'.format(top_name),
+                                                )
+        sub_groups.append(sub)
+
+    grid = [
+        [menu],
+        top_groups,
+        sub_groups,
+        [fig],
+    ]
+    bokeh.io.show(bokeh.layouts.layout(grid))
