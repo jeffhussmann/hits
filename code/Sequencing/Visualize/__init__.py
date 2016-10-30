@@ -26,11 +26,15 @@ def optional_ax(original_function):
     
     return possibly_new_ax
 
-def add_commas_to_yticks(ax):
+def add_commas_to_ticks(ax, which='y'):
     def commas_formatter(x, pos):
         return '{0:,}'.format(int(x))
     tick_formatter = matplotlib.ticker.FuncFormatter(commas_formatter)
-    ax.yaxis.set_major_formatter(tick_formatter)
+    if which == 'y':
+        axis = ax.yaxis
+    elif which == 'x':
+        axis = ax.xaxis
+    axis.set_major_formatter(tick_formatter)
 
 @optional_ax
 def enhanced_scatter(xs, ys,
