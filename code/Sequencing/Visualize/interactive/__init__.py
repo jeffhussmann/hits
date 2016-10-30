@@ -257,7 +257,8 @@ def metacodon(xs, ys, colors, groupings):
             source.name = 'source_{0}_{1}'.format(checkbox_name, key)
             sources[key][checkbox_name] = source
    
-    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800)
+    tools = ['pan', 'tap', 'box_zoom', 'wheel_zoom', 'save', 'reset']
+    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800, tools=tools)
 
     fig.y_range = bokeh.models.Range1d(0, 5, bounds=(-1, 50))
     fig.x_range = bokeh.models.Range1d(-25, 25, bounds=(-100, 100))
@@ -300,6 +301,12 @@ def metacodon(xs, ys, colors, groupings):
     fig.legend.items = []
         
     invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
+    
+    source_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_selection'],
+                                                              args=dict(invisible_legend=invisible_legend),
+                                                             )
+    for source in sources['plotted'].values():
+        source.callback = source_callback
 
     hover = bokeh.models.HoverTool(line_policy='interp',
                                    renderers=lines,
