@@ -13,33 +13,34 @@ for group in checkbox_groups
 
 if active_names.length == 0
     for line in lines
-        name = line.name[5..]
-        color = (v for k, v of colors_dict when name.startsWith(k))[0]
+        name = line.name['line_'.length..]
+        color = (v for k, v of colors_dict when name == k)[0]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
-        line.glyph.line_color = color
+        line.glyph.line_color = "black"
         
     circle.glyph.visible = false for circle in circles
         
 else
     for line in lines
-        name = line.name[5..]
-        color = (v for k, v of colors_dict when name.startsWith(k))[0]
-        
-        if active_names.some((s) -> name.startsWith(s))
+        name = line.name['line_'.length..]
+        color = colors_dict[name]
+
+        if name in active_names
             line.glyph.line_color = color
             line.hover_glyph.line_color = color
             line.glyph.line_width = 2
             line.glyph.line_alpha = 0.95
         else
-            line.glyph.line_color = "#000000"
+            line.glyph.line_color = "black"
             line.glyph.line_width = 1
             line.glyph.line_alpha = 0.2
             
     for circle in circles
-        name = circle.name[7..]
-        color = (v for k, v of colors_dict when name.startsWith(k))[0]
-        if active_names.some((s) -> name.startsWith(s))
+        name = circle.name['circle_'.length..]
+        color = colors_dict[name]
+
+        if name in active_names
             circle.glyph.visible = true
             circle.glyph.line_color = color
             circle.glyph.fill_color = color

@@ -239,24 +239,32 @@ def example():
     df = pd.read_csv(fn, index_col='alias')
     scatter(df, hover_keys=['short_description'], table_keys=['description'])
 
-def lines(xs, ys, colors, groupings):
+def metacodon(xs, ys, colors, groupings):
     sources = {}
     data = defaultdict(dict)
-    for checkbox_name in sorted(ys):
-        source = bokeh.models.ColumnDataSource(ys[checkbox_name])
-        source.data['x'] = xs
-        source.data['y'] = source.data[sorted(ys[checkbox_name])[0]]
-        source.data['name'] = [checkbox_name] * len(xs)
-        sources[checkbox_name] = source
-    
+    for key in ['plotted', 'codon', 'nucleotide']:
+        if key == 'plotted':
+            resolution = 'codon'
+        else:
+            resolution = key
+        
+        sources[key] = {}
+        for checkbox_name in sorted(ys[resolution]):
+            source = bokeh.models.ColumnDataSource(ys[resolution][checkbox_name])
+            source.data['x'] = xs[resolution]
+            source.data['y'] = source.data[sorted(ys[resolution][checkbox_name])[0]]
+            source.data['name'] = [checkbox_name] * len(xs[resolution])
+            source.name = 'source_{0}_{1}'.format(checkbox_name, key)
+            sources[key][checkbox_name] = source
+   
     fig = bokeh.plotting.figure(plot_width=1200, plot_height=800)
 
+    fig.y_range = bokeh.models.Range1d(0, 5, bounds=(-1, 50))
     fig.x_range = bokeh.models.Range1d(-25, 25, bounds=(-100, 100))
-    fig.y_range = bokeh.models.Range1d(0, 20, bounds=(-1, 50))
 
     legend_items = []
     lines = []
-    for checkbox_name, source in sources.items():
+    for checkbox_name, source in sources['plotted'].items():
         line = fig.line(x='x',
                         y='y',
                         color='black',
@@ -285,7 +293,7 @@ def lines(xs, ys, colors, groupings):
                            )
         circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
-        
+    
         legend_items.append((checkbox_name, [line]))
         
     fig.legend.name = 'legend'
@@ -307,15 +315,15 @@ def lines(xs, ys, colors, groupings):
                                         )
     fig.renderers.append(zero)
 
-    options = sorted(ys.values()[0].keys())
+    options = sorted(ys['codon'].values()[0].keys())
     menu = bokeh.models.widgets.Select(options=options, value=options[0])
-    menu.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_menu'])
+    menu.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_menu'])
 
-    sub_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_sub_group'].format(str(colors)),
+    sub_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_sub_group'].format(str(colors)),
                                                                  args=dict(invisible_legend=invisible_legend),
                                                                 )
 
-    top_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['lines_top_group'],
+    top_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_top_group'],
                                                                  args=dict(invisible_legend=invisible_legend),
                                                                 )
 
@@ -338,10 +346,17 @@ def lines(xs, ys, colors, groupings):
                                                 )
         sub_groups.append(sub)
 
+    resolution = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'], active=0)
+    injection_sources = sources['nucleotide'].values() + sources['codon'].values()
+    injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
+    resolution.callback = bokeh.models.CustomJS.from_coffeescript(args=dict(fig=fig, **injection),
+                                                                  code=callbacks['metacodon_button'],
+                                                                 )
+
     grid = [
-        [menu],
         top_groups,
         sub_groups,
-        [fig],
+        [fig, bokeh.layouts.widgetbox([menu, resolution])],
     ]
+
     bokeh.io.show(bokeh.layouts.layout(grid))
