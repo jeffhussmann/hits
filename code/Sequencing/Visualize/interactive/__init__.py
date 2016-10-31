@@ -26,7 +26,8 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     Args:
             df: A pandas DataFrame with columns containing numerical data to plot.
                 If 'color' is a column, it will be used to color the points. 
-                Index values will be used as labels for points.
+                Index values will be used as labels for points. Any text columns
+                will be searchable through the 'Search:' field.
             hover_keys: Names of columns in df to display in the tooltip that appears
                 when you hover over a point.
             table_keys: Names of columns in df to display in the table below the plot
