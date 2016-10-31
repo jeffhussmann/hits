@@ -54,7 +54,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     fig = bokeh.plotting.figure(plot_width=size,
                                 plot_height=size,
                                 tools=','.join(tools),
-                                lod_threshold=5000,
+                                lod_threshold=10000,
                                )
     fig.grid.visible = False
     fig.grid.name = 'grid'
