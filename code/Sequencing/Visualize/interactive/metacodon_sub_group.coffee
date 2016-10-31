@@ -14,7 +14,7 @@ for group in checkbox_groups
 if active_names.length == 0
     for line in lines
         name = line.name['line_'.length..]
-        color = (v for k, v of colors_dict when name == k)[0]
+        color = colors_dict[name]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
         line.glyph.line_color = "black"

@@ -12,7 +12,7 @@ else
     fig.x_range.end = fig.x_range.end / 3
 
 for line in lines
-    name = line.name[5..]
+    name = line.name['line_'.length..]
     circle = models['circle_' + name]
     source = models['source_' + name + '_' + resolution]
     line.data_source.data = source.data
