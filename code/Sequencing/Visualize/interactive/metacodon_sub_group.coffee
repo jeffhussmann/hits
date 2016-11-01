@@ -1,4 +1,4 @@
-colors_dict = {0}
+colors_dict = {colors_dict}
 
 models = cb_obj.document._all_models_by_name._dict
 

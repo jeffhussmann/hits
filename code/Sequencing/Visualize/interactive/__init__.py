@@ -20,6 +20,16 @@ for fn in coffee_fns:
     with open(fn) as fh:
         callbacks[root] = fh.read()
 
+def external_coffeescript(key, args=None, format_args=None):
+    if args is None:
+        args = {}
+    if format_args is None:
+        format_args = {}
+
+    code = callbacks[key].format(**format_args)
+    callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
+    return callback
+
 def scatter(df, hover_keys=None, table_keys=None, size=900):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -42,7 +52,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
 
     # Set up the actual scatter plot.
     
-    tools= [
+    tools = [
         'reset',
         'pan',
         'box_zoom',
@@ -191,14 +201,14 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                      xaxis=fig.xaxis[0],
                      yaxis=fig.yaxis[0],
                     )
-    menu_callback = bokeh.models.CustomJS.from_coffeescript(args=menu_args, code=callbacks['scatter_menu'])
+    menu_callback = external_coffeescript('scatter_menu', args=menu_args)
     x_menu.callback = menu_callback
     y_menu.callback = menu_callback
     
     # Set up callback to filter the table when selection changes.
 
     selection_args = dict(source=scatter_source, table=table, labels=labels)
-    scatter_source.callback = bokeh.models.CustomJS.from_coffeescript(args=selection_args, code=callbacks['scatter_selection'])
+    scatter_source.callback = external_coffeescript('scatter_selection', args=selection_args)
     
     # Button to toggle labels.
     
@@ -211,15 +221,16 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
                                            )
 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1)
-    grid_options.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['scatter_grid'])
+    grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
-    text_input.callback = bokeh.models.CustomJS.from_coffeescript(callbacks['scatter_search'].format(columns=nonnumerical_cols),
-                                                                  args=dict(scatter_source=scatter.data_source,
-                                                                            labels=labels,
-                                                                            table=table,
-                                                                           ),
-                                                                 )
+    text_input.callback = external_coffeescript('scatter_search',
+                                                format_args=dict(columns=nonnumerical_cols),
+                                                args=dict(scatter_source=scatter.data_source,
+                                                          labels=labels,
+                                                          table=table,
+                                                         ),
+                                               )
 
     grid = [
         [bokeh.layouts.widgetbox([x_menu, y_menu])],
@@ -303,9 +314,9 @@ def metacodon(xs, ys, colors, groupings):
         
     invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
     
-    source_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_selection'],
-                                                              args=dict(invisible_legend=invisible_legend),
-                                                             )
+    source_callback = external_coffeescript('metacodon_selection',
+                                            args=dict(invisible_legend=invisible_legend),
+                                           )
     for source in sources['plotted'].values():
         source.callback = source_callback
 
@@ -325,15 +336,16 @@ def metacodon(xs, ys, colors, groupings):
 
     options = sorted(ys['codon'].values()[0].keys())
     menu = bokeh.models.widgets.Select(options=options, value=options[0])
-    menu.callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_menu'])
+    menu.callback = external_coffeescript('metacodon_menu')
 
-    sub_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_sub_group'].format(str(colors)),
-                                                                 args=dict(invisible_legend=invisible_legend),
-                                                                )
+    sub_group_callback = external_coffeescript('metacodon_sub_group',
+                                               format_args=dict(colors_dict=str(colors)),
+                                               args=dict(invisible_legend=invisible_legend),
+                                              )
 
-    top_group_callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks['metacodon_top_group'],
-                                                                 args=dict(invisible_legend=invisible_legend),
-                                                                )
+    top_group_callback = external_coffeescript('metacodon_top_group',
+                                               args=dict(invisible_legend=invisible_legend),
+                                              )
 
     top_groups = []
     sub_groups = []
@@ -357,14 +369,19 @@ def metacodon(xs, ys, colors, groupings):
     resolution = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'], active=0)
     injection_sources = sources['nucleotide'].values() + sources['codon'].values()
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
-    resolution.callback = bokeh.models.CustomJS.from_coffeescript(args=dict(fig=fig, **injection),
-                                                                  code=callbacks['metacodon_button'],
-                                                                 )
+    resolution.callback = external_coffeescript('metacodon_button',
+                                                args=dict(fig=fig, **injection),
+                                               )
+
+    clear_selection = bokeh.models.widgets.Button(label='Clear selection')
+    clear_selection.callback = external_coffeescript('metacodon_clear_selection',
+                                                     args=dict(invisible_legend=invisible_legend),
+                                                    )
 
     grid = [
         top_groups,
         sub_groups,
-        [fig, bokeh.layouts.widgetbox([menu, resolution])],
+        [fig, bokeh.layouts.widgetbox([menu, resolution, clear_selection])],
     ]
 
     bokeh.io.show(bokeh.layouts.layout(grid))
