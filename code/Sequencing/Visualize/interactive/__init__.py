@@ -30,7 +30,7 @@ def external_coffeescript(key, args=None, format_args=None):
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
-def scatter(df, hover_keys=None, table_keys=None, size=900):
+def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
     ''' Makes an interactive scatter plot using bokeh.
 
     Args:
@@ -62,11 +62,18 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
         'save',
     ]
     
-    fig = bokeh.plotting.figure(plot_width=size,
-                                plot_height=size,
-                                tools=','.join(tools),
-                                lod_threshold=10000,
-                               )
+    fig_kwargs = {
+        'plot_width': size,
+        'plot_height': size,
+        'tools': tools,
+        'lod_threshold': 10000,
+    }
+    if log_scale:
+        fig_kwargs['y_axis_type'] = 'log'
+        fig_kwargs['x_axis_type'] = 'log'
+    
+    fig = bokeh.plotting.figure(**fig_kwargs)
+
     fig.grid.visible = False
     fig.grid.name = 'grid'
     
@@ -110,12 +117,23 @@ def scatter(df, hover_keys=None, table_keys=None, size=900):
     overhang = extent * 0.05
     max_overhang = extent * 0.5
     
-    initial = (overall_min - overhang, overall_max + overhang)
-    bounds = (overall_min - max_overhang, overall_max + max_overhang)
+    if log_scale:
+        initial = (overall_min * 0.1, overall_max * 10)
+        bounds = (overall_min * 0.001, overall_max * 1000)
+    else:
+        initial = (overall_min - overhang, overall_max + overhang)
+        bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
     fig.line(x=bounds, y=bounds, color='black', alpha=0.4, name='diagonal')
-    fig.line(x=bounds, y=np.array(bounds) + 1, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
-    fig.line(x=bounds, y=np.array(bounds) - 1, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
+    if log_scale:
+        upper_ys = np.array(bounds) * 10
+        lower_ys = np.array(bounds) * 0.1
+    else:
+        upper_ys = np.array(bounds) + 1
+        lower_ys = np.array(bounds) - 1
+
+    fig.line(x=bounds, y=upper_ys, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
+    fig.line(x=bounds, y=lower_ys, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
     
     fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
     fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
