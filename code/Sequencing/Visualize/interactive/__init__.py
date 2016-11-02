@@ -387,7 +387,7 @@ def metacodon(xs, ys, colors, groupings):
     resolution = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'], active=0)
     injection_sources = sources['nucleotide'].values() + sources['codon'].values()
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
-    resolution.callback = external_coffeescript('metacodon_button',
+    resolution.callback = external_coffeescript('metacodon_resolution',
                                                 args=dict(fig=fig, **injection),
                                                )
 
