@@ -54,6 +54,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
     
     tools = [
         'reset',
+        'undo',
         'pan',
         'box_zoom',
         'box_select',
