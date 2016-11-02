@@ -288,11 +288,28 @@ def metacodon(xs, ys, colors, groupings):
             source.name = 'source_{0}_{1}'.format(checkbox_name, key)
             sources[key][checkbox_name] = source
    
-    tools = ['pan', 'tap', 'box_zoom', 'wheel_zoom', 'save', 'reset']
-    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800, tools=tools)
+    tools = [
+        'pan',
+        'tap',
+        'box_zoom',
+        'wheel_zoom',
+        'save',
+        'reset',
+        'undo',
+    ]
 
-    fig.y_range = bokeh.models.Range1d(0, 5, bounds=(-1, 50))
-    fig.x_range = bokeh.models.Range1d(-25, 25, bounds=(-100, 100))
+    fig = bokeh.plotting.figure(plot_width=1600, plot_height=800,
+                                tools=tools, active_scroll='wheel_zoom',
+                               )
+
+    fig.y_range = bokeh.models.Range1d(0, 5)
+    fig.x_range = bokeh.models.Range1d(-25, 25)
+
+    range_callback =  external_coffeescript('metacodon_range',
+                                            args=dict(fig=fig),
+                                           )
+    fig.y_range.callback = range_callback
+    fig.x_range.callback = range_callback
 
     legend_items = []
     lines = []
