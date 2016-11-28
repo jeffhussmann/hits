@@ -467,3 +467,22 @@ def map_tophat_paired(R1_fn,
     accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
     if not no_sort:
         sam.index_bam(accepted_hits_fn)
+
+def map_star(R1_fn, index_dir, output_prefix, R2_fn=None, num_threads=1):
+    star_command = ['STAR',
+                    '--genomeDir', index_dir,
+                    '--outSAMtype', 'BAM', 'SortedByCoordinate',
+                    '--limitBAMsortRAM', '1345513406',
+                    '--alignIntronMax', '1',
+                    '--runThreadN', str(num_threads),
+                    '--outFileNamePrefix', output_prefix,
+                    '--readFilesIn', R1_fn,
+                   ]
+    if R2_fn is not None:
+        star_command.append(R2_fn)
+
+    print ' '.join(star_command)
+    subprocess.check_output(star_command)
+
+    bam_fn = '{0}Aligned.sortedByCoord.out.bam'.format(output_prefix)
+    sam.index_bam(bam_fn)
