@@ -3,7 +3,7 @@
 from itertools import izip, chain
 from collections import namedtuple
 from .fastq_cython import *
-from .utilities import identity, base_order, reverse_complement
+from .utilities import identity, base_order, reverse_complement, group_by
 import numpy as np
 import string
 import gzip
@@ -203,6 +203,11 @@ def read_pairs(R1_file_name, R2_file_name, **kwargs):
     R1_reads = reads(R1_file_name, **kwargs)
     R2_reads = reads(R2_file_name, **kwargs)
     return izip(R1_reads, R2_reads)
+
+def read_pairs_interleaved(lines, **kwargs):
+    interleaved_reads = reads(lines, **kwargs)
+    grouped = group_by(interleaved_reads, key=lambda r: get_pair_name(r.name))
+    return ((g[0], g[-1]) for _, g in grouped)
 
 make_record = '@{0}\n{1}\n+\n{2}\n'.format
 
