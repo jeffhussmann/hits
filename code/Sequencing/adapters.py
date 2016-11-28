@@ -4,11 +4,11 @@ from Sequencing import utilities
 
 primers = {
     'tru_seq': {
-        'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R1': 'TCTTTCCCTACACGACGCTCTTCCGATCT',
         'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
     },
     'PE': {
-        'R1': 'TCTACACTCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
+        'R1': 'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
         'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
     },
     'nextera': {
@@ -18,21 +18,21 @@ primers = {
 }
 
 flow_cell = {
-    'P5': 'AATGATACGGCGACCACCGAGA',
+    'P5': 'AATGATACGGCGACCACCGAGATCTACAC',
     'P7': 'CAAGCAGAAGACGGCATACGAGAT',
 }
 
 A_tail = 'A' * 10
 
 # For backwards compatibility
-tru_seq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGA'
+tru_seq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGA'
 tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
 P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
 P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
 
-def build_before_adapters(index_sequence='', primer_type='tru_seq'):
+def build_before_adapters(I7_sequence='', primer_type='tru_seq'):
     before_R1 = flow_cell['P5'] + primers[primer_type]['R1']
-    before_R2 = flow_cell['P7'] + utilities.reverse_complement(index_sequence) + primers[primer_type]['R2']
+    before_R2 = flow_cell['P7'] + utilities.reverse_complement(I7_sequence) + primers[primer_type]['R2']
     return before_R1, before_R2
 
 def build_adapters(index_sequence='', max_length=None, primer_type='tru_seq'):
