@@ -17,6 +17,11 @@ primers = {
     },
 }
 
+primers['mix_and_match'] = {
+    'R1': primers['nextera']['R1'],
+    'R2': primers['tru_seq']['R2'],
+}
+
 flow_cell = {
     'P5': 'AATGATACGGCGACCACCGAGATCTACAC',
     'P7': 'CAAGCAGAAGACGGCATACGAGAT',
