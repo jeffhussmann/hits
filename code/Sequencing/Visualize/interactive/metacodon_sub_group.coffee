@@ -2,8 +2,20 @@ colors_dict = {colors_dict}
 
 models = cb_obj.document._all_models_by_name._dict
 
-lines = (v for k, v of models when k.startsWith('line_'))
-circles = (v for k, v of models when k.startsWith('circle_'))
+flatten = (possibly_arrays) ->
+    flat = []
+    for possibly_array in possibly_arrays
+        if not Array.isArray(possibly_array)
+            possibly_array = [possibly_array]
+        flat.push possibly_array...
+    return flat
+
+line_groups = (v for k, v of models when k.startsWith('line_'))
+lines = flatten(line_groups)
+
+circle_groups = (v for k, v of models when k.startsWith('circle_'))
+circles = flatten(circle_groups)
+
 checkbox_groups = (v for k, v of models when k.startsWith('sub_'))
 
 active_names = []
@@ -34,7 +46,7 @@ else
         else
             line.glyph.line_color = "black"
             line.glyph.line_width = 1
-            line.glyph.line_alpha = 0.2
+            line.glyph.line_alpha = {unselected_alpha}
             
     for circle in circles
         name = circle.name['circle_'.length..]
