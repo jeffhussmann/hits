@@ -3,7 +3,6 @@ import tempfile
 import logging
 import subprocess32 as subprocess
 import threading
-import Queue
 import fastq
 import sam
 import pysam
@@ -189,6 +188,7 @@ def launch_bowtie2(index_prefix,
         ('maximum_ambiguous',         ['--n-ceil', options.get('maximum_ambiguous')]),
         ('ambiguous_penalty',         ['--np', str(options.get('ambiguous_penalty'))]),
         ('allow_dovetail',            ['--dovetail']),
+        ('no_mixed',                  ['--no-mixed']),
     ]
 
     if custom_binary:

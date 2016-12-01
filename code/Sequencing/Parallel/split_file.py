@@ -70,6 +70,8 @@ def _find_start(file_name, num_pieces, which_piece, find_next_chunk):
         should not be broken up. Chunks are defined by find_next_chunk, a
         function that takes an open file and finds the start
         of the next chunk.
+        Nasty gotcha - this doesn't necessarily return the same starting read
+        in R1 and R2 files if the read lengths for R1 and R2 are different.
     '''
     file_size = os.path.getsize(file_name)
     if which_piece >= num_pieces:
