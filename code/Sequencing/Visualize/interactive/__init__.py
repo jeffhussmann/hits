@@ -30,7 +30,7 @@ def external_coffeescript(key, args=None, format_args=None):
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
-def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
+def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, volcano=False):
     ''' Makes an interactive scatter plot using bokeh.
 
     Args:
@@ -75,7 +75,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
     
     fig = bokeh.plotting.figure(**fig_kwargs)
 
-    fig.grid.visible = False
+    fig.grid.visible = volcano # i.e. normally False
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -125,7 +125,9 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
-    fig.line(x=bounds, y=bounds, color='black', alpha=0.4, name='diagonal')
+    diagonals_visible = not volcano # i.e. normally True
+    common_kwargs = dict(name='diagonal', color='black', visible=diagonals_visible)
+    fig.line(x=bounds, y=bounds, alpha=0.4, **common_kwargs)
     if log_scale:
         upper_ys = np.array(bounds) * 10
         lower_ys = np.array(bounds) * 0.1
@@ -133,11 +135,15 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
         upper_ys = np.array(bounds) + 1
         lower_ys = np.array(bounds) - 1
 
-    fig.line(x=bounds, y=upper_ys, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
-    fig.line(x=bounds, y=lower_ys, color='black', alpha=0.2, line_dash=[5, 5], name='diagonal')
+    fig.line(x=bounds, y=upper_ys, alpha=0.2, line_dash=[5, 5], **common_kwargs)
+    fig.line(x=bounds, y=lower_ys, alpha=0.2, line_dash=[5, 5], **common_kwargs)
     
-    fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
-    fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
+    if volcano:
+        fig.y_range = bokeh.models.Range1d(-0.1, 8)
+        fig.x_range = bokeh.models.Range1d(-1, 1)
+    else:
+        fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
+        fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
 
     if 'color' not in df:
         scatter.selection_glyph = bokeh.models.Circle(fill_color="orange",
@@ -239,7 +245,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
                                             code='labels.text_alpha = 1 - labels.text_alpha;',
                                            )
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not volcano else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
