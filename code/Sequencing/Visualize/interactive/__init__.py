@@ -189,6 +189,9 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
         fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
         fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
 
+    fig.x_range.name = 'x_range'
+    fig.y_range.name = 'y_range'
+
     scatter.selection_glyph.fill_color = "orange"
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
@@ -272,7 +275,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     scatter_source.callback = external_coffeescript('scatter_selection')
     
     # Button to toggle labels.
-    
     button = bokeh.models.widgets.Toggle(label='label selected points',
                                          width=50,
                                          active=True,
@@ -280,6 +282,12 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     button.callback = bokeh.models.CustomJS(args={'labels': labels},
                                             code='labels.text_alpha = 1 - labels.text_alpha;',
                                            )
+    
+    # Button to zoom to current data limits.
+    zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
+                                                      width=50,
+                                                     )
+    zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data')
 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not volcano else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
@@ -300,7 +308,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
 
     grid = [
         [bokeh.layouts.widgetbox([x_menu, y_menu])],
-        [fig, bokeh.layouts.widgetbox([button, grid_options, text_input, subset_menu])],
+        [fig, bokeh.layouts.widgetbox([button, zoom_to_data_button, grid_options, text_input, subset_menu])],
         [table],
     ]
     layout = bokeh.layouts.layout(grid)
