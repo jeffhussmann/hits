@@ -115,7 +115,8 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     scatter_source.data['y'] = scatter_source.data[y_name]
 
     scatter_source.data['no_color'] = ['rgba(0, 0, 0, 0.5)' for _ in scatter_source.data['x']]
-    scatter_source.data['color'] = scatter_source.data['no_color']
+    if 'color' not in scatter_source.data:
+        scatter_source.data['color'] = scatter_source.data['no_color']
 
     if df.index.name is None:
         df.index.name = 'index'
