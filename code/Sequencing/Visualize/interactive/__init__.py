@@ -316,7 +316,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
 
 def hex_to_CSS(hex_string, alpha=1.):
     ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
-    rgb = matplotlib.colors.colorConvertor.to_rgb(hex_string)
+    rgb = matplotlib.colors.colorConverter.to_rgb(hex_string)
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
