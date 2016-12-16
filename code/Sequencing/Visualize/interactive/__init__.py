@@ -272,7 +272,6 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     y_menu.callback = menu_callback
     
     # Set up callback to filter the table when selection changes.
-
     scatter_source.callback = external_coffeescript('scatter_selection')
     
     # Button to toggle labels.
@@ -304,12 +303,19 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
                                              options=subset_options,
                                              value='',
                                             )
-
     subset_menu.callback = external_coffeescript('scatter_subset_menu')
+
+    # Button to dump table to file.
+    save_button = bokeh.models.widgets.Button(label='Save table to file',
+                                              width=50,
+                                             )
+    save_button.callback = external_coffeescript('scatter_save_button',
+                                                 format_args=dict(columns=table_col_names),
+                                                )
 
     grid = [
         [bokeh.layouts.widgetbox([x_menu, y_menu])],
-        [fig, bokeh.layouts.widgetbox([button, zoom_to_data_button, grid_options, text_input, subset_menu])],
+        [fig, bokeh.layouts.widgetbox([button, zoom_to_data_button, grid_options, text_input, subset_menu, save_button])],
         [table],
     ]
     layout = bokeh.layouts.layout(grid)
