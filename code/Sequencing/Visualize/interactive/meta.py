@@ -181,6 +181,7 @@ def gene(densities,
          groupings,
          y_max=5,
          unselected_alpha=0.2,
+         assignment='three_prime',
         ):
     exp_names = sorted(densities['codon'])
     sources = {}
@@ -209,12 +210,12 @@ def gene(densities,
             source = bokeh.models.ColumnDataSource()
             for landmark in ['start_codon', 'stop_codon']:
                 xs = xs_dict[resolution][landmark]
-                density_type = positions.MetageneDensityType('three_prime',
-                                                            landmark,
-                                                            'all',
-                                                            'none_nearby',
-                                                            0.1,
-                                                           )
+                density_type = positions.MetageneDensityType(assignment,
+                                                             landmark,
+                                                             'all',
+                                                             'none_nearby',
+                                                             0.1,
+                                                            )
                 ys = densities[resolution][exp_name][str(density_type)]['means'][landmark, xs]
 
                 source.data['xs_{0}'.format(landmark)] = xs

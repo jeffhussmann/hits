@@ -47,7 +47,7 @@ colors_list = [ # from http://godsnotwheregodsnot.blogspot.ru/2012/09/color-dist
     "#5B4534", "#FDE8DC", "#404E55", "#0089A3", "#CB7E98", "#A4E804", "#324E72", "#6A3A4C",
 ]
 
-def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
+def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, volcano=False):
     ''' Makes an interactive scatter plot using bokeh.
 
     Args:
@@ -103,7 +103,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
             axis[0].ticker.base = log_scale
             axis[0].formatter.ticker = axis[0].ticker
 
-    fig.grid.visible = False
+    fig.grid.visible = volcano # i.e. normally False
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -131,7 +131,8 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
     scatter_source.data['y'] = scatter_source.data[y_name]
 
     scatter_source.data['no_color'] = ['rgba(0, 0, 0, 0.5)' for _ in scatter_source.data['x']]
-    scatter_source.data['color'] = scatter_source.data['no_color']
+    if 'color' not in scatter_source.data:
+        scatter_source.data['color'] = scatter_source.data['no_color']
 
     if df.index.name is None:
         df.index.name = 'index'
@@ -168,13 +169,17 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
+    diagonals_visible = not volcano # i.e. normally True
+
     fig.line(x=bounds, y=bounds,
              color='black',
              nonselection_color='black',
              alpha=0.4,
              nonselection_alpha=0.4,
              name='diagonal',
+             visible=diagonals_visible,
             )
+
     if log_scale:
         upper_ys = np.array(bounds) * 10
         lower_ys = np.array(bounds) * 0.1
@@ -189,12 +194,20 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
         nonselection_alpha=0.4,
         line_dash=[5, 5],
         name='diagonal',
+        visible=diagonals_visible,
     ) 
     fig.line(x=bounds, y=upper_ys, **line_kwargs)
     fig.line(x=bounds, y=lower_ys, **line_kwargs)
     
-    fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
-    fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
+    if volcano:
+        fig.y_range = bokeh.models.Range1d(-0.1, 8)
+        fig.x_range = bokeh.models.Range1d(-1, 1)
+    else:
+        fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
+        fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
+
+    fig.x_range.name = 'x_range'
+    fig.y_range.name = 'y_range'
 
     scatter.selection_glyph.fill_color = "orange"
     scatter.selection_glyph.line_color = None
@@ -285,8 +298,14 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
     button.callback = bokeh.models.CustomJS(args={'labels': labels},
                                             code='labels.text_alpha = 1 - labels.text_alpha;',
                                            )
+    
+    # Button to zoom to current data limits.
+    zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
+                                                      width=50,
+                                                     )
+    zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data')
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not volcano else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
@@ -312,7 +331,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
 
     grid = [
         [bokeh.layouts.widgetbox([x_menu, y_menu])],
-        [fig, bokeh.layouts.widgetbox([button, grid_options, text_input, subset_menu, save_button])],
+        [fig, bokeh.layouts.widgetbox([button, zoom_to_data_button, grid_options, text_input, subset_menu, save_button])],
         [table],
     ]
     layout = bokeh.layouts.layout(grid)
@@ -320,7 +339,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False):
 
 def hex_to_CSS(hex_string, alpha=1.):
     ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
-    rgb = matplotlib.colors.colorConvertor.to_rgb(hex_string)
+    rgb = matplotlib.colors.colorConverter.to_rgb(hex_string)
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
