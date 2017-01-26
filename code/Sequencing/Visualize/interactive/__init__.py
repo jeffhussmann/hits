@@ -48,6 +48,7 @@ def scatter(df,
             volcano=False,
             heatmap=False,
             grid=False,
+            marker_size=6,
            ):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -63,10 +64,14 @@ def scatter(df,
             table_keys: Names of columns in df to display in the table below the plot
                 that is populated with the selected points from the figure.
             size: Size of the plot in pixels.
+            marker_size: Size of the scatter circles.
             heatmap: If True, displays a heatmap of correlations between
                 numerical columns in df that can be clicked to select columns
                 to scatter.
             grid: If True, defaults to grid instead of diagonal landmarks.
+            volcano: If True, make some tweaks suitable for volcano plots.
+            log_scale: If not False, plot on a log scale with base 10 (or, if a
+                set to a number, with base log_scale.)
     '''
 
     if hover_keys is None:
@@ -147,7 +152,7 @@ def scatter(df,
     scatter = fig.scatter('x',
                           'y',
                           source=scatter_source,
-                          size=6,
+                          size=marker_size,
                           fill_color='color',
                           line_color=None,
                           nonselection_color='color',
