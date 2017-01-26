@@ -62,8 +62,10 @@ def scatter(df,
                 when you hover over a point.
             table_keys: Names of columns in df to display in the table below the plot
                 that is populated with the selected points from the figure.
-            heatmap: If True, 
             size: Size of the plot in pixels.
+            heatmap: If True, displays a heatmap of correlations between
+                numerical columns in df that can be clicked to select columns
+                to scatter.
             grid: If True, defaults to grid instead of diagonal landmarks.
     '''
 
