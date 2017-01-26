@@ -1,9 +1,10 @@
 import numpy as np
 import bokeh.io
 import bokeh.plotting
-#import bokeh.resources
 import pandas as pd
+import scipy.stats
 import matplotlib.colors
+import matplotlib.cm
 import os.path
 import glob
 from collections import defaultdict
@@ -31,23 +32,23 @@ def external_coffeescript(key, args=None, format_args=None):
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
-colors_list = [ # from http://godsnotwheregodsnot.blogspot.ru/2012/09/color-distribution-methodology.html
-    "#000000", "#FFFF00", "#1CE6FF", "#FF34FF", "#FF4A46", "#008941", "#006FA6", "#A30059",
-    "#FFDBE5", "#7A4900", "#0000A6", "#63FFAC", "#B79762", "#004D43", "#8FB0FF", "#997D87",
-    "#5A0007", "#809693", "#FEFFE6", "#1B4400", "#4FC601", "#3B5DFF", "#4A3B53", "#FF2F80",
-    "#61615A", "#BA0900", "#6B7900", "#00C2A0", "#FFAA92", "#FF90C9", "#B903AA", "#D16100",
-    "#DDEFFF", "#000035", "#7B4F4B", "#A1C299", "#300018", "#0AA6D8", "#013349", "#00846F",
-    "#372101", "#FFB500", "#C2FFED", "#A079BF", "#CC0744", "#C0B9B2", "#C2FF99", "#001E09",
-    "#00489C", "#6F0062", "#0CBD66", "#EEC3FF", "#456D75", "#B77B68", "#7A87A1", "#788D66",
-    "#885578", "#FAD09F", "#FF8A9A", "#D157A0", "#BEC459", "#456648", "#0086ED", "#886F4C",
-    "#34362D", "#B4A8BD", "#00A6AA", "#452C2C", "#636375", "#A3C8C9", "#FF913F", "#938A81",
-    "#575329", "#00FECF", "#B05B6F", "#8CD0FF", "#3B9700", "#04F757", "#C8A1A1", "#1E6E00",
-    "#7900D7", "#A77500", "#6367A9", "#A05837", "#6B002C", "#772600", "#D790FF", "#9B9700",
-    "#549E79", "#FFF69F", "#201625", "#72418F", "#BC23FF", "#99ADC0", "#3A2465", "#922329",
-    "#5B4534", "#FDE8DC", "#404E55", "#0089A3", "#CB7E98", "#A4E804", "#324E72", "#6A3A4C",
-]
+colors_list =  (
+    bokeh.palettes.Dark2[8] +
+    bokeh.palettes.Set1[9] +
+    bokeh.palettes.Set2[8] + 
+    bokeh.palettes.Paired[12] +
+    bokeh.palettes.Accent[8]
+)
 
-def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, volcano=False):
+def scatter(df,
+            hover_keys=None, table_keys=None,
+            size=900,
+            axis_label_size=20,
+            log_scale=False,
+            volcano=False,
+            heatmap=False,
+            grid=False,
+           ):
     ''' Makes an interactive scatter plot using bokeh.
 
     Args:
@@ -61,7 +62,9 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
                 when you hover over a point.
             table_keys: Names of columns in df to display in the table below the plot
                 that is populated with the selected points from the figure.
+            heatmap: If True, 
             size: Size of the plot in pixels.
+            grid: If True, defaults to grid instead of diagonal landmarks.
     '''
 
     if hover_keys is None:
@@ -88,6 +91,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
         plot_height=size,
         tools=tools,
         lod_threshold=10000,
+        name='scatter_fig',
     )
 
     if log_scale:
@@ -97,13 +101,14 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
         fig_kwargs['x_axis_type'] = 'log'
     
     fig = bokeh.plotting.figure(**fig_kwargs)
+    fig.toolbar.logo = None
 
     if log_scale:
         for axis in [fig.xaxis, fig.yaxis]:
             axis[0].ticker.base = log_scale
             axis[0].formatter.ticker = axis[0].ticker
 
-    fig.grid.visible = volcano # i.e. normally False
+    fig.grid.visible = volcano or grid # i.e. normally False
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -122,7 +127,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     fig.xaxis.axis_label = x_name
     fig.yaxis.axis_label = y_name
     for axis in (fig.xaxis, fig.yaxis):
-        axis.axis_label_text_font_size = '20pt'
+        axis.axis_label_text_font_size = '{0}pt'.format(axis_label_size)
         axis.axis_label_text_font_style = 'normal'
 
     scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
@@ -169,7 +174,7 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
-    diagonals_visible = not volcano # i.e. normally True
+    diagonals_visible = not (volcano or grid) # i.e. normally True
 
     fig.line(x=bounds, y=bounds,
              color='black',
@@ -261,51 +266,155 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
     
     table = bokeh.models.widgets.DataTable(source=filtered_source,
                                            columns=columns,
-                                           width=size,
+                                           width=2 * size if heatmap else size,
                                            height=1000,
                                            sortable=False,
                                            name='table',
                                           )
     
-    # Set up menus to select columns from df to put on x- and y-axis.
+    # Set up menus or heatmap to select columns from df to put on x- and y-axis.
 
-    x_menu = bokeh.models.widgets.Select(title='X',
-                                         options=numerical_cols,
-                                         value=x_name,
-                                        )
-    y_menu = bokeh.models.widgets.Select(title='Y',
-                                         options=numerical_cols,
-                                         value=y_name,
-                                        )
+    if heatmap:
+        norm = matplotlib.colors.Normalize(vmin=-1, vmax=1)
+        def r_to_color(r):
+            color = matplotlib.colors.rgb2hex(matplotlib.cm.RdBu_r(norm(r)))
+            return color
+        xs = []
+        x_names = []
+        ys = []
+        y_names = []
+        rs = []
+        colors = []
 
-    menu_args = dict(x_menu=x_menu,
-                     y_menu=y_menu,
-                     xaxis=fig.xaxis[0],
-                     yaxis=fig.yaxis[0],
-                    )
-    menu_callback = external_coffeescript('scatter_menu', args=menu_args)
-    x_menu.callback = menu_callback
-    y_menu.callback = menu_callback
+        for y, row in enumerate(numerical_cols):
+            for x, col in enumerate(numerical_cols):
+                r, p = scipy.stats.pearsonr(df[row], df[col])
+                rs.append(r)
+                xs.append(x)
+                x_names.append(col)
+                ys.append(y)
+                y_names.append(row)
+                colors.append(r_to_color(r))
+                
+        data = {
+            'x': xs,
+            'x_name': x_names,
+            'y': ys,
+            'y_name': y_names,
+            'r': rs,
+            'color': colors,
+        }
+
+        heatmap_source = bokeh.models.ColumnDataSource(data)
+        num_exps = len(numerical_cols)
+        heatmap_size = int(size * 1)
+        heatmap_fig = bokeh.plotting.figure(tools='tap',
+                                            x_range=(-0.5, num_exps - 0.5),
+                                            y_range=(num_exps - 0.5, -0.5),
+                                            width=heatmap_size, height=heatmap_size,
+                                            toolbar_location=None,
+                                           )
+
+        heatmap_fig.grid.visible = False
+        rects = heatmap_fig.rect(x='x', y='y',
+                                 line_color=None,
+                                 hover_line_color='black',
+                                 hover_fill_color='color',
+                                 selection_fill_color='color',
+                                 nonselection_fill_color='color',
+                                 nonselection_fill_alpha=1,
+                                 nonselection_line_color=None,
+                                 selection_line_color='black',
+                                 line_width=5,
+                                 fill_color='color',
+                                 source=heatmap_source,
+                                 width=1, height=1,
+                                )
+
+        hover = bokeh.models.HoverTool()
+        hover.tooltips = [
+            ('X', '@x_name'),
+            ('Y', '@y_name'),
+            ('r', '@r'),
+        ]
+        heatmap_fig.add_tools(hover)
+
+        first_row = [heatmap_fig]
+        args = dict(xaxis=fig.xaxis[0],
+                    yaxis=fig.yaxis[0],
+                   )
+        heatmap_source.callback = external_coffeescript('scatter_heatmap', args=args)
+
+        code = '''
+        dict = {dict}
+        return dict[tick].slice(0, 15)
+        '''.format(dict=dict(enumerate(numerical_cols)))
+        
+        for ax in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
+            ax.ticker = bokeh.models.FixedTicker(ticks=range(num_exps))
+            ax.formatter = bokeh.models.FuncTickFormatter(code=code)
+            ax.major_label_text_font_size = '8pt'
+
+        heatmap_fig.xaxis.major_label_orientation = np.pi / 4
+
+        pvd = bokeh.core.property_containers.PropertyValueDict
+        pvl = bokeh.core.property_containers.PropertyValueList
+
+        selected_from_scratch = pvd({
+            '0d': pvd({
+                'glyph': None,
+                'indices': pvl(),
+            }),
+            '1d': pvd({
+                'indices': pvl([num_exps]),
+            }),
+            '2d': pvd(),
+        })
+
+        heatmap_source.selected = selected_from_scratch
+        heatmap_fig.min_border = 80
+        
+    else:
+        x_menu = bokeh.models.widgets.Select(title='X',
+                                             options=numerical_cols,
+                                             value=x_name,
+                                            )
+        y_menu = bokeh.models.widgets.Select(title='Y',
+                                             options=numerical_cols,
+                                             value=y_name,
+                                            )
+
+        menu_args = dict(x_menu=x_menu,
+                         y_menu=y_menu,
+                         xaxis=fig.xaxis[0],
+                         yaxis=fig.yaxis[0],
+                        )
+        menu_callback = external_coffeescript('scatter_menu', args=menu_args)
+        x_menu.callback = menu_callback
+        y_menu.callback = menu_callback
+        
+        first_row = [bokeh.layouts.widgetbox([x_menu, y_menu])],
     
     # Set up callback to filter the table when selection changes.
     scatter_source.callback = external_coffeescript('scatter_selection')
     
     # Button to toggle labels.
-    button = bokeh.models.widgets.Toggle(label='label selected points',
-                                         width=50,
-                                         active=True,
-                                        )
-    button.callback = bokeh.models.CustomJS(args={'labels': labels},
-                                            code='labels.text_alpha = 1 - labels.text_alpha;',
-                                           )
+    label_button = bokeh.models.widgets.Toggle(label='label selected points',
+                                               width=50,
+                                               active=True,
+                                              )
+    label_button.callback = bokeh.models.CustomJS(args={'labels': labels},
+                                                  code='labels.text_alpha = 1 - labels.text_alpha;',
+                                                 )
     
     # Button to zoom to current data limits.
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
                                                      )
-    zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data')
+    zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
+                                                         format_args=dict(log_scale='true' if log_scale else 'false'))
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not volcano else 0)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not (volcano or grid) else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
@@ -329,13 +438,41 @@ def scatter(df, hover_keys=None, table_keys=None, size=900, log_scale=False, vol
                                                  format_args=dict(columns=table_col_names),
                                                 )
 
-    grid = [
-        [bokeh.layouts.widgetbox([x_menu, y_menu])],
-        [fig, bokeh.layouts.widgetbox([button, zoom_to_data_button, grid_options, text_input, subset_menu, save_button])],
-        [table],
+    fig.min_border = 80
+
+    widgets = [
+        label_button,
+        zoom_to_data_button,
+        grid_options,
+        text_input,
+        subset_menu,
+        save_button,
     ]
-    layout = bokeh.layouts.layout(grid)
-    bokeh.io.show(layout)
+
+    if len(subset_options) == 1:
+        widgets = widgets[:-2] + widgets[-1:]
+
+    if not heatmap:
+        widgets = [x_menu, y_menu] + widgets
+
+    widget_box = bokeh.layouts.widgetbox(children=widgets)
+
+    columns = [
+        bokeh.layouts.column(children=[fig]),
+        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100),
+                                       widget_box,
+                                      ]),
+    ]
+
+    if heatmap:
+        columns = columns[:1] + [bokeh.layouts.column(children=[heatmap_fig])] + columns[1:]
+
+    full = bokeh.layouts.column(children=[
+        bokeh.layouts.row(children=columns),
+        table,
+    ])
+
+    bokeh.io.show(full)
 
 def hex_to_CSS(hex_string, alpha=1.):
     ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
@@ -346,4 +483,4 @@ def hex_to_CSS(hex_string, alpha=1.):
 def example():
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
-    scatter(df, hover_keys=['short_description'], table_keys=['description'])
+    scatter(df, heatmap=True, hover_keys=['short_description'], table_keys=['description'], grid=True)
