@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.colors
 import os.path
 import glob
+import IPython.display
 from collections import defaultdict
 
 bokeh.io.output_notebook()
@@ -331,3 +332,27 @@ def example():
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
     scatter(df, hover_keys=['short_description'], table_keys=['description'])
+
+# from http://chris-said.io/
+toggle = '''
+<script>
+  function code_toggle() {
+    if (code_shown){
+      $('div.input').hide('100');
+      $('#toggleButton').val('Show Code')
+    } else {
+      $('div.input').show('100');
+      $('#toggleButton').val('Hide Code')
+    }
+    code_shown = !code_shown
+  }
+
+  $( document ).ready(function(){
+    code_shown=false;
+    $('div.input').hide()
+  });
+</script>
+<form action="javascript:code_toggle()"><input type="submit" id="toggleButton" value="Show Code"></form>
+'''
+
+toggle_cell = IPython.display.HTML(toggle)
