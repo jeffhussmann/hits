@@ -49,6 +49,7 @@ def scatter(df,
             volcano=False,
             heatmap=False,
             grid=False,
+            marker_size=6,
            ):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -64,10 +65,14 @@ def scatter(df,
             table_keys: Names of columns in df to display in the table below the plot
                 that is populated with the selected points from the figure.
             size: Size of the plot in pixels.
+            marker_size: Size of the scatter circles.
             heatmap: If True, displays a heatmap of correlations between
                 numerical columns in df that can be clicked to select columns
                 to scatter.
             grid: If True, defaults to grid instead of diagonal landmarks.
+            volcano: If True, make some tweaks suitable for volcano plots.
+            log_scale: If not False, plot on a log scale with base 10 (or, if a
+                set to a number, with base log_scale.)
     '''
 
     if hover_keys is None:
@@ -75,6 +80,9 @@ def scatter(df,
 
     if table_keys is None:
         table_keys = []
+
+    if volcano:
+        grid = True
 
     # Set up the actual scatter plot.
     
@@ -111,7 +119,7 @@ def scatter(df,
             axis[0].ticker.base = log_scale
             axis[0].formatter.ticker = axis[0].ticker
 
-    fig.grid.visible = volcano or grid # i.e. normally False
+    fig.grid.visible = grid
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -148,7 +156,7 @@ def scatter(df,
     scatter = fig.scatter('x',
                           'y',
                           source=scatter_source,
-                          size=6,
+                          size=marker_size,
                           fill_color='color',
                           line_color=None,
                           nonselection_color='color',
@@ -177,7 +185,7 @@ def scatter(df,
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
-    diagonals_visible = not (volcano or grid) # i.e. normally True
+    diagonals_visible = not grid # i.e. normally True
 
     fig.line(x=bounds, y=bounds,
              color='black',
@@ -417,7 +425,7 @@ def scatter(df,
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
                                                          format_args=dict(log_scale='true' if log_scale else 'false'))
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not (volcano or grid) else 0)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not grid else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
