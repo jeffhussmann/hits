@@ -80,6 +80,9 @@ def scatter(df,
     if table_keys is None:
         table_keys = []
 
+    if volcano:
+        grid = True
+
     # Set up the actual scatter plot.
     
     tools = [
@@ -115,7 +118,7 @@ def scatter(df,
             axis[0].ticker.base = log_scale
             axis[0].formatter.ticker = axis[0].ticker
 
-    fig.grid.visible = volcano or grid # i.e. normally False
+    fig.grid.visible = grid
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -181,7 +184,7 @@ def scatter(df,
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
 
-    diagonals_visible = not (volcano or grid) # i.e. normally True
+    diagonals_visible = not grid # i.e. normally True
 
     fig.line(x=bounds, y=bounds,
              color='black',
@@ -421,7 +424,7 @@ def scatter(df,
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
                                                          format_args=dict(log_scale='true' if log_scale else 'false'))
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not (volcano or grid) else 0)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not grid else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
