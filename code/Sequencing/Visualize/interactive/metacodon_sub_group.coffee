@@ -1,5 +1,3 @@
-colors_dict = {colors_dict}
-
 models = cb_obj.document._all_models_by_name._dict
 
 flatten = (possibly_arrays) ->
@@ -26,7 +24,7 @@ for group in checkbox_groups
 if active_names.length == 0
     for line in lines
         name = line.name['line_'.length..]
-        color = colors_dict[name]
+        color = colors.value[name]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
         line.glyph.line_color = "black"
@@ -36,7 +34,7 @@ if active_names.length == 0
 else
     for line in lines
         name = line.name['line_'.length..]
-        color = colors_dict[name]
+        color = colors.value[name]
 
         if name in active_names
             line.glyph.line_color = color
@@ -45,11 +43,11 @@ else
         else
             line.glyph.line_color = "black"
             line.glyph.line_width = 1
-            line.glyph.line_alpha = {unselected_alpha}
+            line.glyph.line_alpha = unselected_alpha.value
             
     for circle in circles
         name = circle.name['circle_'.length..]
-        color = colors_dict[name]
+        color = colors.value[name]
 
         if name in active_names
             circle.glyph.visible = true
@@ -57,7 +55,8 @@ else
             circle.glyph.fill_color = color
         else
             circle.glyph.visible = false
-        
-items = (item for item in models['invisible_legend'].items when item.label.value in active_names)
+
+legend = models['legend']
+items = (item for item in legend.all_items when item.label.value in active_names)
 items.sort (a, b) -> a.label.value.localeCompare b.label.value
-models['legend'].items = items
+legend.items = items

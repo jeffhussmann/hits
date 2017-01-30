@@ -1,5 +1,9 @@
-fig.y_range.start = 0 if fig.y_range.start < 0
-fig.y_range.end = 50 if fig.y_range.end > 50
+models = cb_obj.document._all_models_by_name._dict
+x_range = models['x_range']
+y_range = models['y_range']
 
-fig.x_range.start = -100 if fig.x_range.start < -100
-fig.x_range.end = 100 if fig.x_range.end > 100
+y_range.start = 0 if y_range.start < 0
+y_range.end = 50 if y_range.end > 50
+
+x_range.start = -100 if x_range.start < -100
+x_range.end = 100 if x_range.end > 100

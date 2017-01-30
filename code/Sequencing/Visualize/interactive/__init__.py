@@ -1,6 +1,8 @@
 import numpy as np
 import bokeh.io
 import bokeh.plotting
+from bokeh.model import Model
+from bokeh.core.properties import Bool, String, Float, List, Dict
 import pandas as pd
 import scipy.stats
 import matplotlib.colors
@@ -10,6 +12,66 @@ import glob
 from collections import defaultdict
 
 bokeh.io.output_notebook()
+
+class BoolModel(Model):
+    value = Bool
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class BoolModel extends Model 
+    type: "BoolModel"
+    @define { value: [p.Bool] }
+
+module.exports = 
+    Model: BoolModel
+'''
+
+class ListOfStringsModel(Model):
+    value = List(String)
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class ListOfStringsModel extends Model 
+    type: "ListOfStringsModel"
+    @define { value: [p.Array, []] }
+
+module.exports = 
+    Model: ListOfStringsModel
+'''
+
+class DictOfStringsModel(Model):
+    value = Dict(String, String)
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class DictOfStringsModel extends Model 
+    type: "DictOfStringsModel"
+    @define { value: [p.Any, {}] }
+
+module.exports = 
+    Model: DictOfStringsModel
+'''
+
+class FloatModel(Model):
+    value = Float
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class FloatModel extends Model 
+    type: "FloatModel"
+    @define { value: [p.Number] }
+
+module.exports = 
+    Model: FloatModel
+'''
 
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this one. Load their contents into a dictionary.
@@ -22,14 +84,13 @@ for fn in coffee_fns:
     with open(fn) as fh:
         callbacks[root] = fh.read()
 
-def external_coffeescript(key, args=None, format_args=None):
+def external_coffeescript(key, args=None):
     if args is None:
         args = {}
-    if format_args is None:
-        format_args = {}
 
-    code = callbacks[key].format(**format_args)
-    callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
+    callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks[key],
+                                                       args=args,
+                                                      )
     return callback
 
 colors_list =  (
@@ -421,33 +482,34 @@ def scatter(df,
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
                                                      )
+    args = dict(log_scale=BoolModel(value=log_scale))
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
-                                                         format_args=dict(log_scale='true' if log_scale else 'false'),
+                                                         args=args,
                                                         )
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not grid else 0)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
+                                                   active=1 if not grid else 0,
+                                                  )
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
-    text_input.callback = external_coffeescript('scatter_search',
-                                                format_args=dict(columns=object_cols),
-                                               )
+    args = dict(column_names=ListOfStringsModel(value=object_cols))
+    text_input.callback = external_coffeescript('scatter_search', args=args)
     
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
     subset_menu = bokeh.models.widgets.Select(title='Select subset:',
-                                             options=subset_options,
-                                             value='',
-                                            )
+                                              options=subset_options,
+                                              value='',
+                                             )
     subset_menu.callback = external_coffeescript('scatter_subset_menu')
 
     # Button to dump table to file.
     save_button = bokeh.models.widgets.Button(label='Save table to file',
                                               width=50,
                                              )
-    save_button.callback = external_coffeescript('scatter_save_button',
-                                                 format_args=dict(columns=table_col_names),
-                                                )
+    args = dict(column_names=ListOfStringsModel(value=table_col_names))
+    save_button.callback = external_coffeescript('scatter_save_button', args)
 
     fig.min_border = 80
 

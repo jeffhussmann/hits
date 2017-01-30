@@ -1,8 +1,28 @@
 import bokeh
+from bokeh.core.properties import List, Instance
+from bokeh.models.annotations import LegendItem
 import numpy as np
 import positions
 from itertools import cycle
-from . import external_coffeescript, colors_list
+from . import external_coffeescript, colors_list, FloatModel, DictOfStringsModel
+
+class ToggleLegend(bokeh.models.annotations.Legend):
+    all_items = List(Instance(LegendItem))
+
+    __implementation__ = '''
+Legend = require "models/annotations/legend"
+p = require "core/properties"
+
+class ToggleLegend extends Legend.Model
+    type: "ToggleLegend"
+    @define {
+        all_items: [p.Array, []]
+    }
+
+module.exports = 
+    Model: ToggleLegend
+'''
+
 
 def codon(xs, ys, colors, groupings,
           toggle_resolution=True,
@@ -60,20 +80,21 @@ def codon(xs, ys, colors, groupings,
         'undo',
     ]
 
-    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800,
+    fig = bokeh.plotting.figure(plot_width=1200,
+                                plot_height=800,
                                 tools=tools,
                                 active_scroll='wheel_zoom',
+                                name='figure',
                                )
 
     fig.grid.grid_line_alpha = 0.4
 
     fig.y_range = bokeh.models.Range1d(0, y_max)
+    fig.y_range.name = 'y_range'
     fig.x_range = bokeh.models.Range1d(-x_max, x_max)
     fig.x_range.name = 'x_range'
 
-    range_callback =  external_coffeescript('metacodon_range',
-                                            args=dict(fig=fig),
-                                           )
+    range_callback =  external_coffeescript('metacodon_range')
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
@@ -113,7 +134,6 @@ def codon(xs, ys, colors, groupings,
                         line_join='round',
                         hover_alpha=1.0,
                         hover_color=colors[checkbox_name],
-                        legend=checkbox_name,
                        )
         line.hover_glyph.line_width = 4
         line.name = 'line_{0}'.format(checkbox_name)
@@ -133,15 +153,17 @@ def codon(xs, ys, colors, groupings,
         circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
     
-        legend_items.append((checkbox_name, [line]))
+        legend_item = LegendItem(label=checkbox_name, renderers=[line])
+        legend_items.append(legend_item)
         if checkbox_name in initial_sub_group_selections:
-            initial_legend_items.append((checkbox_name, [line]))
+            initial_legend_items.append(legend_item)
         
-    fig.legend.name = 'legend'
-    fig.legend.items = initial_legend_items
-        
-    invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
-    
+    legend = ToggleLegend(name='legend',
+                          items=initial_legend_items,
+                          all_items=legend_items,
+                         )
+    fig.add_layout(legend)
+
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
@@ -169,13 +191,13 @@ def codon(xs, ys, colors, groupings,
     menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
     menu.callback = external_coffeescript('metacodon_menu')
 
-    sub_group_callback = external_coffeescript('metacodon_sub_group',
-                                               format_args=dict(colors_dict=colors,
-                                                                unselected_alpha=unselected_alpha
-                                                               ),
-                                              )
+    args = dict(unselected_alpha=FloatModel(value=unselected_alpha),
+                colors=DictOfStringsModel(value=colors),
+               )
+    sub_group_callback = external_coffeescript('metacodon_sub_group', args=args)
 
     top_group_callback = external_coffeescript('metacodon_top_group')
+
     top_groups = []
     sub_groups = []
 
@@ -216,7 +238,7 @@ def codon(xs, ys, colors, groupings,
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
     highest_level_chooser.callback = external_coffeescript(callback_name,
-                                                           args=dict(fig=fig, **injection),
+                                                           args=injection,
                                                           )
 
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
@@ -330,7 +352,7 @@ def gene(densities,
     lines = {'start_codon': [], 'stop_codon': []}
     legend_items = []
 
-    colors = dict(zip(exp_names, cycle(bokeh.palettes.brewer['Dark2'][8])))
+    colors = dict(zip(exp_names, colors_list))
     for exp_name in exp_names:
         for landmark in ('start_codon', 'stop_codon'):
             if landmark == 'stop_codon':
@@ -371,8 +393,6 @@ def gene(densities,
     figs['stop_codon'].legend.name = 'legend'
     figs['stop_codon'].legend.items = []
     
-    invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
-
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
@@ -393,14 +413,13 @@ def gene(densities,
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
     resolution.callback = external_coffeescript('metacodon_resolution',
-                                                args=dict(**injection),
+                                                args=injection,
                                                )
     
-    sub_group_callback = external_coffeescript('metacodon_sub_group',
-                                               format_args=dict(colors_dict=colors,
-                                                                unselected_alpha=unselected_alpha
-                                                               ),
-                                              )
+    args = dict(unselected_alpha=FloatModel(value=unselected_alpha),
+                colors=DictOfStringsModel(value=colors),
+               )
+    sub_group_callback = external_coffeescript('metacodon_sub_group', args=args)
 
     top_group_callback = external_coffeescript('metacodon_top_group')
 
