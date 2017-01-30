@@ -18,4 +18,5 @@ for group in checkbox_groups
                 group.active = (a for a in group.active when a != i)
 
             group.trigger('change')
-            group.callback.func(invisible_legend, group)
+
+group.callback.func(group)

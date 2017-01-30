@@ -8,4 +8,5 @@ for group in checkbox_groups
             group.active = (i for c, i in group.labels)
         else
             group.active = []
-        group.callback.func(invisible_legend, group)
+
+group.callback.func(group)
