@@ -422,7 +422,8 @@ def scatter(df,
                                                       width=50,
                                                      )
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
-                                                         format_args=dict(log_scale='true' if log_scale else 'false'))
+                                                         format_args=dict(log_scale='true' if log_scale else 'false'),
+                                                        )
 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not grid else 0)
     grid_options.callback = external_coffeescript('scatter_grid')
