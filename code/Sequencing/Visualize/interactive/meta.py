@@ -8,10 +8,30 @@ def codon(xs, ys, colors, groupings,
           y_max=5,
           x_max=25,
           unselected_alpha=0.2,
+          initial_menu_selection=None,
+          initial_top_group_selections=None,
+          initial_sub_group_selections=None,
          ):
+    if initial_top_group_selections is None:
+        initial_top_group_selections = []
+    if initial_sub_group_selections is None:
+        initial_sub_group_selections = []
+
+    initial_sub_group_selections = set(initial_sub_group_selections)
+    for top_name, sub_names in sorted(groupings.items()):
+        if top_name in initial_top_group_selections:
+            initial_sub_group_selections.update(sub_names)
+    
     sources = {}
 
     highest_level_keys = sorted(ys)
+    
+    menu_options = sorted(ys[highest_level_keys[0]].values()[0].keys())
+
+    if initial_menu_selection is None:
+        initial_menu_selection = menu_options[0]
+    if initial_menu_selection not in menu_options:
+        raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
     for key in ['plotted'] + highest_level_keys:
         if key == 'plotted':
@@ -24,7 +44,7 @@ def codon(xs, ys, colors, groupings,
             menu_names = sorted(ys[resolution][checkbox_name])
             source = bokeh.models.ColumnDataSource(ys[resolution][checkbox_name])
             source.data['x'] = xs[resolution]
-            source.data['y'] = source.data[menu_names[0]]
+            source.data['y'] = source.data[initial_menu_selection]
             source.data['name'] = [checkbox_name] * len(xs[resolution])
             source.name = 'source_{0}_{1}'.format(checkbox_name, key)
             sources[key][checkbox_name] = source
@@ -54,14 +74,29 @@ def codon(xs, ys, colors, groupings,
     fig.x_range.callback = range_callback
 
     legend_items = []
+    initial_legend_items = []
     lines = []
     for checkbox_name, source in sources['plotted'].items():
+        if checkbox_name in initial_sub_group_selections:
+            color = colors[checkbox_name]
+            line_width = 2
+            line_alpha = 0.95
+            circle_visible = True
+        else:
+            color ='black'
+            line_width = 1
+            circle_visible = False
+            if len(initial_sub_group_selections) > 0:
+                line_alpha = unselected_alpha
+            else:
+                line_alpha = 0.6
+
         line = fig.line(x='x',
                         y='y',
-                        color='black',
+                        color=color,
                         source=source,
-                        line_width=1,
-                        line_alpha=0.6,
+                        line_width=line_width,
+                        line_alpha=line_alpha,
                         line_join='round',
                         hover_alpha=1.0,
                         hover_color=colors[checkbox_name],
@@ -73,12 +108,12 @@ def codon(xs, ys, colors, groupings,
         
         circle = fig.circle(x='x',
                             y='y',
-                            color='black',
+                            color=color,
                             source=source,
-                            size=4,
+                            size=3,
                             fill_alpha=0.9,
                             line_alpha=0.9,
-                            visible=False,
+                            visible=circle_visible,
                             hover_alpha=1.0,
                             hover_color=colors[checkbox_name],
                            )
@@ -86,15 +121,15 @@ def codon(xs, ys, colors, groupings,
         circle.name = 'circle_{0}'.format(checkbox_name)
     
         legend_items.append((checkbox_name, [line]))
+        if checkbox_name in initial_sub_group_selections:
+            initial_legend_items.append((checkbox_name, [line]))
         
     fig.legend.name = 'legend'
-    fig.legend.items = []
+    fig.legend.items = initial_legend_items
         
     invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
     
-    source_callback = external_coffeescript('metacodon_selection',
-                                            args=dict(invisible_legend=invisible_legend),
-                                           )
+    source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
 
