@@ -40,7 +40,6 @@ else
 
         if name in active_names
             line.glyph.line_color = color
-            line.hover_glyph.line_color = color
             line.glyph.line_width = 2
             line.glyph.line_alpha = 0.95
         else
@@ -59,5 +58,6 @@ else
         else
             circle.glyph.visible = false
         
-legend = (v for k, v of models when k == 'legend')[0]
-legend.items = (item for item in invisible_legend.items when item.label.value in active_names)
+items = (item for item in models['invisible_legend'].items when item.label.value in active_names)
+items.sort (a, b) -> a.label.value.localeCompare b.label.value
+models['legend'].items = items

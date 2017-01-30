@@ -1,6 +1,7 @@
 import bokeh
 import numpy as np
 import positions
+from itertools import cycle
 from . import external_coffeescript, colors_list
 
 def codon(xs, ys, colors, groupings,
@@ -59,9 +60,12 @@ def codon(xs, ys, colors, groupings,
         'undo',
     ]
 
-    fig = bokeh.plotting.figure(plot_width=1600, plot_height=800,
-                                tools=tools, active_scroll='wheel_zoom',
+    fig = bokeh.plotting.figure(plot_width=1200, plot_height=800,
+                                tools=tools,
+                                active_scroll='wheel_zoom',
                                )
+
+    fig.grid.grid_line_alpha = 0.4
 
     fig.y_range = bokeh.models.Range1d(0, y_max)
     fig.x_range = bokeh.models.Range1d(-x_max, x_max)
@@ -72,6 +76,15 @@ def codon(xs, ys, colors, groupings,
                                            )
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
+
+    fig.xaxis.axis_label = 'Offset (codons)'
+    fig.yaxis.axis_label = 'Mean relative enrichment'
+
+    fig.xaxis.name = 'x_axis'
+    fig.yaxis.name = 'y_axis'
+
+    fig.xaxis.axis_label_text_font_style = 'normal'
+    fig.yaxis.axis_label_text_font_style = 'normal'
 
     legend_items = []
     initial_legend_items = []
@@ -139,42 +152,49 @@ def codon(xs, ys, colors, groupings,
     hover.tooltips = [('name', '@name')]
     fig.add_tools(hover)
 
-    zero = bokeh.models.annotations.Span(location=0,
-                                         dimension='height',
-                                         line_color='black',
-                                         line_alpha=0.8,
-                                         line_dash='dashed',
-                                        )
-    fig.renderers.append(zero)
+    zero_x = bokeh.models.annotations.Span(location=0,
+                                           dimension='height',
+                                           line_color='black',
+                                           line_alpha=0.8,
+                                          )
+    fig.renderers.append(zero_x)
 
-    options = sorted(ys[highest_level_keys[0]].values()[0].keys())
-    menu = bokeh.models.widgets.Select(options=options, value=options[0])
+    one_y = bokeh.models.annotations.Span(location=1,
+                                           dimension='width',
+                                           line_color='black',
+                                           line_alpha=0.8,
+                                          )
+    fig.renderers.append(one_y)
+
+    menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
     menu.callback = external_coffeescript('metacodon_menu')
 
     sub_group_callback = external_coffeescript('metacodon_sub_group',
                                                format_args=dict(colors_dict=colors,
                                                                 unselected_alpha=unselected_alpha
                                                                ),
-                                               args=dict(invisible_legend=invisible_legend),
                                               )
 
-    top_group_callback = external_coffeescript('metacodon_top_group',
-                                               args=dict(invisible_legend=invisible_legend),
-                                              )
-
+    top_group_callback = external_coffeescript('metacodon_top_group')
     top_groups = []
     sub_groups = []
-    width = 75 + max(len(l) for top_name in groupings for l in groupings[top_name]) * 5
+
     for top_name, sub_names in sorted(groupings.items()):
+        
+        width = 75 + max(len(l) for l in sub_names) * 6
+
+        top_active = [0] if top_name in initial_top_group_selections else []
         top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
-                                                 active=[],
+                                                 active=top_active,
                                                  width=width,
                                                  name='top_{0}'.format(top_name),
                                                  callback=top_group_callback,
                                                 )
         top_groups.append(top)
+
+        sub_active = [i for i, n in enumerate(sub_names) if n in initial_sub_group_selections]
         sub = bokeh.models.widgets.CheckboxGroup(labels=sub_names,
-                                                 active=[],
+                                                 active=sub_active,
                                                  width=width,
                                                  callback=sub_group_callback,
                                                  name='sub_{0}'.format(top_name),
@@ -200,9 +220,7 @@ def codon(xs, ys, colors, groupings,
                                                           )
 
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
-    clear_selection.callback = external_coffeescript('metacodon_clear_selection',
-                                                     args=dict(invisible_legend=invisible_legend),
-                                                    )
+    clear_selection.callback = external_coffeescript('metacodon_clear_selection')
 
     grid = [
         top_groups,
@@ -217,6 +235,8 @@ def gene(densities,
          y_max=5,
          unselected_alpha=0.2,
          assignment='three_prime',
+         min_density=0,
+         start_grey=False,
         ):
     exp_names = sorted(densities['codon'])
     sources = {}
@@ -245,11 +265,17 @@ def gene(densities,
             source = bokeh.models.ColumnDataSource()
             for landmark in ['start_codon', 'stop_codon']:
                 xs = xs_dict[resolution][landmark]
-                density_type = positions.MetageneDensityType(assignment,
+
+                if resolution == 'codon':
+                    actual_assignment = assignment
+                else:
+                    actual_assignment = 'three_prime'
+
+                density_type = positions.MetageneDensityType(actual_assignment,
                                                              landmark,
                                                              'all',
                                                              'none_nearby',
-                                                             0.1,
+                                                             min_density,
                                                             )
                 ys = densities[resolution][exp_name][str(density_type)]['means'][landmark, xs]
 
@@ -304,7 +330,7 @@ def gene(densities,
     lines = {'start_codon': [], 'stop_codon': []}
     legend_items = []
 
-    colors = dict(zip(exp_names, bokeh.palettes.brewer['Dark2'][8]))
+    colors = dict(zip(exp_names, cycle(bokeh.palettes.brewer['Dark2'][8])))
     for exp_name in exp_names:
         for landmark in ('start_codon', 'stop_codon'):
             if landmark == 'stop_codon':
@@ -315,11 +341,11 @@ def gene(densities,
             line = figs[landmark].line(x='xs_{0}'.format(landmark),
                                        y='ys_{0}'.format(landmark),
                                        source=sources['plotted'][exp_name],
-                                       color=colors[exp_name],
+                                       color='black' if start_grey else colors[exp_name],
                                        hover_alpha=1.0,
                                        hover_color=colors[exp_name],
                                        line_width=1.5,
-                                       line_alpha=0.6,
+                                       line_alpha=0.2 if start_grey else 0.6,
                                        **legend_kwarg)
             line.hover_glyph.line_width = 4
             line.name = 'line_{0}'.format(exp_name)
@@ -347,9 +373,7 @@ def gene(densities,
     
     invisible_legend = bokeh.models.Legend(items=legend_items, name='invisible_legend')
 
-    source_callback = external_coffeescript('metacodon_selection',
-                                            args=dict(invisible_legend=invisible_legend),
-                                           )
+    source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
 
@@ -369,24 +393,22 @@ def gene(densities,
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
     resolution.callback = external_coffeescript('metacodon_resolution',
-                                       args=dict(**injection),
-                                      )
+                                                args=dict(**injection),
+                                               )
     
     sub_group_callback = external_coffeescript('metacodon_sub_group',
                                                format_args=dict(colors_dict=colors,
                                                                 unselected_alpha=unselected_alpha
                                                                ),
-                                               args=dict(invisible_legend=invisible_legend),
                                               )
 
-    top_group_callback = external_coffeescript('metacodon_top_group',
-                                               args=dict(invisible_legend=invisible_legend),
-                                              )
+    top_group_callback = external_coffeescript('metacodon_top_group')
 
     top_groups = []
     sub_groups = []
-    width = 75 + max(len(l) for top_name in groupings for l in groupings[top_name]) * 6
+    width = 100
     for top_name, sub_names in sorted(groupings.items()):
+        width = 75 + max(len(l) for l in sub_names) * 6
         top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
                                                  active=[],
                                                  width=width,
@@ -394,7 +416,7 @@ def gene(densities,
                                                  callback=top_group_callback,
                                                 )
         top_groups.append(top)
-        sub = bokeh.models.widgets.CheckboxGroup(labels=sub_names,
+        sub = bokeh.models.widgets.CheckboxGroup(labels=sorted(sub_names),
                                                  active=[],
                                                  width=width,
                                                  callback=sub_group_callback,
