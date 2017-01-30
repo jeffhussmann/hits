@@ -388,15 +388,15 @@ def scatter(df,
         x_menu = bokeh.models.widgets.Select(title='X',
                                              options=numerical_cols,
                                              value=x_name,
+                                             name='x_menu',
                                             )
         y_menu = bokeh.models.widgets.Select(title='Y',
                                              options=numerical_cols,
                                              value=y_name,
+                                             name='y_menu',
                                             )
 
-        menu_args = dict(x_menu=x_menu,
-                         y_menu=y_menu,
-                         xaxis=fig.xaxis[0],
+        menu_args = dict(xaxis=fig.xaxis[0],
                          yaxis=fig.yaxis[0],
                         )
         menu_callback = external_coffeescript('scatter_menu', args=menu_args)

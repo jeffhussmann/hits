@@ -3,8 +3,8 @@ models = cb_obj.document._all_models_by_name._dict
 scatter_data = models['scatter_source'].data
 label_data = models['labels_source'].data
 
-x_name = x_menu.value
-y_name = y_menu.value
+x_name = models['x_menu'].value
+y_name = models['y_menu'].value
 
 scatter_data.x = scatter_data[x_name]
 scatter_data.y = scatter_data[y_name]
