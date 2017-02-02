@@ -177,7 +177,7 @@ def scatter(df,
     scatter_source.data['x'] = scatter_source.data[x_name]
     scatter_source.data['y'] = scatter_source.data[y_name]
 
-    scatter_source.data['no_color'] = ['rgba(0, 0, 0, 0.5)' for _ in scatter_source.data['x']]
+    scatter_source.data['no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
     if 'color' not in scatter_source.data:
         scatter_source.data['color'] = scatter_source.data['no_color']
 
@@ -189,6 +189,7 @@ def scatter(df,
                           source=scatter_source,
                           size=marker_size,
                           fill_color='color',
+                          fill_alpha=0.5,
                           line_color=None,
                           nonselection_color='color',
                           nonselection_alpha=0.1,
@@ -476,12 +477,30 @@ def scatter(df,
     args = dict(column_names=ListOfStringsModel(value=table_col_names))
     save_button.callback = external_coffeescript('scatter_save_button', args)
 
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=0.5,
+                                       step=.05,
+                                       title='alpha',
+                                      )
+    alpha_slider.callback = external_coffeescript('scatter_alpha')
+    
+    size_slider = bokeh.models.Slider(start=1,
+                                       end=20.,
+                                       value=marker_size,
+                                       step=1,
+                                       title='marker size',
+                                      )
+    size_slider.callback = external_coffeescript('scatter_size')
+
     fig.min_border = 80
 
     widgets = [
         label_button,
         zoom_to_data_button,
         grid_options,
+        alpha_slider,
+        size_slider,
         text_input,
         subset_menu,
         save_button,
