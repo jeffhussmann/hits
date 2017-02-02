@@ -5,6 +5,8 @@ import os.path
 import pandas as pd
 from itertools import cycle
 from . import external_coffeescript, colors_list
+from meta import ToggleLegend
+from bokeh.models.annotations import LegendItem
 
 def load_data(exp_dirs):
     def read_csv(fn):
@@ -95,40 +97,31 @@ def extract_ladder_peak_times(series):
     peak_times = {series[start:end].idxmax(): nt for (start, end), nt in ladder_peaks}
     return peak_times
 
-JS_CODE = """
-Legend = require "models/annotations/legend"
-properties = require "core/properties"
-class ToggleLegend extends Legend.Model
-    number: properties.Int
-
-module.exports = 
-    Model: ToggleLegend
-"""
-
-class ToggleLegend(bokeh.models.annotations.Legend):
-    __implementation__ = JS_CODE
-
-    number = bokeh.core.properties.Int
-
-def plot(exps, unselected_alpha=0.2):
+def plot(exps,
+         initial_sub_group_selections=None,
+         unselected_alpha=0.2,
+        ):
+    if initial_sub_group_selections is None:
+        initial_sub_group_selections = []
     groupings = {group_name: sorted(exps['raw'][group_name]) for group_name in exps['raw']}
 
     sources = {}
     colors = {}
-    color_iter = cycle(bokeh.palettes.Dark2[8])
+    color_iter = cycle(colors_list)
 
     highest_level_keys = [k for k in sorted(exps) if k != 'descriptions']
 
     for key in ['plotted'] + highest_level_keys:
         if key == 'plotted':
-            normalization = 'nonmarker area'
+            normalization = 'raw'
         else:
             normalization = key
         
         sources[key] = {}
         for group_name in sorted(exps[normalization]):
             for sample_name in sorted(exps[normalization][group_name]):
-                colors[sample_name] = color_iter.next()
+                if sample_name not in colors:
+                    colors[sample_name] = color_iter.next()
                 series = exps[normalization][group_name][sample_name]
                 source = bokeh.models.ColumnDataSource()
                 source.data['x'] = list(series.index)
@@ -161,7 +154,8 @@ def plot(exps, unselected_alpha=0.2):
     ]
 
     x_range = bokeh.models.Range1d(17, 70, bounds=(17, 70))
-    fig = bokeh.plotting.figure(plot_width=1200, plot_height=600,
+    fig = bokeh.plotting.figure(plot_width=1200,
+                                plot_height=600,
                                 tools=tools, active_scroll='wheel_zoom',
                                 x_range=x_range,
                                )
@@ -189,28 +183,49 @@ def plot(exps, unselected_alpha=0.2):
     fig.xaxis.formatter = bokeh.models.FuncTickFormatter(code=convert_tick)
     fig.xaxis.ticker = bokeh.models.FixedTicker(ticks=list(peak_times))
 
-    legend_items = []
+    all_legend_items = []
+    initial_legend_items = []
     lines = []
     for sample_name, source in sources['plotted'].items():
+        if sample_name in initial_sub_group_selections:
+            color = colors[sample_name]
+            line_width = 2
+            line_alpha = 0.95
+        else:
+            color = 'black'
+            line_width = 1
+            if len(initial_sub_group_selections) > 0:
+                line_alpha = unselected_alpha
+            else:
+                line_alpha = 0.6
+
         line = fig.line(x='x',
                         y='y',
-                        color='black',
+                        color=color,
                         source=source,
-                        line_width=1,
-                        line_alpha=0.6,
+                        line_width=line_width,
+                        line_alpha=line_alpha,
                         line_join='round',
+                        nonselection_line_color=colors[sample_name],
+                        nonselection_line_alpha=unselected_alpha,
                         hover_alpha=1.0,
                         hover_color=colors[sample_name],
-                        #legend=sample_name,
                        )
+
         line.hover_glyph.line_width = 4
         line.name = 'line_{0}'.format(sample_name)
         lines.append(line)
+
+        legend_item = LegendItem(label=sample_name, renderers=[line])
+        all_legend_items.append(legend_item)
+        if sample_name in initial_sub_group_selections:
+            initial_legend_items.append(legend_item)
         
-        legend_items.append((sample_name, [line]))
-        
-    fig.legend.name = 'legend'
-    fig.legend.items = legend_items
+    legend = ToggleLegend(name='legend',
+                          items=initial_legend_items,
+                          all_items=all_legend_items,
+                         )
+    fig.add_layout(legend)
     
     source_callback = external_coffeescript('bioanalyzer_selection',
                                             args=dict(full_source=full_source),
@@ -225,12 +240,12 @@ def plot(exps, unselected_alpha=0.2):
     fig.add_tools(hover)
 
     sub_group_callback = external_coffeescript('bioanalyzer_sub_group',
-                                               format_args=dict(colors_dict=colors,
-                                                                unselected_alpha=unselected_alpha
-                                                               ),
+                                               args=dict(full_source=full_source),
                                               )
 
-    top_group_callback = external_coffeescript('bioanalyzer_top_group')
+    top_group_callback = external_coffeescript('bioanalyzer_top_group',
+                                               args=dict(full_source=full_source),
+                                              )
 
     top_groups = []
     sub_groups = []
@@ -243,8 +258,10 @@ def plot(exps, unselected_alpha=0.2):
                                                  callback=top_group_callback,
                                                 )
         top_groups.append(top)
+
+        sub_active = [i for i, n in enumerate(sub_names) if n in initial_sub_group_selections]
         sub = bokeh.models.widgets.CheckboxGroup(labels=sub_names,
-                                                 active=[],
+                                                 active=sub_active,
                                                  width=width,
                                                  callback=sub_group_callback,
                                                  name='sub_{0}'.format(top_name),
@@ -253,10 +270,12 @@ def plot(exps, unselected_alpha=0.2):
 
     
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
-    clear_selection.callback = external_coffeescript('bioanalyzer_clear_selection')
+    clear_selection.callback = external_coffeescript('bioanalyzer_clear_selection',
+                                                     args=dict(full_source=full_source),
+                                                    )
     
     highest_level_chooser = bokeh.models.widgets.Select(options=highest_level_keys,
-                                                        value=highest_level_keys[1],
+                                                        value=highest_level_keys[2],
                                                        )
     callback_name = 'metacodon_highest_level'
     

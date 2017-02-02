@@ -12,8 +12,8 @@ scatter_data.y = scatter_data[y_name]
 label_data.x = label_data[x_name]
 label_data.y = label_data[y_name]
 
-xaxis.axis_label = x_name
-yaxis.axis_label = y_name
+models['x_axis'].axis_label = x_name
+models['y_axis'].axis_label = y_name
 
 models['scatter_source'].trigger('change')
 models['labels_source'].trigger('change')

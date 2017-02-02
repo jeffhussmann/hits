@@ -24,7 +24,6 @@ for group in checkbox_groups
 if active_names.length == 0
     for line in lines
         name = line.name['line_'.length..]
-        color = colors.value[name]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
         line.glyph.line_color = "black"
@@ -34,25 +33,21 @@ if active_names.length == 0
 else
     for line in lines
         name = line.name['line_'.length..]
-        color = colors.value[name]
 
         if name in active_names
-            line.glyph.line_color = color
+            line.glyph.line_color = line.nonselection_glyph.line_color
             line.glyph.line_width = 2
             line.glyph.line_alpha = 0.95
         else
             line.glyph.line_color = "black"
             line.glyph.line_width = 1
-            line.glyph.line_alpha = unselected_alpha.value
+            line.glyph.line_alpha = line.nonselection_glyph.line_alpha
             
     for circle in circles
         name = circle.name['circle_'.length..]
-        color = colors.value[name]
 
         if name in active_names
             circle.glyph.visible = true
-            circle.glyph.line_color = color
-            circle.glyph.fill_color = color
         else
             circle.glyph.visible = false
 

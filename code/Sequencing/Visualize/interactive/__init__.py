@@ -2,7 +2,7 @@ import numpy as np
 import bokeh.io
 import bokeh.plotting
 from bokeh.model import Model
-from bokeh.core.properties import Bool, String, Float, List, Dict
+from bokeh.core.properties import Bool, String, List
 import pandas as pd
 import scipy.stats
 import matplotlib.colors
@@ -43,36 +43,6 @@ module.exports =
     Model: ListOfStringsModel
 '''
 
-class DictOfStringsModel(Model):
-    value = Dict(String, String)
-
-    __implementation__ = '''
-Model = require "model"
-p = require "core/properties"
-
-class DictOfStringsModel extends Model 
-    type: "DictOfStringsModel"
-    @define { value: [p.Any, {}] }
-
-module.exports = 
-    Model: DictOfStringsModel
-'''
-
-class FloatModel(Model):
-    value = Float
-
-    __implementation__ = '''
-Model = require "model"
-p = require "core/properties"
-
-class FloatModel extends Model 
-    type: "FloatModel"
-    @define { value: [p.Number] }
-
-module.exports = 
-    Model: FloatModel
-'''
-
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this one. Load their contents into a dictionary.
 
@@ -88,9 +58,8 @@ def external_coffeescript(key, args=None):
     if args is None:
         args = {}
 
-    callback = bokeh.models.CustomJS.from_coffeescript(code=callbacks[key],
-                                                       args=args,
-                                                      )
+    code = callbacks[key]
+    callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
 colors_list =  (
@@ -195,6 +164,8 @@ def scatter(df,
 
     x_name, y_name = numerical_cols[:2]
     
+    fig.xaxis.name = 'x_axis'
+    fig.yaxis.name = 'y_axis'
     fig.xaxis.axis_label = x_name
     fig.yaxis.axis_label = y_name
     for axis in (fig.xaxis, fig.yaxis):
@@ -411,10 +382,7 @@ def scatter(df,
         heatmap_fig.add_tools(hover)
 
         first_row = [heatmap_fig]
-        args = dict(xaxis=fig.xaxis[0],
-                    yaxis=fig.yaxis[0],
-                   )
-        heatmap_source.callback = external_coffeescript('scatter_heatmap', args=args)
+        heatmap_source.callback = external_coffeescript('scatter_heatmap')
 
         code = '''
         dict = {dict}
@@ -457,10 +425,7 @@ def scatter(df,
                                              name='y_menu',
                                             )
 
-        menu_args = dict(xaxis=fig.xaxis[0],
-                         yaxis=fig.yaxis[0],
-                        )
-        menu_callback = external_coffeescript('scatter_menu', args=menu_args)
+        menu_callback = external_coffeescript('scatter_menu')
         x_menu.callback = menu_callback
         y_menu.callback = menu_callback
         

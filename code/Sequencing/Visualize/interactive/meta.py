@@ -4,7 +4,7 @@ from bokeh.models.annotations import LegendItem
 import numpy as np
 import positions
 from itertools import cycle
-from . import external_coffeescript, colors_list, FloatModel, DictOfStringsModel
+from . import external_coffeescript, colors_list
 
 class ToggleLegend(bokeh.models.annotations.Legend):
     all_items = List(Instance(LegendItem))
@@ -132,6 +132,8 @@ def codon(xs, ys, colors, groupings,
                         line_width=line_width,
                         line_alpha=line_alpha,
                         line_join='round',
+                        nonselection_line_color=colors[checkbox_name],
+                        nonselection_line_alpha=unselected_alpha,
                         hover_alpha=1.0,
                         hover_color=colors[checkbox_name],
                        )
@@ -141,13 +143,13 @@ def codon(xs, ys, colors, groupings,
         
         circle = fig.circle(x='x',
                             y='y',
-                            color=color,
+                            color=colors[checkbox_name],
                             source=source,
                             size=3,
-                            fill_alpha=0.9,
-                            line_alpha=0.9,
+                            fill_alpha=0.95,
+                            line_alpha=0.95,
                             visible=circle_visible,
-                            hover_alpha=1.0,
+                            hover_alpha=0.95,
                             hover_color=colors[checkbox_name],
                            )
         circle.hover_glyph.visible = True
@@ -191,10 +193,7 @@ def codon(xs, ys, colors, groupings,
     menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
     menu.callback = external_coffeescript('metacodon_menu')
 
-    args = dict(unselected_alpha=FloatModel(value=unselected_alpha),
-                colors=DictOfStringsModel(value=colors),
-               )
-    sub_group_callback = external_coffeescript('metacodon_sub_group', args=args)
+    sub_group_callback = external_coffeescript('metacodon_sub_group')
 
     top_group_callback = external_coffeescript('metacodon_top_group')
 
@@ -416,10 +415,7 @@ def gene(densities,
                                                 args=injection,
                                                )
     
-    args = dict(unselected_alpha=FloatModel(value=unselected_alpha),
-                colors=DictOfStringsModel(value=colors),
-               )
-    sub_group_callback = external_coffeescript('metacodon_sub_group', args=args)
+    sub_group_callback = external_coffeescript('metacodon_sub_group')
 
     top_group_callback = external_coffeescript('metacodon_top_group')
 
