@@ -7,4 +7,5 @@ for line in lines
     circle = models['circle_' + name]
     source = models['source_' + name + '_' + cb_obj.value]
     line.data_source.data = source.data
-    circle.data_source.data = source.data
+    if (circle?)
+        circle.data_source.data = source.data

@@ -20,3 +20,5 @@ for line_group in lines
         name = line.name['line_'.length..]
         source = models['source_' + name + '_' + resolution]
         line.data_source.data = source.data
+
+models['x_axis'].axis_label = 'Offset (' + resolution + 's)'

@@ -21,4 +21,4 @@ for group in checkbox_groups
 
     group.trigger('change')
 
-group.callback.func(group)
+group.callback.func(full_source, group)

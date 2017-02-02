@@ -1,6 +1,8 @@
 import numpy as np
 import bokeh.io
 import bokeh.plotting
+from bokeh.model import Model
+from bokeh.core.properties import Bool, String, List
 import pandas as pd
 import scipy.stats
 import matplotlib.colors
@@ -11,6 +13,36 @@ import IPython.display
 from collections import defaultdict
 
 bokeh.io.output_notebook()
+
+class BoolModel(Model):
+    value = Bool
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class BoolModel extends Model 
+    type: "BoolModel"
+    @define { value: [p.Bool] }
+
+module.exports = 
+    Model: BoolModel
+'''
+
+class ListOfStringsModel(Model):
+    value = List(String)
+
+    __implementation__ = '''
+Model = require "model"
+p = require "core/properties"
+
+class ListOfStringsModel extends Model 
+    type: "ListOfStringsModel"
+    @define { value: [p.Array, []] }
+
+module.exports = 
+    Model: ListOfStringsModel
+'''
 
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this one. Load their contents into a dictionary.
@@ -23,13 +55,11 @@ for fn in coffee_fns:
     with open(fn) as fh:
         callbacks[root] = fh.read()
 
-def external_coffeescript(key, args=None, format_args=None):
+def external_coffeescript(key, args=None):
     if args is None:
         args = {}
-    if format_args is None:
-        format_args = {}
 
-    code = callbacks[key].format(**format_args)
+    code = callbacks[key]
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
@@ -135,6 +165,8 @@ def scatter(df,
 
     x_name, y_name = numerical_cols[:2]
     
+    fig.xaxis.name = 'x_axis'
+    fig.yaxis.name = 'y_axis'
     fig.xaxis.axis_label = x_name
     fig.yaxis.axis_label = y_name
     for axis in (fig.xaxis, fig.yaxis):
@@ -146,7 +178,7 @@ def scatter(df,
     scatter_source.data['x'] = scatter_source.data[x_name]
     scatter_source.data['y'] = scatter_source.data[y_name]
 
-    scatter_source.data['no_color'] = ['rgba(0, 0, 0, 0.5)' for _ in scatter_source.data['x']]
+    scatter_source.data['no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
     if 'color' not in scatter_source.data:
         scatter_source.data['color'] = scatter_source.data['no_color']
 
@@ -158,6 +190,7 @@ def scatter(df,
                           source=scatter_source,
                           size=marker_size,
                           fill_color='color',
+                          fill_alpha=0.5,
                           line_color=None,
                           nonselection_color='color',
                           nonselection_alpha=0.1,
@@ -351,10 +384,7 @@ def scatter(df,
         heatmap_fig.add_tools(hover)
 
         first_row = [heatmap_fig]
-        args = dict(xaxis=fig.xaxis[0],
-                    yaxis=fig.yaxis[0],
-                   )
-        heatmap_source.callback = external_coffeescript('scatter_heatmap', args=args)
+        heatmap_source.callback = external_coffeescript('scatter_heatmap')
 
         code = '''
         dict = {dict}
@@ -389,18 +419,15 @@ def scatter(df,
         x_menu = bokeh.models.widgets.Select(title='X',
                                              options=numerical_cols,
                                              value=x_name,
+                                             name='x_menu',
                                             )
         y_menu = bokeh.models.widgets.Select(title='Y',
                                              options=numerical_cols,
                                              value=y_name,
+                                             name='y_menu',
                                             )
 
-        menu_args = dict(x_menu=x_menu,
-                         y_menu=y_menu,
-                         xaxis=fig.xaxis[0],
-                         yaxis=fig.yaxis[0],
-                        )
-        menu_callback = external_coffeescript('scatter_menu', args=menu_args)
+        menu_callback = external_coffeescript('scatter_menu')
         x_menu.callback = menu_callback
         y_menu.callback = menu_callback
         
@@ -422,32 +449,50 @@ def scatter(df,
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
                                                      )
+    args = dict(log_scale=BoolModel(value=log_scale))
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
-                                                         format_args=dict(log_scale='true' if log_scale else 'false'))
+                                                         args=args,
+                                                        )
 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'], active=1 if not grid else 0)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
+                                                   active=1 if not grid else 0,
+                                                  )
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
-    text_input.callback = external_coffeescript('scatter_search',
-                                                format_args=dict(columns=object_cols),
-                                               )
+    args = dict(column_names=ListOfStringsModel(value=object_cols))
+    text_input.callback = external_coffeescript('scatter_search', args=args)
     
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
     subset_menu = bokeh.models.widgets.Select(title='Select subset:',
-                                             options=subset_options,
-                                             value='',
-                                            )
+                                              options=subset_options,
+                                              value='',
+                                             )
     subset_menu.callback = external_coffeescript('scatter_subset_menu')
 
     # Button to dump table to file.
     save_button = bokeh.models.widgets.Button(label='Save table to file',
                                               width=50,
                                              )
-    save_button.callback = external_coffeescript('scatter_save_button',
-                                                 format_args=dict(columns=table_col_names),
-                                                )
+    args = dict(column_names=ListOfStringsModel(value=table_col_names))
+    save_button.callback = external_coffeescript('scatter_save_button', args)
+
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=0.5,
+                                       step=.05,
+                                       title='alpha',
+                                      )
+    alpha_slider.callback = external_coffeescript('scatter_alpha')
+    
+    size_slider = bokeh.models.Slider(start=1,
+                                       end=20.,
+                                       value=marker_size,
+                                       step=1,
+                                       title='marker size',
+                                      )
+    size_slider.callback = external_coffeescript('scatter_size')
 
     fig.min_border = 80
 
@@ -455,6 +500,8 @@ def scatter(df,
         label_button,
         zoom_to_data_button,
         grid_options,
+        alpha_slider,
+        size_slider,
         text_input,
         subset_menu,
         save_button,

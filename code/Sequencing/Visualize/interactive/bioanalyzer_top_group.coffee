@@ -9,4 +9,4 @@ for group in checkbox_groups
         else
             group.active = []
 
-group.callback.func(group)
+group.callback.func(full_source, group)
