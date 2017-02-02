@@ -486,8 +486,9 @@ def scatter(df,
     bokeh.io.show(full)
 
 def hex_to_CSS(hex_string, alpha=1.):
-    ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
+    ''' Converts an RGB hex value and optional alpha value to a CSS-format RGBA string. '''
     rgb = matplotlib.colors.colorConverter.to_rgb(hex_string)
+    rgb = [int(v * 255) for v in rgb]
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
