@@ -540,4 +540,4 @@ def hex_to_CSS(hex_string, alpha=1.):
 def example():
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
-    scatter(df, heatmap=True, hover_keys=['short_description'], table_keys=['description'], grid=True)
+    scatter(df, size=700, hover_keys=['short_description'], table_keys=['description'], grid=True)
