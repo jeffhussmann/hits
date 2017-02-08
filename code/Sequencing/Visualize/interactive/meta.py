@@ -32,6 +32,7 @@ def codon(xs, ys, colors, groupings,
           initial_menu_selection=None,
           initial_top_group_selections=None,
           initial_sub_group_selections=None,
+          intial_resolution='codon',
          ):
     if initial_top_group_selections is None:
         initial_top_group_selections = []
@@ -56,7 +57,7 @@ def codon(xs, ys, colors, groupings,
 
     for key in ['plotted'] + highest_level_keys:
         if key == 'plotted':
-            resolution = highest_level_keys[0]
+            resolution = intial_resolution
         else:
             resolution = key
         
@@ -223,7 +224,9 @@ def codon(xs, ys, colors, groupings,
         sub_groups.append(sub)
 
     if toggle_resolution:
-        highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'], active=0)
+        highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
+                                                                active=0 if intial_resolution == 'codon' else 1,
+                                                               )
         callback_name = 'metacodon_resolution'
     else:
         highest_level_chooser = bokeh.models.widgets.Select(options=highest_level_keys,
