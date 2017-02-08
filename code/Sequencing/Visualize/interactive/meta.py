@@ -488,3 +488,148 @@ def gene(densities,
         [plots, resolution],
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
+
+def lengths(ys, group_by='experiment'):
+    sources = {}
+    initial_sub_group_selections = []
+
+    first_exp_name = ys.keys()[0]
+
+    # ys has experiments as top level keys and types as lower level keys.
+    # Need a dictionary with checkbox names as the top keys, so if grouping by
+    # type, don't need to do anything. If grouping by experiment, need to invert
+    # the order.
+
+    if group_by == 'experiment':
+        menu_names = sorted(ys)
+        checkbox_names = sorted(ys[first_exp_name])
+        
+        rekeyed_ys = {}
+        for checkbox_name in checkbox_names:
+            rekeyed_ys[checkbox_name] = {}
+            for menu_name in menu_names:
+                rekeyed_ys[checkbox_name][menu_name] = ys[menu_name][checkbox_name]
+
+        ys = rekeyed_ys
+    elif group_by == 'type':
+        menu_names = sorted(ys[first_exp_name])
+        checkbox_names = sorted(ys)
+
+    colors = dict(zip(checkbox_names, cycle(colors_list)))
+
+    initial_menu_selection = None
+    if initial_menu_selection is None:
+        initial_menu_selection = menu_names[0]
+
+    if initial_menu_selection not in menu_names:
+        raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_names))
+
+    for checkbox_name in checkbox_names:
+        source = bokeh.models.ColumnDataSource(ys[checkbox_name])
+
+        xs = range(len(ys[checkbox_name][menu_names[0]]))
+        source.data['x'] = xs
+
+        source.data['y'] = source.data[initial_menu_selection]
+
+        source.data['name'] = [checkbox_name] * len(xs)
+        source.name = 'source_{0}'.format(checkbox_name)
+        sources[checkbox_name] = source
+
+    tools = [
+        'pan',
+        'tap',
+        'box_zoom',
+        'wheel_zoom',
+        'save',
+        'reset',
+        'undo',
+    ]
+
+    fig = bokeh.plotting.figure(plot_width=1200,
+                                plot_height=800,
+                                tools=tools,
+                                active_scroll='wheel_zoom',
+                                name='figure',
+                               )
+
+    fig.grid.grid_line_alpha = 0.4
+
+    #fig.y_range = bokeh.models.Range1d(0, y_max)
+    fig.y_range.name = 'y_range'
+    #fig.x_range = bokeh.models.Range1d(-x_max, x_max)
+    fig.x_range.name = 'x_range'
+
+    #range_callback = external_coffeescript('metacodon_range')
+    #fig.y_range.callback = range_callback
+    #fig.x_range.callback = range_callback
+
+    fig.xaxis.axis_label = 'Length'
+    fig.yaxis.axis_label = 'y'
+
+    fig.xaxis.name = 'x_axis'
+    fig.yaxis.name = 'y_axis'
+
+    fig.xaxis.axis_label_text_font_style = 'normal'
+    fig.yaxis.axis_label_text_font_style = 'normal'
+
+    legend_items = []
+    initial_legend_items = []
+    lines = []
+    for checkbox_name, source in sources.items():
+        if checkbox_name in initial_sub_group_selections:
+            color = 'green' #colors[checkbox_name]
+            line_width = 2
+            line_alpha = 0.95
+            circle_visible = True
+        else:
+            color ='black'
+            line_width = 1
+            circle_visible = False
+            if len(initial_sub_group_selections) > 0:
+                line_alpha = unselected_alpha
+            else:
+                line_alpha = 0.6
+
+        line = fig.line(x='x',
+                        y='y',
+                        color=color,
+                        source=source,
+                        line_width=line_width,
+                        line_alpha=line_alpha,
+                        line_join='round',
+                        nonselection_line_color='green',#colors[checkbox_name],
+                        nonselection_line_alpha=0.5,#unselected_alpha,
+                        hover_alpha=1.0,
+                        hover_color='green',#colors[checkbox_name],
+                       )
+        line.hover_glyph.line_width = 4
+        line.name = 'line_{0}'.format(checkbox_name)
+        lines.append(line)
+        
+        circle = fig.circle(x='x',
+                            y='y',
+                            color='green',#colors[checkbox_name],
+                            source=source,
+                            size=3,
+                            fill_alpha=0.95,
+                            line_alpha=0.95,
+                            visible=circle_visible,
+                            hover_alpha=0.95,
+                            hover_color='green',#colors[checkbox_name],
+                           )
+        circle.hover_glyph.visible = True
+        circle.name = 'circle_{0}'.format(checkbox_name)
+    
+        legend_item = LegendItem(label=checkbox_name, renderers=[line])
+        legend_items.append(legend_item)
+        if checkbox_name in initial_sub_group_selections:
+            initial_legend_items.append(legend_item)
+        
+    legend = ToggleLegend(name='legend',
+                          items=initial_legend_items,
+                          all_items=legend_items,
+                         )
+    fig.add_layout(legend)
+
+    bokeh.io.show(fig)
