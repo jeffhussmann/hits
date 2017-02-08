@@ -9,6 +9,7 @@ import matplotlib.colors
 import matplotlib.cm
 import os.path
 import glob
+import IPython.display
 from collections import defaultdict
 
 bokeh.io.output_notebook()
@@ -532,8 +533,9 @@ def scatter(df,
     bokeh.io.show(full)
 
 def hex_to_CSS(hex_string, alpha=1.):
-    ''' Converts an RGB hex value and option alpha value to a CSS-format RGBA string. '''
+    ''' Converts an RGB hex value and optional alpha value to a CSS-format RGBA string. '''
     rgb = matplotlib.colors.colorConverter.to_rgb(hex_string)
+    rgb = [int(v * 255) for v in rgb]
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
@@ -541,3 +543,27 @@ def example():
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
     scatter(df, size=700, hover_keys=['short_description'], table_keys=['description'], grid=True)
+
+# from http://chris-said.io/
+toggle = '''
+<script>
+  function code_toggle() {
+    if (code_shown){
+      $('div.input').hide('100');
+      $('#toggleButton').val('Show Code')
+    } else {
+      $('div.input').show('100');
+      $('#toggleButton').val('Hide Code')
+    }
+    code_shown = !code_shown
+  }
+
+  $( document ).ready(function(){
+    code_shown=false;
+    $('div.input').hide()
+  });
+</script>
+<form action="javascript:code_toggle()"><input type="submit" id="toggleButton" value="Show Code"></form>
+'''
+
+toggle_cell = IPython.display.HTML(toggle)
