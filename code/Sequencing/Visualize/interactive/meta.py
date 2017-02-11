@@ -1,5 +1,6 @@
 import bokeh
 from bokeh.core.properties import List, Instance
+from bokeh.models.tickers import SingleIntervalTicker
 from bokeh.models.annotations import LegendItem
 import numpy as np
 import positions
@@ -22,11 +23,22 @@ class ToggleLegend extends Legend.Model
 module.exports = 
     Model: ToggleLegend
 '''
+    elif bokeh.__version__ == '0.12.4':
+        __implementation__ = '''
+import {Legend} from "models/annotations/legend"
+import * as p from "core/properties"
+
+export class ToggleLegend extends Legend
+    type: "ToggleLegend"
+    @define {
+        all_items: [p.Array, []]
+    }
+'''
 
 def codon(xs, ys, colors, groupings,
           toggle_resolution=True,
           y_max=5,
-          x_max=25,
+          x_lims=(-25, 25),
           unselected_alpha=0.2,
           initial_menu_selection=None,
           initial_top_group_selections=None,
@@ -90,14 +102,14 @@ def codon(xs, ys, colors, groupings,
 
     fig.y_range = bokeh.models.Range1d(0, y_max)
     fig.y_range.name = 'y_range'
-    fig.x_range = bokeh.models.Range1d(-x_max, x_max)
+    fig.x_range = bokeh.models.Range1d(*x_lims)
     fig.x_range.name = 'x_range'
 
     range_callback = external_coffeescript('metacodon_range')
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
-    fig.xaxis.axis_label = 'Offset (codons)'
+    fig.xaxis.axis_label = 'Offset ({0}s)'.format(intial_resolution)
     fig.yaxis.axis_label = 'Mean relative enrichment'
 
     fig.xaxis.name = 'x_axis'
@@ -136,7 +148,7 @@ def codon(xs, ys, colors, groupings,
                         hover_alpha=1.0,
                         hover_color=colors[checkbox_name],
                        )
-        line.hover_glyph.line_width = 4
+        line.hover_glyph.line_width = 3
         line.name = 'line_{0}'.format(checkbox_name)
         lines.append(line)
         
@@ -144,7 +156,7 @@ def codon(xs, ys, colors, groupings,
                             y='y',
                             color=colors[checkbox_name],
                             source=source,
-                            size=3,
+                            size=2.5,
                             fill_alpha=0.95,
                             line_alpha=0.95,
                             visible=circle_visible,
@@ -164,8 +176,10 @@ def codon(xs, ys, colors, groupings,
                           all_items=legend_items,
                          )
     fig.add_layout(legend)
-    fig.legend.location = 'top_left'
+    fig.legend.location = 'top_right'
     fig.legend.background_fill_alpha = 0.5
+
+    fig.xaxis[0].ticker = bokeh.models.tickers.SingleIntervalTicker(interval=3, num_minor_ticks=3)
 
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
@@ -191,7 +205,11 @@ def codon(xs, ys, colors, groupings,
                                           )
     fig.renderers.append(one_y)
 
-    menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
+    #menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
+    menu = bokeh.models.widgets.MultiSelect(options=menu_options,
+                                            value=[initial_menu_selection],
+                                            size=min(40, len(menu_options)),
+                                           )
     menu.callback = external_coffeescript('metacodon_menu')
 
     sub_group_callback = external_coffeescript('metacodon_sub_group')
@@ -226,11 +244,13 @@ def codon(xs, ys, colors, groupings,
     if toggle_resolution:
         highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
                                                                 active=0 if intial_resolution == 'codon' else 1,
+                                                                name='highest_level_chooser',
                                                                )
         callback_name = 'metacodon_resolution'
     else:
         highest_level_chooser = bokeh.models.widgets.Select(options=highest_level_keys,
                                                             value=highest_level_keys[0],
+                                                            name='highest_level_chooser',
                                                            )
         callback_name = 'metacodon_highest_level'
     
