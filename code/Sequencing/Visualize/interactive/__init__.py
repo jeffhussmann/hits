@@ -1,4 +1,5 @@
 import numpy as np
+import bokeh
 import bokeh.io
 import bokeh.plotting
 from bokeh.model import Model
@@ -17,7 +18,8 @@ bokeh.io.output_notebook()
 class BoolModel(Model):
     value = Bool
 
-    __implementation__ = '''
+    if bokeh.__version__ == '0.12.3':
+        __implementation__ = '''
 Model = require "model"
 p = require "core/properties"
 
@@ -28,11 +30,21 @@ class BoolModel extends Model
 module.exports = 
     Model: BoolModel
 '''
+    elif bokeh.__version__ == '0.12.4':
+        __implementation__ = '''
+import {Model} from "model"
+import * as p from "core/properties"
+
+export class BoolModel extends Model 
+    type: "BoolModel"
+    @define { value: [p.Bool] }
+'''
 
 class ListOfStringsModel(Model):
     value = List(String)
 
-    __implementation__ = '''
+    if bokeh.__version__ == '0.12.3':
+        __implementation__ = '''
 Model = require "model"
 p = require "core/properties"
 
@@ -42,6 +54,15 @@ class ListOfStringsModel extends Model
 
 module.exports = 
     Model: ListOfStringsModel
+'''
+    elif bokeh.__version__ == '0.12.4':
+        __implementation__ = '''
+import {Model} from "model"
+import * as p from "core/properties"
+
+export class ListOfStringsModel extends Model 
+    type: "ListOfStringsModel"
+    @define { value: [p.Array, []] }
 '''
 
 # For easier editing, coffeescript callbacks are kept in separate files
@@ -154,6 +175,14 @@ def scatter(df,
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
     fig.add_tools(lasso)
+    
+    scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
+
+    if 'index' in scatter_source.data:
+        scatter_source.data['_index'] = scatter_source.data['index']
+
+    if df.index.name is None:
+        df.index.name = 'index'
 
     numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
 
@@ -173,18 +202,15 @@ def scatter(df,
         axis.axis_label_text_font_size = '{0}pt'.format(axis_label_size)
         axis.axis_label_text_font_style = 'normal'
 
-    scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
-
     scatter_source.data['x'] = scatter_source.data[x_name]
     scatter_source.data['y'] = scatter_source.data[y_name]
+    
+    scatter_source.data['index'] = list(df.index)
 
     scatter_source.data['no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
     if 'color' not in scatter_source.data:
         scatter_source.data['color'] = scatter_source.data['no_color']
 
-    if df.index.name is None:
-        df.index.name = 'index'
-    
     scatter = fig.scatter('x',
                           'y',
                           source=scatter_source,
@@ -279,7 +305,7 @@ def scatter(df,
     for col_name in table_col_names:
         if col_name == df.index.name:
             formatter = None
-            width = 80
+            width = 50
         elif col_name in numerical_cols:
             formatter = bokeh.models.widgets.NumberFormatter(format='0.00')
             width = 50
@@ -294,7 +320,7 @@ def scatter(df,
                                                  )
         columns.append(column)
 
-    filtered_data = {k: [] for k in list(df.columns) + [df.index.name, 'x', 'y']}
+    filtered_data = {k: [] for k in scatter_source.data}
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data, name='labels_source')
     
     labels = bokeh.models.LabelSet(x='x',
@@ -305,6 +331,7 @@ def scatter(df,
                                    y_offset=2,
                                    source=filtered_source,
                                    text_font_size='8pt',
+                                   name='labels',
                                   )
     fig.add_layout(labels)
     
@@ -314,6 +341,7 @@ def scatter(df,
                                            height=1000,
                                            sortable=False,
                                            name='table',
+                                           row_headers=False,
                                           )
     
     # Set up menus or heatmap to select columns from df to put on x- and y-axis.
@@ -398,8 +426,12 @@ def scatter(df,
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
 
-        pvd = bokeh.core.property_containers.PropertyValueDict
-        pvl = bokeh.core.property_containers.PropertyValueList
+        if bokeh.__version__ == '0.12.3':
+            pvd = bokeh.core.property_containers.PropertyValueDict
+            pvl = bokeh.core.property_containers.PropertyValueList
+        else:
+            pvd = bokeh.core.property.containers.PropertyValueDict
+            pvl = bokeh.core.property.containers.PropertyValueList
 
         selected_from_scratch = pvd({
             '0d': pvd({
@@ -539,10 +571,12 @@ def hex_to_CSS(hex_string, alpha=1.):
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
-def example():
+def example(**extra_kwargs):
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
-    scatter(df, size=700, hover_keys=['short_description'], table_keys=['description'], grid=True)
+    kwargs = dict(size=700, hover_keys=['short_description'], table_keys=['description'], grid=False)
+    kwargs.update(extra_kwargs)
+    scatter(df, **kwargs)
 
 # from http://chris-said.io/
 toggle = '''
