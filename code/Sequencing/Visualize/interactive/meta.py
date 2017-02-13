@@ -392,7 +392,7 @@ def gene(densities,
     legend_items = []
     initial_legend_items = []
 
-    colors = dict(zip(exp_names, colors_list))
+    colors = dict(zip(exp_names, cycle(colors_list)))
     for exp_name in exp_names:
         if exp_name in initial_sub_group_selections:
             color = colors[exp_name]
@@ -450,6 +450,21 @@ def gene(densities,
     figs['stop_codon'].add_layout(legend)
     figs['stop_codon'].legend.location = 'top_left'
     figs['stop_codon'].legend.background_fill_alpha = 0.5
+    
+    for landmark, fig in figs.items():
+        zero_x = bokeh.models.annotations.Span(location=0,
+                                               dimension='height',
+                                               line_color='black',
+                                               line_alpha=0.5,
+                                              )
+        fig.renderers.append(zero_x)
+
+        one_y = bokeh.models.annotations.Span(location=1,
+                                               dimension='width',
+                                               line_color='black',
+                                               line_alpha=0.5,
+                                              )
+        fig.renderers.append(one_y)
     
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
