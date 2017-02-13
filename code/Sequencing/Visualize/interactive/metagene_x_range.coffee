@@ -11,6 +11,9 @@ else
     max_after = 250
 
 changed = cb_obj
+start_changed = changed.attributes.start != changed._previousAttributes.start
+end_changed = changed.attributes.end != changed._previousAttributes.end
+
 changed_landmark = changed.name['x_range_'.length..]
 other_landmark = if changed_landmark == 'stop_codon' then 'start_codon' else 'stop_codon'
 other = models['x_range_' + other_landmark]
@@ -22,5 +25,7 @@ else
     changed.end = max_before if changed.end > max_before
     changed.start = -max_after if changed.start < -max_after
 
-other.start = -changed.end
-other.end = -changed.start
+if end_changed
+    other.start = -changed.end
+if start_changed
+    other.end = -changed.start
