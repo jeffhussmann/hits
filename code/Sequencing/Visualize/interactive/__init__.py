@@ -18,20 +18,7 @@ bokeh.io.output_notebook()
 class BoolModel(Model):
     value = Bool
 
-    if bokeh.__version__ == '0.12.3':
-        __implementation__ = '''
-Model = require "model"
-p = require "core/properties"
-
-class BoolModel extends Model 
-    type: "BoolModel"
-    @define { value: [p.Bool] }
-
-module.exports = 
-    Model: BoolModel
-'''
-    elif bokeh.__version__ == '0.12.4':
-        __implementation__ = '''
+    __implementation__ = '''
 import {Model} from "model"
 import * as p from "core/properties"
 
@@ -43,20 +30,7 @@ export class BoolModel extends Model
 class ListOfStringsModel(Model):
     value = List(String)
 
-    if bokeh.__version__ == '0.12.3':
-        __implementation__ = '''
-Model = require "model"
-p = require "core/properties"
-
-class ListOfStringsModel extends Model 
-    type: "ListOfStringsModel"
-    @define { value: [p.Array, []] }
-
-module.exports = 
-    Model: ListOfStringsModel
-'''
-    elif bokeh.__version__ == '0.12.4':
-        __implementation__ = '''
+    __implementation__ = '''
 import {Model} from "model"
 import * as p from "core/properties"
 
@@ -426,12 +400,8 @@ def scatter(df,
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
 
-        if bokeh.__version__ == '0.12.3':
-            pvd = bokeh.core.property_containers.PropertyValueDict
-            pvl = bokeh.core.property_containers.PropertyValueList
-        else:
-            pvd = bokeh.core.property.containers.PropertyValueDict
-            pvl = bokeh.core.property.containers.PropertyValueList
+        pvd = bokeh.core.property.containers.PropertyValueDict
+        pvl = bokeh.core.property.containers.PropertyValueList
 
         selected_from_scratch = pvd({
             '0d': pvd({

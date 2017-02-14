@@ -11,20 +11,6 @@ class ToggleLegend(bokeh.models.annotations.Legend):
     all_items = List(Instance(LegendItem))
 
     __implementation__ = '''
-Legend = require "models/annotations/legend"
-p = require "core/properties"
-
-class ToggleLegend extends Legend.Model
-    type: "ToggleLegend"
-    @define {
-        all_items: [p.Array, []]
-    }
-
-module.exports = 
-    Model: ToggleLegend
-'''
-    elif bokeh.__version__ == '0.12.4':
-        __implementation__ = '''
 import {Legend} from "models/annotations/legend"
 import * as p from "core/properties"
 
