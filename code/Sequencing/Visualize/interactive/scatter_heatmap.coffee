@@ -1,5 +1,4 @@
 models = cb_obj.document._all_models_by_name._dict
-console.log models
 
 scatter_data = models['scatter_source'].data
 label_data = models['labels_source'].data
