@@ -191,7 +191,6 @@ def codon(xs, ys, colors, groupings,
                                           )
     fig.renderers.append(one_y)
 
-    #menu = bokeh.models.widgets.Select(options=menu_options, value=initial_menu_selection)
     menu = bokeh.models.widgets.MultiSelect(options=menu_options,
                                             value=[initial_menu_selection],
                                             size=min(40, len(menu_options)),
@@ -289,12 +288,14 @@ def gene(densities,
     max_before = 90
     max_after = 250
     xs_dict = {
-        'codon': {'start_codon': np.arange(-max_before, max_after),
-                  'stop_codon': np.arange(-max_after, max_before),
-                 },
-        'nucleotide': {'start_codon': np.arange(-3 * max_before, 3 * max_after),
-                       'stop_codon': np.arange(-3 * max_after, 3 * max_before),
-                      },
+        'codon': {
+            'start_codon': np.arange(-max_before, max_after),
+            'stop_codon': np.arange(-max_after, max_before),
+        },
+        'nucleotide': {
+            'start_codon': np.arange(-3 * max_before, 3 * max_after),
+            'stop_codon': np.arange(-3 * max_after, 3 * max_before),
+        },
     }
 
     for key in ['plotted'] + highest_level_keys:
@@ -514,9 +515,11 @@ def gene(densities,
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
 
-def lengths(ys, group_by='experiment'):
+def lengths(ys, group_by='experiment', groupings=None,
+            initial_top_group_selections=[],
+            initial_sub_group_selections=[],
+           ):
     sources = {}
-    initial_sub_group_selections = []
 
     first_exp_name = ys.keys()[0]
 
@@ -526,39 +529,46 @@ def lengths(ys, group_by='experiment'):
     # the order.
 
     if group_by == 'experiment':
-        menu_names = sorted(ys)
+        menu_options = sorted(ys)
         checkbox_names = sorted(ys[first_exp_name])
         
         rekeyed_ys = {}
         for checkbox_name in checkbox_names:
             rekeyed_ys[checkbox_name] = {}
-            for menu_name in menu_names:
+            for menu_name in menu_options:
                 rekeyed_ys[checkbox_name][menu_name] = ys[menu_name][checkbox_name]
 
         ys = rekeyed_ys
     elif group_by == 'type':
-        menu_names = sorted(ys[first_exp_name])
+        menu_options = sorted(ys[first_exp_name])
         checkbox_names = sorted(ys)
+
+    for checkbox_name in ys:
+        for menu_name in ys[checkbox_name]:
+            ys[checkbox_name][menu_name] = ys[checkbox_name][menu_name][:200]
+    
+    if groupings is None:
+        groupings = {n: [n] for n in checkbox_names}
 
     colors = dict(zip(checkbox_names, cycle(colors_list)))
 
     initial_menu_selection = None
     if initial_menu_selection is None:
-        initial_menu_selection = menu_names[0]
+        initial_menu_selection = menu_options[0]
 
-    if initial_menu_selection not in menu_names:
-        raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_names))
+    if initial_menu_selection not in menu_options:
+        raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
     for checkbox_name in checkbox_names:
         source = bokeh.models.ColumnDataSource(ys[checkbox_name])
 
-        xs = range(len(ys[checkbox_name][menu_names[0]]))
+        xs = range(len(ys[checkbox_name][menu_options[0]]))
         source.data['x'] = xs
 
         source.data['y'] = source.data[initial_menu_selection]
 
         source.data['name'] = [checkbox_name] * len(xs)
-        source.name = 'source_{0}'.format(checkbox_name)
+        source.name = 'source_{0}_plotted'.format(checkbox_name)
         sources[checkbox_name] = source
 
     tools = [
@@ -603,12 +613,12 @@ def lengths(ys, group_by='experiment'):
     lines = []
     for checkbox_name, source in sources.items():
         if checkbox_name in initial_sub_group_selections:
-            color = 'green' #colors[checkbox_name]
+            color = colors[checkbox_name]
             line_width = 2
             line_alpha = 0.95
             circle_visible = True
         else:
-            color ='black'
+            color = colors[checkbox_name]
             line_width = 1
             circle_visible = False
             if len(initial_sub_group_selections) > 0:
@@ -623,25 +633,25 @@ def lengths(ys, group_by='experiment'):
                         line_width=line_width,
                         line_alpha=line_alpha,
                         line_join='round',
-                        nonselection_line_color='green',#colors[checkbox_name],
-                        nonselection_line_alpha=0.5,#unselected_alpha,
+                        nonselection_line_color=colors[checkbox_name],
+                        nonselection_line_alpha=0.5,
                         hover_alpha=1.0,
-                        hover_color='green',#colors[checkbox_name],
+                        hover_color=colors[checkbox_name],
                        )
-        line.hover_glyph.line_width = 4
+        line.hover_glyph.line_width = 3
         line.name = 'line_{0}'.format(checkbox_name)
         lines.append(line)
         
         circle = fig.circle(x='x',
                             y='y',
-                            color='green',#colors[checkbox_name],
+                            color=colors[checkbox_name],
                             source=source,
-                            size=3,
+                            size=2,
                             fill_alpha=0.95,
                             line_alpha=0.95,
                             visible=circle_visible,
                             hover_alpha=0.95,
-                            hover_color='green',#colors[checkbox_name],
+                            hover_color=colors[checkbox_name],
                            )
         circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
@@ -656,5 +666,53 @@ def lengths(ys, group_by='experiment'):
                           all_items=legend_items,
                          )
     fig.add_layout(legend)
+    
+    source_callback = external_coffeescript('metacodon_selection')
+    for source in sources.values():
+        source.callback = source_callback
+    
+    hover = bokeh.models.HoverTool(line_policy='interp',
+                                   renderers=lines,
+                                  )
+    hover.tooltips = [('name', '@name')]
+    fig.add_tools(hover)
+    
+    menu = bokeh.models.widgets.MultiSelect(options=menu_options,
+                                            value=[initial_menu_selection],
+                                            size=min(40, len(menu_options)),
+                                           )
+    menu.callback = external_coffeescript('metacodon_menu')
+    
+    sub_group_callback = external_coffeescript('metacodon_sub_group')
+    top_group_callback = external_coffeescript('metacodon_top_group')
 
-    bokeh.io.show(fig)
+    top_groups = []
+    sub_groups = []
+    width = 100
+    for top_name, sub_names in sorted(groupings.items()):
+        width = 75 + max(len(l) for l in sub_names) * 6
+        
+        top_active = [0] if top_name in initial_top_group_selections else []
+        top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
+                                                 active=top_active,
+                                                 width=width,
+                                                 name='top_{0}'.format(top_name),
+                                                 callback=top_group_callback,
+                                                )
+        top_groups.append(top)
+
+        sub_active = [i for i, n in enumerate(sub_names) if n in initial_sub_group_selections]
+        sub = bokeh.models.widgets.CheckboxGroup(labels=sorted(sub_names),
+                                                 active=sub_active,
+                                                 width=width,
+                                                 callback=sub_group_callback,
+                                                 name='sub_{0}'.format(top_name),
+                                                )
+        sub_groups.append(sub)
+
+    grid = [
+        top_groups,
+        sub_groups,
+        [fig, menu],
+    ]
+    bokeh.io.show(bokeh.layouts.layout(grid))
