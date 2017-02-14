@@ -481,7 +481,7 @@ def scatter(df,
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
                                                      )
-    args = dict(log_scale=BoolModel(value=log_scale))
+    args = dict(log_scale=BoolModel(value=bool(log_scale)))
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
                                                          args=args,
                                                         )
