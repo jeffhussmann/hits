@@ -7,6 +7,17 @@ import matplotlib.pyplot as plt
 
 igv_colors = define_igv_colors.normalized_rgbs
 
+blues_cdict = {'red':   ((0.0, 1.0, 1.0),
+                         (1.0, 0.0, 0.0)),
+               'green': ((0.0, 1.0, 1.0),
+                         (1.0, 0.0, 0.0)),
+               'blue':  ((0.0, 1.0, 1.0),
+                         (1.0, 1.0, 1.0)),
+              }
+
+blues = matplotlib.colors.LinearSegmentedColormap('blues', blues_cdict, 10000)
+blues.set_over('black')
+
 def optional_ax(original_function):
     def possibly_new_ax(*args, **kwargs):
         ax_given = kwargs.get('ax')
