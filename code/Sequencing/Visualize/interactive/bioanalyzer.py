@@ -15,7 +15,7 @@ def load_data(exp_dirs):
         while not line.startswith('Sample Name'):
             line = fh.readline()
             
-        name = line.strip().split(',')[1]
+        name = line.strip().split(',', 1)[1].translate(None, '"')
         
         while not line.startswith('Time,Value'):
             line = fh.readline()
@@ -59,10 +59,7 @@ def load_data(exp_dirs):
             descriptions = dict(line.strip().split('\t') for line in open(description_fn))
             descriptions['Ladder'] = 'ladder'
         except IOError:
-            class idempotent(object):
-                def __getitem__(self, key):
-                    return key
-            descriptions = idempotent()
+            descriptions = {}
 
         head, tail = os.path.split(exp_dir)
         for key in exps:
@@ -81,7 +78,7 @@ def load_data(exp_dirs):
             exps['raw'][tail][name] = data
             exps['nonmarker area'][tail][name] = data / nonmarker_area
             exps['marker area'][tail][name] = data / marker_area
-            exps['descriptions'][tail][name] = descriptions[data.name]
+            exps['descriptions'][tail][name] = descriptions.get(data.name, data.name)
         
     return exps
 
