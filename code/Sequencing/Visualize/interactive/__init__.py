@@ -438,10 +438,16 @@ def scatter(df,
                                                   )
     grid_options.callback = external_coffeescript('scatter_grid')
 
-    text_input = bokeh.models.widgets.TextInput(title='Search:')
+    text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
     text_input.callback = external_coffeescript('scatter_search',
                                                 format_kwargs=dict(column_names=str(object_cols)),
                                                )
+
+    case_sensitive = bokeh.models.widgets.CheckboxGroup(labels=['Case sensitive'],
+                                                        active=[],
+                                                        name='case_sensitive',
+                                                       )
+    case_sensitive.callback = external_coffeescript('case_sensitive')
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
@@ -484,6 +490,7 @@ def scatter(df,
         alpha_slider,
         size_slider,
         text_input,
+        case_sensitive,
         subset_menu,
         save_button,
     ]
