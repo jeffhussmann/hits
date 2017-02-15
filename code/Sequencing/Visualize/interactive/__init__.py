@@ -15,30 +15,6 @@ from collections import defaultdict
 
 bokeh.io.output_notebook()
 
-class BoolModel(Model):
-    value = Bool
-
-    __implementation__ = '''
-import {Model} from "model"
-import * as p from "core/properties"
-
-export class BoolModel extends Model 
-    type: "BoolModel"
-    @define { value: [p.Bool] }
-'''
-
-class ListOfStringsModel(Model):
-    value = List(String)
-
-    __implementation__ = '''
-import {Model} from "model"
-import * as p from "core/properties"
-
-export class ListOfStringsModel extends Model 
-    type: "ListOfStringsModel"
-    @define { value: [p.Array, []] }
-'''
-
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this one. Load their contents into a dictionary.
 
@@ -50,11 +26,13 @@ for fn in coffee_fns:
     with open(fn) as fh:
         callbacks[root] = fh.read()
 
-def external_coffeescript(key, args=None):
+def external_coffeescript(key, format_kwargs=None, args=None):
     if args is None:
         args = {}
+    if format_kwargs is None:
+        format_kwargs = {}
 
-    code = callbacks[key]
+    code = callbacks[key].format(**format_kwargs)
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
 
@@ -451,9 +429,8 @@ def scatter(df,
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
                                                      )
-    args = dict(log_scale=BoolModel(value=bool(log_scale)))
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
-                                                         args=args,
+                                                         format_kwargs=dict(log_scale='true' if log_scale else 'false'),
                                                         )
 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
@@ -462,9 +439,10 @@ def scatter(df,
     grid_options.callback = external_coffeescript('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:')
-    args = dict(column_names=ListOfStringsModel(value=object_cols))
-    text_input.callback = external_coffeescript('scatter_search', args=args)
-    
+    text_input.callback = external_coffeescript('scatter_search',
+                                                format_kwargs=dict(column_names=str(object_cols)),
+                                               )
+
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
     subset_menu = bokeh.models.widgets.Select(title='Select subset:',
@@ -477,8 +455,9 @@ def scatter(df,
     save_button = bokeh.models.widgets.Button(label='Save table to file',
                                               width=50,
                                              )
-    args = dict(column_names=ListOfStringsModel(value=table_col_names))
-    save_button.callback = external_coffeescript('scatter_save_button', args)
+    save_button.callback = external_coffeescript('scatter_save_button',
+                                                 format_kwargs=dict(column_names=str(table_col_names)),
+                                                )
 
     alpha_slider = bokeh.models.Slider(start=0.,
                                        end=1.,

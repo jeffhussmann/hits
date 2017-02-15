@@ -1,5 +1,7 @@
 models = cb_obj.document._all_models_by_name._dict
 
+log_scale = {log_scale}
+
 scatter_data = models['scatter_source'].data
 x_range = models['x_range']
 y_range = models['y_range']
