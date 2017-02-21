@@ -90,6 +90,25 @@ def scatter(df,
     if volcano:
         grid = True
 
+    # Infer column types.
+    
+    scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
+
+    if 'index' in scatter_source.data:
+        scatter_source.data['_index'] = scatter_source.data['index']
+
+    if df.index.name is None:
+        df.index.name = 'index'
+
+    numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
+
+    object_cols = [n for n in df.columns if df[n].dtype is np.dtype('O')]
+    if df.index.dtype is np.dtype('O'):
+        object_cols.append(df.index.name)
+
+    bool_cols = [n for n in df.columns if df[n].dtype is np.dtype('bool')]
+
+
     # Set up the actual scatter plot.
     
     tools = [
@@ -131,22 +150,6 @@ def scatter(df,
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
     fig.add_tools(lasso)
     
-    scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
-
-    if 'index' in scatter_source.data:
-        scatter_source.data['_index'] = scatter_source.data['index']
-
-    if df.index.name is None:
-        df.index.name = 'index'
-
-    numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
-
-    object_cols = [n for n in df.columns if df[n].dtype is np.dtype('O')]
-    if df.index.dtype is np.dtype('O'):
-        object_cols.append(df.index.name)
-
-    bool_cols = [n for n in df.columns if df[n].dtype is np.dtype('bool')]
-
     x_name, y_name = numerical_cols[:2]
     
     fig.xaxis.name = 'x_axis'
