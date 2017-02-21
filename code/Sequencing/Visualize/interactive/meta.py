@@ -193,11 +193,13 @@ def codon(xs, ys, colors, groupings,
 
     menu = bokeh.models.widgets.MultiSelect(options=menu_options,
                                             value=[initial_menu_selection],
-                                            size=min(40, len(menu_options)),
+                                            size=min(30, len(menu_options)),
                                            )
     menu.callback = external_coffeescript('metacodon_menu')
 
-    sub_group_callback = external_coffeescript('metacodon_sub_group')
+    sub_group_callback = external_coffeescript('metacodon_sub_group',
+                                               format_kwargs=dict(color_unselected='false'),
+                                              )
 
     top_group_callback = external_coffeescript('metacodon_top_group')
 
@@ -479,7 +481,9 @@ def gene(densities,
                                                 args=injection,
                                                )
     
-    sub_group_callback = external_coffeescript('metacodon_sub_group')
+    sub_group_callback = external_coffeescript('metacodon_sub_group',
+                                               format_kwargs=dict(color_unselected='false'),
+                                              )
 
     top_group_callback = external_coffeescript('metacodon_top_group')
 
@@ -683,7 +687,9 @@ def lengths(ys, group_by='experiment', groupings=None,
                                            )
     menu.callback = external_coffeescript('metacodon_menu')
     
-    sub_group_callback = external_coffeescript('metacodon_sub_group')
+    sub_group_callback = external_coffeescript('metacodon_sub_group',
+                                               format_kwargs=dict(color_unselected='true'),
+                                              )
     top_group_callback = external_coffeescript('metacodon_top_group')
 
     top_groups = []

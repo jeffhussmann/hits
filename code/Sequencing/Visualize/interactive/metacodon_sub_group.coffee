@@ -1,5 +1,7 @@
 models = cb_obj.document._all_models_by_name._dict
 
+color_unselected = {color_unselected}
+
 flatten = (possibly_arrays) ->
     flat = []
     for possibly_array in possibly_arrays
@@ -26,7 +28,10 @@ if active_names.length == 0
         name = line.name['line_'.length..]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
-        line.glyph.line_color = "black"
+        if color_unselected
+            line.glyph.line_color = line.nonselection_glyph.line_color
+        else
+            line.glyph.line_color = "black"
         
     circle.glyph.visible = false for circle in circles
         
@@ -39,7 +44,10 @@ else
             line.glyph.line_width = 2
             line.glyph.line_alpha = 0.95
         else
-            line.glyph.line_color = "black"
+            if color_unselected
+                line.glyph.line_color = line.nonselection_glyph.line_color
+            else
+                line.glyph.line_color = "black"
             line.glyph.line_width = 1
             line.glyph.line_alpha = line.nonselection_glyph.line_alpha
             
