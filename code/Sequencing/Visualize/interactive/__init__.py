@@ -18,13 +18,15 @@ bokeh.io.output_notebook()
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this one. Load their contents into a dictionary.
 
-coffee_fns = glob.glob(os.path.join(os.path.dirname(__file__), '*.coffee'))
-callbacks = {}
-for fn in coffee_fns:
-    head, tail = os.path.split(fn)
-    root, ext = os.path.splitext(tail)
-    with open(fn) as fh:
-        callbacks[root] = fh.read()
+def load_callbacks():
+    coffee_fns = glob.glob(os.path.join(os.path.dirname(__file__), '*.coffee'))
+    callbacks = {}
+    for fn in coffee_fns:
+        head, tail = os.path.split(fn)
+        root, ext = os.path.splitext(tail)
+        with open(fn) as fh:
+            callbacks[root] = fh.read()
+    return callbacks
 
 def external_coffeescript(key, format_kwargs=None, args=None):
     if args is None:
@@ -32,6 +34,7 @@ def external_coffeescript(key, format_kwargs=None, args=None):
     if format_kwargs is None:
         format_kwargs = {}
 
+    callbacks = load_callbacks()
     code = callbacks[key].format(**format_kwargs)
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
     return callback
