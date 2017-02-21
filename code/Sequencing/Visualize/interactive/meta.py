@@ -581,9 +581,18 @@ def lengths(ys, group_by='experiment', groupings=None,
         raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
     for checkbox_name in checkbox_names:
-        source = bokeh.models.ColumnDataSource(ys[checkbox_name])
+        data = {}
+        for menu_name in ys[checkbox_name]:
+            full_list = list(ys[checkbox_name][menu_name])
+            if len(full_list) > max_length:
+                full_list[max_length] = sum(full_list[max_length:])
+            elif len(full_list < max_length):
+                full_list.extend([0]*(max_length + 1 - len(full_list)))
 
-        xs = range(len(ys[checkbox_name][menu_options[0]]))
+            data[menu_name] = full_list[:max_length + 1]
+        source = bokeh.models.ColumnDataSource(data)
+
+        xs = range(max_length + 1)
         source.data['x'] = xs
 
         source.data['y'] = source.data[initial_menu_selection]
