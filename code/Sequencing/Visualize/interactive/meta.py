@@ -611,14 +611,12 @@ def lengths(ys, group_by='experiment', groupings=None,
 
     fig.grid.grid_line_alpha = 0.4
 
-    #fig.y_range = bokeh.models.Range1d(0, y_max)
     fig.y_range.name = 'y_range'
-    #fig.x_range = bokeh.models.Range1d(-x_max, x_max)
     fig.x_range.name = 'x_range'
 
-    #range_callback = external_coffeescript('metacodon_range')
-    #fig.y_range.callback = range_callback
-    #fig.x_range.callback = range_callback
+    range_callback = external_coffeescript('lengths_range')
+    fig.y_range.callback = range_callback
+    fig.x_range.callback = range_callback
 
     fig.xaxis.axis_label = 'Length'
     fig.yaxis.axis_label = 'y'
