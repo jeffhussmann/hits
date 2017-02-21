@@ -252,11 +252,19 @@ def codon(xs, ys, colors, groupings,
 
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
     clear_selection.callback = external_coffeescript('metacodon_clear_selection')
+    
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=unselected_alpha,
+                                       step=.05,
+                                       title='unselected alpha',
+                                      )
+    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
 
     grid = [
         top_groups,
         sub_groups,
-        [fig, bokeh.layouts.widgetbox([menu, highest_level_chooser, clear_selection])],
+        [fig, bokeh.layouts.widgetbox([menu, highest_level_chooser, alpha_slider, clear_selection])],
     ]
 
     bokeh.io.show(bokeh.layouts.layout(grid))
@@ -510,18 +518,27 @@ def gene(densities,
                                                  name='sub_{0}'.format(top_name),
                                                 )
         sub_groups.append(sub)
+    
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=unselected_alpha,
+                                       step=.05,
+                                       title='unselected alpha',
+                                      )
+    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
 
     plots = bokeh.layouts.gridplot([[figs['start_codon'], figs['stop_codon']]])
     grid = [
         top_groups,
         sub_groups,
-        [plots, resolution],
+        [plots, bokeh.layouts.widgetbox([resolution, alpha_slider])],
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
 
 def lengths(ys, group_by='experiment', groupings=None,
             initial_top_group_selections=[],
-            initial_sub_group_selections=[],
+            initial_sub_group_selections=None,
+            max_length=52,
            ):
     sources = {}
 
@@ -715,10 +732,18 @@ def lengths(ys, group_by='experiment', groupings=None,
                                                  name='sub_{0}'.format(top_name),
                                                 )
         sub_groups.append(sub)
+    
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=0.5,
+                                       step=.05,
+                                       title='alpha',
+                                      )
+    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
 
     grid = [
         top_groups,
         sub_groups,
-        [fig, menu],
+        [fig, bokeh.layouts.widgetbox([menu, alpha_slider])],
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
