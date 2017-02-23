@@ -44,6 +44,23 @@ colors_list =  (
     bokeh.palettes.Accent[8]
 )
 
+def build_selected(indices):
+    pvd = bokeh.core.property.containers.PropertyValueDict
+    pvl = bokeh.core.property.containers.PropertyValueList
+
+    selected = pvd({
+        '0d': pvd({
+            'glyph': None,
+            'indices': pvl(),
+        }),
+        '1d': pvd({
+            'indices': pvl(indices),
+        }),
+        '2d': pvd(),
+    })
+
+    return selected
+
 def scatter(df,
             hover_keys=None, table_keys=None,
             size=900,
@@ -53,6 +70,7 @@ def scatter(df,
             heatmap=False,
             grid=False,
             marker_size=6,
+            initial_selection=None,
            ):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -96,6 +114,11 @@ def scatter(df,
 
     if df.index.name is None:
         df.index.name = 'index'
+
+    if initial_selection is None:
+        initial_selection = []
+
+    initial_indices = [i for i, n in enumerate(df.index) if n in initial_selection]
 
     numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
 
@@ -165,6 +188,8 @@ def scatter(df,
     scatter_source.data['no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
     if 'color' not in scatter_source.data:
         scatter_source.data['color'] = scatter_source.data['no_color']
+
+    scatter_source.selected = build_selected(initial_indices)
 
     scatter = fig.scatter('x',
                           'y',
@@ -275,7 +300,9 @@ def scatter(df,
                                                  )
         columns.append(column)
 
-    filtered_data = {k: [] for k in scatter_source.data}
+    filtered_data = {k: [scatter_source.data[k][i] for i in initial_indices]
+                     for k in scatter_source.data
+                    }
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data, name='labels_source')
     
     labels = bokeh.models.LabelSet(x='x',
@@ -381,22 +408,10 @@ def scatter(df,
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
 
-        pvd = bokeh.core.property.containers.PropertyValueDict
-        pvl = bokeh.core.property.containers.PropertyValueList
+        # num_exps is the index of the first square in the second row
+        heatmap_source.selected = build_selected([num_exps])
 
-        selected_from_scratch = pvd({
-            '0d': pvd({
-                'glyph': None,
-                'indices': pvl(),
-            }),
-            '1d': pvd({
-                'indices': pvl([num_exps]),
-            }),
-            '2d': pvd(),
-        })
-
-        heatmap_source.selected = selected_from_scratch
-        heatmap_fig.min_border = 80
+        heatmap_fig.min_border = min_border
         
     else:
         x_menu = bokeh.models.widgets.Select(title='X',
