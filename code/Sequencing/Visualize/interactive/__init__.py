@@ -550,7 +550,12 @@ def hex_to_CSS(hex_string, alpha=1.):
 def example(**extra_kwargs):
     fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
     df = pd.read_csv(fn, index_col='alias')
-    kwargs = dict(size=700, hover_keys=['short_description'], table_keys=['description'], grid=False)
+    kwargs = dict(size=800,
+                  log_scale=True,
+                  hover_keys=['systematic_name', 'short_description'],
+                  table_keys=['systematic_name', 'description'],
+                  grid=False,
+                 )
     kwargs.update(extra_kwargs)
     scatter(df, **kwargs)
 
