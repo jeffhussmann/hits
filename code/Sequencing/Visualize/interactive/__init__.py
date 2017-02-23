@@ -150,6 +150,8 @@ def scatter(df,
         name='scatter_fig',
     )
 
+    min_border = 80
+
     if log_scale:
         if log_scale is True:
             log_scale = 10
@@ -499,7 +501,7 @@ def scatter(df,
                                       )
     size_slider.callback = external_coffeescript('scatter_size')
 
-    fig.min_border = 80
+    fig.min_border = min_border
 
     widgets = [
         label_button,
@@ -523,7 +525,7 @@ def scatter(df,
 
     columns = [
         bokeh.layouts.column(children=[fig]),
-        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100),
+        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
                                        widget_box,
                                       ]),
     ]
