@@ -285,15 +285,15 @@ def scatter(df,
     table_col_names = [df.index.name] + table_keys
     columns = []
     for col_name in table_col_names:
-        if col_name == df.index.name:
-            formatter = None
-            width = 50
-        elif col_name in numerical_cols:
+        lengths = [len(str(v)) for v in scatter_source.data[col_name]]
+        mean_length = np.mean(lengths)
+
+        if col_name in numerical_cols:
             formatter = bokeh.models.widgets.NumberFormatter(format='0.00')
             width = 50
         else:
             formatter = None
-            width = 500
+            width = min(500, int(12 * mean_length))
 
         column = bokeh.models.widgets.TableColumn(field=col_name,
                                                   title=col_name,
