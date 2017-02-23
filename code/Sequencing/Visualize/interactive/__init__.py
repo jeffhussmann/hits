@@ -62,7 +62,8 @@ def build_selected(indices):
     return selected
 
 def scatter(df,
-            hover_keys=None, table_keys=None,
+            hover_keys=None,
+            table_keys=None,
             size=900,
             axis_label_size=20,
             log_scale=False,
@@ -127,7 +128,6 @@ def scatter(df,
         object_cols.append(df.index.name)
 
     bool_cols = [n for n in df.columns if df[n].dtype is np.dtype('bool')]
-
 
     # Set up the actual scatter plot.
     
@@ -266,7 +266,7 @@ def scatter(df,
     fig.x_range.name = 'x_range'
     fig.y_range.name = 'y_range'
 
-    scatter.selection_glyph.fill_color = "orange"
+    scatter.selection_glyph.fill_color = 'orange'
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
 
@@ -307,6 +307,19 @@ def scatter(df,
                     }
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data, name='labels_source')
     
+    table = bokeh.models.widgets.DataTable(source=filtered_source,
+                                           columns=columns,
+                                           width=2 * size if heatmap else size,
+                                           height=600,
+                                           sortable=False,
+                                           name='table',
+                                           row_headers=False,
+                                          )
+    
+    # Callback to filter the table when selection changes.
+    scatter_source.callback = external_coffeescript('scatter_selection')
+    
+    # Label selected points with their index.
     labels = bokeh.models.LabelSet(x='x',
                                    y='y',
                                    text=df.index.name,
@@ -319,48 +332,34 @@ def scatter(df,
                                   )
     fig.add_layout(labels)
     
-    table = bokeh.models.widgets.DataTable(source=filtered_source,
-                                           columns=columns,
-                                           width=2 * size if heatmap else size,
-                                           height=1000,
-                                           sortable=False,
-                                           name='table',
-                                           row_headers=False,
-                                          )
-    
     # Set up menus or heatmap to select columns from df to put on x- and y-axis.
 
     if heatmap:
         norm = matplotlib.colors.Normalize(vmin=-1, vmax=1)
+
         def r_to_color(r):
             color = matplotlib.colors.rgb2hex(matplotlib.cm.RdBu_r(norm(r)))
             return color
-        xs = []
-        x_names = []
-        ys = []
-        y_names = []
-        rs = []
-        colors = []
+
+        data = {
+            'x': [],
+            'x_name': [],
+            'y': [],
+            'y_name': [],
+            'r': [],
+            'color': [],
+        }
 
         for y, row in enumerate(numerical_cols):
             for x, col in enumerate(numerical_cols):
                 r, p = scipy.stats.pearsonr(df[row], df[col])
-                rs.append(r)
-                xs.append(x)
-                x_names.append(col)
-                ys.append(y)
-                y_names.append(row)
-                colors.append(r_to_color(r))
+                data['r'].append(r)
+                data['x'].append(x)
+                data['x_name'].append(col)
+                data['y'].append(y)
+                data['y_name'].append(row)
+                data['color'].append(r_to_color(r))
                 
-        data = {
-            'x': xs,
-            'x_name': x_names,
-            'y': ys,
-            'y_name': y_names,
-            'r': rs,
-            'color': colors,
-        }
-
         heatmap_source = bokeh.models.ColumnDataSource(data)
         num_exps = len(numerical_cols)
         heatmap_size = int(size * 1)
@@ -435,9 +434,6 @@ def scatter(df,
         
         first_row = [bokeh.layouts.widgetbox([x_menu, y_menu])],
     
-    # Set up callback to filter the table when selection changes.
-    scatter_source.callback = external_coffeescript('scatter_selection')
-    
     # Button to toggle labels.
     label_button = bokeh.models.widgets.Toggle(label='label selected points',
                                                width=50,
@@ -455,6 +451,8 @@ def scatter(df,
                                                          format_kwargs=dict(log_scale='true' if log_scale else 'false'),
                                                         )
 
+    # Radio group to choose whether to draw a vertical/horizontal grid or
+    # diagonal guide lines. 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
                                                    active=1 if not grid else 0,
                                                   )
