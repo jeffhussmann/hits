@@ -45,13 +45,13 @@ IUPAC = {'A': {'A'},
 def counts_to_array(counts, dim=1):
     ''' Converts a dictionary with integer keys into an array. '''
     if dim == 1:
-        if counts:
+        if len(counts) > 0:
             biggest = max(counts)
             array = np.array([counts[i] for i in range(biggest + 1)])
         else:
             array = np.array([0])
     elif dim == 2:
-        if counts:
+        if len(counts) > 0:
             larger_of_two = map(max, counts)
             biggest = max(larger_of_two)
             array = np.zeros(shape=(biggest + 1, biggest + 1), dtype=np.int)
