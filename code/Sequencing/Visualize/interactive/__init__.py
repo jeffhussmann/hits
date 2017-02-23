@@ -95,6 +95,8 @@ def scatter(df,
             volcano: If True, make some tweaks suitable for volcano plots.
             log_scale: If not False, plot on a log scale with base 10 (or, if a
                 set to a number, with base log_scale.)
+            axis_label_size: Size of the font used for axis labels.
+            intiial_selection: Names of index value to initially highlight.
     '''
 
     if hover_keys is None:
