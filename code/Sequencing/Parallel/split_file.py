@@ -53,6 +53,10 @@ def interleaved_piece(file_name, num_pieces, which_piece):
     ''' An iterator over the lines of fastq chunks which are equivalent to 
         which_piece mod num_pieces.
     '''
+    if which_piece == -1:
+        # Sentinel value indicating merged experimnt
+        which_piece = 0
+
     for i, chunk in enumerate(fastq.get_line_groups(file_name)):
         if i % num_pieces == which_piece:
             for line in chunk:
