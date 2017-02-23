@@ -230,6 +230,8 @@ def get_read_name_parser(read_name):
         elif num_words == 1:
             if '#' in read_name:
                 parser = parse_old_illumina_read_name
+            elif '/' in read_name:
+                parser = parse_unindexed_old_illumina_read_name
             else:
                 parser = parse_standardized_name
         else:
@@ -277,6 +279,11 @@ def parse_old_illumina_read_name(read_name):
     lane, tile, x, y = location_info.split(':')[-4:]
     index, member = member_info.split('/')
     return lane, tile, x, y, member, index
+
+def parse_unindexed_old_illumina_read_name(read_name):
+    location_info, member = read_name.split('/')
+    lane, tile, x, y = location_info.split(':')[-4:]
+    return lane, tile, x, y, member, ''
 
 def parse_standardized_name(read_name):
     lane, tile, x, y, member = read_name.split(':')
