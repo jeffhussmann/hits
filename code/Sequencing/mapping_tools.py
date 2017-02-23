@@ -395,9 +395,9 @@ def map_bowtie2(index_prefix,
 
 def map_tophat(reads_file_names,
                bowtie2_index,
-               gtf_file_name,
-               transcriptome_index,
                tophat_dir,
+               gtf_file_name=None,
+               transcriptome_index=None,
                num_threads=1,
                no_sort=False,
                keep_temporary_files=False,
@@ -406,14 +406,17 @@ def map_tophat(reads_file_names,
     joined_reads_names = ','.join(reads_file_names)
 
     options = [
-        '--GTF', gtf_file_name,
         '--no-novel-juncs',
         '--num-threads', str(num_threads),
         '--output-dir', tophat_dir,
-        '--transcriptome-index', transcriptome_index,
         '--report-secondary-alignments',
         '--read-realign-edit-dist', '0',
     ]
+
+    if gtf_file_name is not None:
+        options.extend(['--GTF', gtf_file_name])
+    if transcriptome_index is not None:
+        options.extend(['--transcriptome-index', transcriptome_index])
     if no_sort:
         options.append('--no-sort-bam')
     if keep_temporary_files:
