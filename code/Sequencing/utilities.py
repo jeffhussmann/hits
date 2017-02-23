@@ -98,12 +98,14 @@ def line_count(file_name):
     count = int(count)
     return count
 
-def progress_bar(iterable):
+def progress_bar(iterable, max_val=None):
     if progressbar == None:
         # If the module wasn't imported
         return iterable
     else:
-        max_val = len(iterable)
+        if max_val is None:
+            max_val = len(iterable)
+
         max_str = str(len(str(max_val)))
         format_string = '%(value)' + max_str + 'd / %(max)d'
         widgets = [progressbar.Bar('='),
