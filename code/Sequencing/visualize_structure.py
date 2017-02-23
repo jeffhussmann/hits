@@ -117,12 +117,14 @@ def up_to_first_space(string):
     return beginning
 
 def produce_sw_alignments(reads, genome_dirs, extra_targets, max_to_report=5):
-    targets = []
+    targets = set()
+
     for genome_dir in genome_dirs:
         fasta_fns = genomes.get_all_fasta_file_names(genome_dir)
         for fasta_fn in fasta_fns:
-            targets.extend(list(fasta.reads(fasta_fn)))
-    targets.extend(extra_targets)
+            targets.update(fasta.reads(fasta_fn))
+
+    targets.update(extra_targets)
 
     for read in reads:
         alignments = get_local_alignments(read, targets) + get_edge_alignments(read, targets)
