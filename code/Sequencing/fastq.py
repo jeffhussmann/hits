@@ -72,7 +72,7 @@ def quality_and_complexity(reads, max_read_length):
     
     return q_array, c_array, average_q_distribution
 
-def quality_and_complexity_paired(read_pairs, max_read_length, composition):
+def quality_and_complexity_paired(read_pairs, max_read_length, results):
     R1_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
     R1_c_array = np.zeros((max_read_length, 256), int)
     R2_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
@@ -93,17 +93,18 @@ def quality_and_complexity_paired(read_pairs, max_read_length, composition):
     R1_average_q_distribution = joint_average_q_distribution.sum(axis=1) 
     R2_average_q_distribution = joint_average_q_distribution.sum(axis=0) 
 
-    composition.update({'R1_qs': R1_q_array,
-                        'R1_cs': R1_c_array,
-                        'R2_qs': R2_q_array,
-                        'R2_cs': R2_c_array,
-                        'joint_average_qs': joint_average_q_distribution,
-                        'R1_average_qs': R1_average_q_distribution,
-                        'R2_average_qs': R2_average_q_distribution,
-                       })
+    results.update({
+        'R1_qs': R1_q_array,
+        'R1_cs': R1_c_array,
+        'R2_qs': R2_q_array,
+        'R2_cs': R2_c_array,
+        'joint_average_qs': joint_average_q_distribution,
+        'R1_average_qs': R1_average_q_distribution,
+        'R2_average_qs': R2_average_q_distribution,
+    })
 
 def get_line_groups(line_source):
-    if type(line_source) == str:
+    if isinstance(line_source, str) or isinstance(line_source, unicode):
         # line_source is a file name.
         if line_source.endswith('.gz'):
             lines = gzip.open(line_source)
