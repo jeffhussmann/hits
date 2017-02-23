@@ -3,8 +3,15 @@ models = cb_obj.document._all_models_by_name._dict
 scatter_data = models['scatter_source'].data
 label_data = models['labels_source'].data
 
-x_name = models['x_menu'].value
-y_name = models['y_menu'].value
+squeeze = (possibly_array) ->
+    if Array.isArray(possibly_array)
+        squeezed = possibly_array[0]
+    else
+        squeezed = possibly_array
+    return squeezed
+
+x_name = squeeze models['x_menu'].value
+y_name = squeeze models['y_menu'].value
 
 scatter_data.x = scatter_data[x_name]
 scatter_data.y = scatter_data[y_name]

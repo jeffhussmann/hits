@@ -416,16 +416,18 @@ def scatter(df,
         heatmap_fig.min_border = min_border
         
     else:
-        x_menu = bokeh.models.widgets.Select(title='X',
-                                             options=numerical_cols,
-                                             value=x_name,
-                                             name='x_menu',
-                                            )
-        y_menu = bokeh.models.widgets.Select(title='Y',
-                                             options=numerical_cols,
-                                             value=y_name,
-                                             name='y_menu',
-                                            )
+        x_menu = bokeh.models.widgets.MultiSelect(title='X',
+                                                  options=numerical_cols,
+                                                  value=[x_name],
+                                                  size=min(6, len(numerical_cols)),
+                                                  name='x_menu',
+                                               )
+        y_menu = bokeh.models.widgets.MultiSelect(title='Y',
+                                                  options=numerical_cols,
+                                                  value=[y_name],
+                                                  size=min(6, len(numerical_cols)),
+                                                  name='y_menu',
+                                               )
 
         menu_callback = external_coffeescript('scatter_menu')
         x_menu.callback = menu_callback
