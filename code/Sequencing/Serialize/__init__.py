@@ -43,11 +43,15 @@ special_mergers = {'bam': sam.merge_sorted_bam_files,
                   }
 
 def merge_files(input_file_names, output_file_name, file_format, fast=False):
-    if fast:
-        file_format.fast_merge(input_file_names, output_file_name)
-    elif isinstance(file_format, str):
-        special_mergers[file_format](input_file_names, output_file_name)
-    else:
-        processed_inputs = (file_format.read_file(fn) for fn in input_file_names)
-        merged_data = reduce(file_format.combine_data, processed_inputs)
-        file_format.write_file(merged_data, output_file_name)
+    try:
+        if fast:
+            file_format.fast_merge(input_file_names, output_file_name)
+        elif isinstance(file_format, str):
+            special_mergers[file_format](input_file_names, output_file_name)
+        else:
+            processed_inputs = (file_format.read_file(fn) for fn in input_file_names)
+            merged_data = reduce(file_format.combine_data, processed_inputs)
+            file_format.write_file(merged_data, output_file_name)
+    except IOError:
+        print output_file_name
+        raise
