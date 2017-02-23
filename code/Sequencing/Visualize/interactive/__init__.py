@@ -16,17 +16,13 @@ from collections import defaultdict
 bokeh.io.output_notebook()
 
 # For easier editing, coffeescript callbacks are kept in separate files
-# in the same directory as this one. Load their contents into a dictionary.
+# in the same directory as this file.
 
-def load_callbacks():
-    coffee_fns = glob.glob(os.path.join(os.path.dirname(__file__), '*.coffee'))
-    callbacks = {}
-    for fn in coffee_fns:
-        head, tail = os.path.split(fn)
-        root, ext = os.path.splitext(tail)
-        with open(fn) as fh:
-            callbacks[root] = fh.read()
-    return callbacks
+def load_callback(key):
+    fn = os.path.join(os.path.dirname(__file__), '{0}.coffee'.format(key))
+    with open(fn) as fh:
+        callback = fh.read()
+    return callback
 
 def external_coffeescript(key, format_kwargs=None, args=None):
     if args is None:
@@ -34,9 +30,10 @@ def external_coffeescript(key, format_kwargs=None, args=None):
     if format_kwargs is None:
         format_kwargs = {}
 
-    callbacks = load_callbacks()
-    code = callbacks[key].format(**format_kwargs)
+    code_template = load_callback(key)
+    code = code_template.format(**format_kwargs)
     callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
+
     return callback
 
 colors_list =  (
