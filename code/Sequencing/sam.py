@@ -802,6 +802,17 @@ def get_length_counts(bam_file_name, only_primary=True, only_unique=False):
     
     return qlen_counts
 
+def get_tlen_counts(bam_file_name, only_primary=True, only_unique=False):
+    bam_file = pysam.Samfile(bam_file_name)
+    if only_unique:
+        tlen_counts = Counter(ar.tlen for ar in bam_file if ar.mapping_quality == 50)
+    elif only_primary:
+        tlen_counts = Counter(ar.tlen for ar in bam_file if not ar.is_unmapped and not ar.is_secondary)
+    else:
+        tlen_counts = Counter(ar.tlen for ar in bam_file)
+    
+    return tlen_counts
+
 def get_mapq_counts(bam_file_name):
     bam_file = pysam.Samfile(bam_file_name)
     mapq_counts = Counter(ar.mapq for ar in bam_file)
