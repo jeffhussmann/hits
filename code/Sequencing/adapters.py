@@ -35,9 +35,14 @@ tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
 P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
 P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
 
-def build_before_adapters(I7_sequence='', primer_type='tru_seq'):
-    before_R1 = flow_cell['P5'] + primers[primer_type]['R1']
-    before_R2 = flow_cell['P7'] + utilities.reverse_complement(I7_sequence) + primers[primer_type]['R2']
+def build_before_adapters(I7_sequence='', primer_type='tru_seq', just_primers=False):
+    if just_primers:
+        before_R1 = primers[primer_type]['R1']
+        before_R2 = primers[primer_type]['R2']
+    else:
+        before_R1 = flow_cell['P5'] + primers[primer_type]['R1']
+        before_R2 = flow_cell['P7'] + utilities.reverse_complement(I7_sequence) + primers[primer_type]['R2']
+
     return before_R1, before_R2
 
 def build_adapters(index_sequence='', max_length=None, primer_type='tru_seq'):
