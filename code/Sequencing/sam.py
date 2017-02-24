@@ -234,8 +234,11 @@ def contains_soft_clipping_pysam(read):
     return (BAM_CSOFT_CLIP in kinds)
 
 def cigar_blocks_to_string(cigar_blocks):
-    """ Builds a CIGAR string out of a corresponding list of operations. """
-    return ''.join([str(l) + k for l, k in cigar_blocks])
+    ''' Builds a CIGAR string out of a corresponding list of operations. '''
+    string = ['{0}{1}'.format(length, op_to_char[op])
+              for op, length in cigar_blocks
+             ]
+    return ''.join(string)
 
 def alignment_to_cigar_blocks(ref_aligned, read_aligned):
     """ Builds a list of CIGAR operations from an alignment. """
