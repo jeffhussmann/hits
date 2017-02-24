@@ -72,6 +72,9 @@ def scatter(df,
             grid=False,
             marker_size=6,
             initial_selection=None,
+            initial_xy_names=None,
+            data_lims=None,
+            hide_widgets=None,
            ):
     ''' Makes an interactive scatter plot using bokeh.
 
@@ -97,6 +100,11 @@ def scatter(df,
                 set to a number, with base log_scale.)
             axis_label_size: Size of the font used for axis labels.
             intiial_selection: Names of index value to initially highlight.
+            initial_xy_names: Tuple (x_name, y_name) of datasets to initially
+                display on x- and y-axes.
+            hide_widgets: List of widgets to not display. Possible options are
+                ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
+                 'grid_radio_buttons'].
     '''
 
     if hover_keys is None:
@@ -104,6 +112,9 @@ def scatter(df,
 
     if table_keys is None:
         table_keys = []
+    
+    if hide_widgets is None:
+        hide_widgets = []
 
     if volcano:
         grid = True
@@ -174,7 +185,10 @@ def scatter(df,
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
     fig.add_tools(lasso)
     
-    x_name, y_name = numerical_cols[:2]
+    if initial_xy_names is None:
+        x_name, y_name = numerical_cols[:2]
+    else:
+        x_name, y_name = initial_xy_names
     
     fig.xaxis.name = 'x_axis'
     fig.yaxis.name = 'y_axis'
@@ -227,6 +241,10 @@ def scatter(df,
 
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
+
+    if data_lims is not None:
+        initial = data_lims
+        bounds = data_lims
 
     diagonals_visible = not grid # i.e. normally True
 
@@ -411,8 +429,9 @@ def scatter(df,
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
 
-        # num_exps is the index of the first square in the second row
-        heatmap_source.selected = build_selected([num_exps])
+        name_pairs = zip(heatmap_source.data['x_name'], heatmap_source.data['y_name'])
+        initial_index = name_pairs.index((x_name, y_name))
+        heatmap_source.selected = build_selected([initial_index])
 
         heatmap_fig.min_border = min_border
         
@@ -440,6 +459,7 @@ def scatter(df,
     label_button = bokeh.models.widgets.Toggle(label='label selected points',
                                                width=50,
                                                active=True,
+                                               name='label_button',
                                               )
     label_button.callback = bokeh.models.CustomJS(args={'labels': labels},
                                                   code='labels.text_alpha = 1 - labels.text_alpha;',
@@ -448,6 +468,7 @@ def scatter(df,
     # Button to zoom to current data limits.
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
                                                       width=50,
+                                                      name='zoom_button',
                                                      )
     zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
                                                          format_kwargs=dict(log_scale='true' if log_scale else 'false'),
@@ -457,6 +478,7 @@ def scatter(df,
     # diagonal guide lines. 
     grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
                                                    active=1 if not grid else 0,
+                                                   name='grid_radio_buttons',
                                                   )
     grid_options.callback = external_coffeescript('scatter_grid')
 
@@ -476,12 +498,14 @@ def scatter(df,
     subset_menu = bokeh.models.widgets.Select(title='Select subset:',
                                               options=subset_options,
                                               value='',
+                                              name='subset_menu',
                                              )
     subset_menu.callback = external_coffeescript('scatter_subset_menu')
 
     # Button to dump table to file.
     save_button = bokeh.models.widgets.Button(label='Save table to file',
                                               width=50,
+                                              name='save_button',
                                              )
     save_button.callback = external_coffeescript('scatter_save_button',
                                                  format_kwargs=dict(column_names=str(table_col_names)),
@@ -492,14 +516,16 @@ def scatter(df,
                                        value=0.5,
                                        step=.05,
                                        title='alpha',
+                                       name='alpha',
                                       )
     alpha_slider.callback = external_coffeescript('scatter_alpha')
     
     size_slider = bokeh.models.Slider(start=1,
-                                       end=20.,
-                                       value=marker_size,
-                                       step=1,
-                                       title='marker size',
+                                      end=20.,
+                                      value=marker_size,
+                                      step=1,
+                                      title='marker size',
+                                      name='marker_size',
                                       )
     size_slider.callback = external_coffeescript('scatter_size')
 
@@ -517,8 +543,17 @@ def scatter(df,
         save_button,
     ]
 
+    hide_widgets = set(hide_widgets)
+    if 'table' in hide_widgets:
+        hide_widgets.add('save_button')
+
+    if 'search' in hide_widgets:
+        hide_widgets.add('case_sensitive')
+
     if len(subset_options) == 1:
-        widgets = widgets[:-2] + widgets[-1:]
+        hide_widgets.add('subset_menu')
+
+    widgets = [w for w in widgets if w.name not in hide_widgets]
 
     if not heatmap:
         widgets = [x_menu, y_menu] + widgets
@@ -535,10 +570,13 @@ def scatter(df,
     if heatmap:
         columns = columns[:1] + [bokeh.layouts.column(children=[heatmap_fig])] + columns[1:]
 
-    full = bokeh.layouts.column(children=[
+    rows = [
         bokeh.layouts.row(children=columns),
-        table,
-    ])
+    ]
+    if 'table' not in hide_widgets:
+        rows.append(table)
+
+    full = bokeh.layouts.column(children=rows)
 
     bokeh.io.show(full)
 

@@ -7,5 +7,7 @@ indices = cb_obj.selected['1d'].indices
 for key, values of full_data
     filtered_data[key] = (values[i] for i in indices)
 
-models['table'].trigger('change')
+if (models['table']?)
+    models['table'].trigger('change')
+
 models['labels_source'].trigger('change')
