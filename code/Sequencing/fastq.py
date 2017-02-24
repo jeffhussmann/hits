@@ -222,7 +222,7 @@ def get_read_name_parser(read_name):
             parser = parse_SRA_read_name
         elif len(read_name.split('.')) == 3:
             parser = parse_paired_SRA_read_name
-    elif read_name.startswith('ERR'):
+    elif read_name.startswith('ERR') or read_name.startswith('DRR'):
         parser = parse_ERR_read_name
     else:
         num_words = len(read_name.split())
