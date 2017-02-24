@@ -316,7 +316,7 @@ def collapse_representations(representations):
         return representations
 
     # Sort by leftmost position prior to collapsing
-    representations = sorted(representations, key=leftmost_position)
+    representations = sorted(set(representations), key=leftmost_position)
 
     collapsed = [representations[0]]
     for read_positions, lines in representations[1:]:
