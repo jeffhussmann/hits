@@ -145,15 +145,14 @@ def produce_representations(alignment_groups_list):
             representations.extend(map(represent_alignment, alignment_group))
 
         if len(qnames) > 1:
+            print alignment_group_list
             raise ValueError('Attempted to flatten alignment groups with different qnames:', qnames)
 
         qname = qnames.pop()
-        
+
         yield qname, representations
 
-def find_best_offset(R1_seq, R2_rc_seq):
-    print R1_seq
-    print R2_rc_seq
+def find_best_offset(R1_seq, R2_rc_seq, periodic=False):
     first_between_fractions = periodicity.compute_between_fractions(R1_seq, R2_rc_seq) 
     first_offset = np.argmax(first_between_fractions)
     first_offset_fraction = first_between_fractions[first_offset]
@@ -162,8 +161,11 @@ def find_best_offset(R1_seq, R2_rc_seq):
     second_offset = np.argmax(second_between_fractions)
     second_offset_fraction = second_between_fractions[second_offset]
 
-    within_fractions = (periodicity.compute_within_fractions(R1_seq) + periodicity.compute_within_fractions(R2_rc_seq)) / 2
-    period, period_fraction = periodicity.best_period(within_fractions)
+    if periodic:
+        within_fractions = (periodicity.compute_within_fractions(R1_seq) + periodicity.compute_within_fractions(R2_rc_seq)) / 2
+        period, period_fraction = periodicity.best_period(within_fractions)
+    else:
+        period_fraction = 0
 
     # Heuristic - if both offset fractions are very high, use the one with the
     # most overlap, which is the one with the smaller offset.
@@ -283,7 +285,7 @@ def represent_alignment(alignment):
 
     lines = (ref_name_line, extent_line, read_positions_line)
     
-    return set(read_positions), lines
+    return frozenset(read_positions), lines
 
 def combine_representations(first_read_positions,
                             first_lines,
