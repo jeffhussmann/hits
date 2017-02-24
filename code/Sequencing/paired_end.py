@@ -24,16 +24,35 @@ def is_disoriented(R1_aligned, R2_aligned):
 
     return disoriented
 
-def is_discordant(R1_aligned, R2_aligned, max_insert_length):
+def get_reference_extent(R1_m, R2_m):
+    if R1_m.tid != R2_m.tid:
+        raise ValueError(R1_m, R2_m)
+    
+    min_start = min(R1_m.reference_start, R2_m.reference_start)
+    max_end = max(R1_m.reference_end, R2_m.reference_end)
+
+    # No +1 needed in tlen subtraction because reference_end points
+    # one past the end.
+    tlen = max_end - min_start
+
+    return tlen
+
+def is_discordant(R1_m, R2_m, max_insert_length):
     discordant = False
-    if R1_aligned.tid != R2_aligned.tid:
+    if R1_m.tid != R2_m.tid:
         discordant = True
-    elif abs(R1_aligned.tlen) > max_insert_length:
-        discordant = True
+    else:
+        tlen = get_reference_extent(R1_m, R2_m)
+        if tlen > max_insert_length:
+            discordant = True
 
     return discordant
 
 def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
+    ''' Takes two pysam mappings representing opposite ends of a fragment and
+    combines them into one mapping, (ab)using BAM_CREF_SKIP to bridge the gap
+    (if any) between them.
+    '''
     R1_strand = sam.get_strand(R1_mapping)
 
     if R1_strand == '+':
@@ -172,6 +191,11 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
             elif len(right_using_left_mismatches) < len(left_using_right_mismatches):
                 use_overlap_from = 'left'
             else:
+                logging.info('disagreements in {0}'.format(left_mapping.qname))
+                logging.info('left overlap cigar is  {0}'.format(str(left_overlap_cigar)))
+                logging.info('right overlap cigar is {0}'.format(str(right_overlap_cigar)))
+                logging.info('left_using_right_mismatches - {0}'.format(len(left_using_right_mismatches)))
+                logging.info('right_using_left_mismatches - {0}'.format(len(right_using_left_mismatches)))
                 logging.info('ambiguous disagreement')
                 return False
 
@@ -220,7 +244,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
         combined_mapping.setTag('Xs', overlap_seq_tag)
         combined_mapping.setTag('Xq', overlap_qual_tag)
         combined_mapping.setTag('Xw', use_overlap_from)
-    
+
     return combined_mapping
 
 def realigned_mismatches(seq, start, realigned_cigar, ref_dict):
@@ -558,3 +582,20 @@ def filter_long_TLENs(bam_file_name, filtered_bam_file_name, max_TLEN):
     for aligned_read in bam_file:
         if aligned_read.tlen < max_TLEN:
             filtered_bam_file.write(aligned_read)
+
+def get_concordant_pairs(R1_group, R2_group, max_insert_length):
+    ''' Results are sorted by reference extent length. '''
+    pairs = []
+    for R1_m in R1_group:
+        for R2_m in R2_group:
+            if not is_discordant(R1_m, R2_m, max_insert_length) and not is_disoriented(R1_m, R2_m):
+                pairs.append((R1_m, R2_m))
+    pairs = sorted(pairs, key=lambda p: get_reference_extent(*p))
+    return pairs
+
+def group_mapping_pairs(mappings):
+    groups = utilities.group_by(mappings, lambda r: r.query_name)
+    for query_name, query_mappings in groups:
+        R1_group = [m for m in query_mappings if m.is_read1]
+        R2_group = [m for m in query_mappings if m.is_read2]
+        yield query_name, (R1_group, R2_group)
