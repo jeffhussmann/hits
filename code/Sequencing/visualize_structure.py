@@ -398,8 +398,7 @@ def visualize_unpaired_alignments(get_reads,
             output_fh.write(R1_seq + '\n')
             output_fh.write('\n\n')
 
-def visualize_paired_end_mappings(R1_fn,
-                                  R2_fn,
+def visualize_paired_end_mappings(get_read_pairs,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
@@ -409,11 +408,21 @@ def visualize_paired_end_mappings(R1_fn,
     R1_alignment_groups_list = []
     R2_alignment_groups_list = []
 
-    def get_R1_reads():
-        return islice(fastq.reads(R1_fn), 100)
-    
-    def get_R2_rc_reads():
-        return islice(fastq.reverse_complement_reads(R2_fn), 100)
+    if isinstance(get_read_pairs, tuple):
+        R1_fn, R2_fn = get_read_pairs
+        def get_R1_reads():
+            return islice(fastq.reads(R1_fn), 100)
+        
+        def get_R2_rc_reads():
+            return islice(fastq.reverse_complement_reads(R2_fn), 100)
+    else:
+        def get_R1_reads():
+            read_pairs = islice(get_read_pairs(), 100)
+            return (R1 for R1, R2 in read_pairs)
+        
+        def get_R2_rc_reads():
+            read_pairs = islice(get_read_pairs(), 100)
+            return (fastq.Read(R2.name, utilities.reverse_complement(R2.seq), R2.qual[::-1]) for R1, R2 in read_pairs)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
         R1_alignment_groups = produce_bowtie2_alignments(get_R1_reads(),
