@@ -60,6 +60,8 @@ else
             circle.glyph.visible = false
 
 legend = models['legend']
-items = (item for item in legend.all_items when item.label.value in active_names)
-items.sort (a, b) -> a.label.value.localeCompare b.label.value
-legend.items = items
+
+if (legend.all_items?)
+    items = (item for item in legend.all_items when item.label.value in active_names)
+    items.sort (a, b) -> a.label.value.localeCompare b.label.value
+    legend.items = items
