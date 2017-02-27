@@ -86,6 +86,7 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
     def lookup_loaded(seq_name, start, end):
         if seq_name not in references:
             references[seq_name] = seq_name_to_file[seq_name].fetch(seq_name)
+
         region = references[seq_name][start:end]
         return region
 
