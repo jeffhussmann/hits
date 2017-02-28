@@ -207,7 +207,6 @@ def codon(xs, ys, colors, groupings,
     sub_groups = []
 
     for top_name, sub_names in sorted(groupings.items()):
-        
         width = 75 + max(len(l) for l in sub_names) * 6
 
         top_active = [0] if top_name in initial_top_group_selections else []
@@ -535,14 +534,36 @@ def gene(densities,
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
 
-def lengths(ys, group_by='experiment', groupings=None,
-            initial_top_group_selections=[],
+def lengths(raw_counts,
+            group_by='experiment',
+            groupings=None,
+            initial_top_group_selections=None,
             initial_sub_group_selections=None,
-            max_length=52,
+            types=None,
+            max_length=1000,
+            x_max=500,
            ):
-    sources = {}
+    ys = {
+        'raw_counts': raw_counts,
+        'by_type': {},
+        'by_exp': {},
+    }
 
-    first_exp_name = ys.keys()[0]
+    if types is None:
+        types = raw_counts.values()[0].keys()
+
+    for exp_name in ys['raw_counts']:
+        total_counts = sum(ys['raw_counts'][exp_name]['insert_lengths'])
+
+        ys['by_type'][exp_name] = {}
+        ys['by_exp'][exp_name] = {}
+
+        for type_name in raw_counts[exp_name]:
+            raw = raw_counts[exp_name][type_name]
+            ys['by_type'][exp_name][type_name] = np.true_divide(raw, sum(raw))
+            ys['by_exp'][exp_name][type_name] = np.true_divide(raw, total_counts)
+
+    first_exp_name = ys['raw_counts'].keys()[0]
 
     # ys has experiments as top level keys and types as lower level keys.
     # Need a dictionary with checkbox names as the top keys, so if grouping by
@@ -550,24 +571,29 @@ def lengths(ys, group_by='experiment', groupings=None,
     # the order.
 
     if group_by == 'experiment':
-        menu_options = sorted(ys)
-        checkbox_names = sorted(ys[first_exp_name])
+        menu_options = sorted(ys['raw_counts'])
+        checkbox_names = sorted(ys['raw_counts'][first_exp_name])
         
         rekeyed_ys = {}
-        for checkbox_name in checkbox_names:
-            rekeyed_ys[checkbox_name] = {}
-            for menu_name in menu_options:
-                rekeyed_ys[checkbox_name][menu_name] = ys[menu_name][checkbox_name]
+        for normalization in ys:
+            rekeyed_ys[normalization] = {}
+            for checkbox_name in checkbox_names:
+                rekeyed_ys[normalization][checkbox_name] = {}
+                for menu_name in menu_options:
+                    rekeyed_ys[normalization][checkbox_name][menu_name] = ys[normalization][menu_name][checkbox_name]
 
         ys = rekeyed_ys
-    elif group_by == 'type':
-        menu_options = sorted(ys[first_exp_name])
-        checkbox_names = sorted(ys)
 
-    for checkbox_name in ys:
-        for menu_name in ys[checkbox_name]:
-            ys[checkbox_name][menu_name] = ys[checkbox_name][menu_name][:200]
-    
+    elif group_by == 'type':
+        menu_options = types
+        checkbox_names = sorted(ys['raw_counts'])
+
+    if initial_sub_group_selections is None:
+        initial_sub_group_selections = checkbox_names
+
+    if initial_top_group_selections is None:
+        initial_top_group_selections = []
+
     if groupings is None:
         groupings = {n: [n] for n in checkbox_names}
 
@@ -580,26 +606,34 @@ def lengths(ys, group_by='experiment', groupings=None,
     if initial_menu_selection not in menu_options:
         raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
-    for checkbox_name in checkbox_names:
-        data = {}
-        for menu_name in ys[checkbox_name]:
-            full_list = list(ys[checkbox_name][menu_name])
-            if len(full_list) > max_length:
-                full_list[max_length] = sum(full_list[max_length:])
-            elif len(full_list < max_length):
-                full_list.extend([0]*(max_length + 1 - len(full_list)))
+    sources = {}
+    for key in ['plotted'] + ys.keys():
+        if key == 'plotted':
+            normalization = 'raw_counts'
+        else:
+            normalization = key
 
-            data[menu_name] = full_list[:max_length + 1]
-        source = bokeh.models.ColumnDataSource(data)
+        sources[key] = {}
+        for checkbox_name in checkbox_names:
+            data = {}
+            for menu_name in ys[normalization][checkbox_name]:
+                full_list = list(ys[normalization][checkbox_name][menu_name])
+                if len(full_list) > max_length:
+                    full_list[max_length] = sum(full_list[max_length:])
+                elif len(full_list < max_length):
+                    full_list.extend([0]*(max_length + 1 - len(full_list)))
 
-        xs = range(max_length + 1)
-        source.data['x'] = xs
+                data[menu_name] = full_list[:max_length + 1]
+            source = bokeh.models.ColumnDataSource(data)
 
-        source.data['y'] = source.data[initial_menu_selection]
+            xs = range(max_length + 1)
+            source.data['x'] = xs
 
-        source.data['name'] = [checkbox_name] * len(xs)
-        source.name = 'source_{0}_plotted'.format(checkbox_name)
-        sources[checkbox_name] = source
+            source.data['y'] = source.data[initial_menu_selection]
+
+            source.data['name'] = [checkbox_name] * len(xs)
+            source.name = 'source_{0}_{1}'.format(checkbox_name, key)
+            sources[key][checkbox_name] = source
 
     tools = [
         'pan',
@@ -622,6 +656,7 @@ def lengths(ys, group_by='experiment', groupings=None,
 
     fig.y_range.name = 'y_range'
     fig.x_range.name = 'x_range'
+    fig.x_range.end = x_max
 
     range_callback = external_coffeescript('lengths_range')
     fig.y_range.callback = range_callback
@@ -639,7 +674,7 @@ def lengths(ys, group_by='experiment', groupings=None,
     legend_items = []
     initial_legend_items = []
     lines = []
-    for checkbox_name, source in sources.items():
+    for checkbox_name, source in sources['plotted'].items():
         if checkbox_name in initial_sub_group_selections:
             color = colors[checkbox_name]
             line_width = 2
@@ -674,7 +709,7 @@ def lengths(ys, group_by='experiment', groupings=None,
                             y='y',
                             color=colors[checkbox_name],
                             source=source,
-                            size=2,
+                            size=1,
                             fill_alpha=0.95,
                             line_alpha=0.95,
                             visible=circle_visible,
@@ -689,14 +724,13 @@ def lengths(ys, group_by='experiment', groupings=None,
         if checkbox_name in initial_sub_group_selections:
             initial_legend_items.append(legend_item)
         
-    legend = ToggleLegend(name='legend',
-                          items=initial_legend_items,
-                          all_items=legend_items,
-                         )
+    legend = bokeh.models.Legend(name='legend',
+                                 items=legend_items,
+                                )
     fig.add_layout(legend)
     
     source_callback = external_coffeescript('metacodon_selection')
-    for source in sources.values():
+    for source in sources['plotted'].values():
         source.callback = source_callback
     
     hover = bokeh.models.HoverTool(line_policy='interp',
@@ -747,10 +781,25 @@ def lengths(ys, group_by='experiment', groupings=None,
                                        title='alpha',
                                       )
     alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
+    
+    highest_level_chooser = bokeh.models.widgets.Select(options=ys.keys(),
+                                                        value='raw_counts',
+                                                       )
+
+    injection_sources = []
+    for key in ys:
+        injection_sources.extend(sources[key].values())
+    # Note: use throwaway names instead of source names to ensure no illegal
+    # characters in names.
+    injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
+
+    highest_level_chooser.callback = external_coffeescript('metacodon_highest_level',
+                                                           args=injection,
+                                                          )
 
     grid = [
         top_groups,
         sub_groups,
-        [fig, bokeh.layouts.widgetbox([menu, alpha_slider])],
+        [fig, bokeh.layouts.widgetbox([menu, highest_level_chooser, alpha_slider])],
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
