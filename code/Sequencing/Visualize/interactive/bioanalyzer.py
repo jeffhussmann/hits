@@ -246,8 +246,8 @@ def plot(exps,
 
     top_groups = []
     sub_groups = []
-    width = 75 + max(len(l) for top_name in groupings for l in groupings[top_name]) * 5
     for top_name, sub_names in sorted(groupings.items()):
+        width = 75 + max(len(l) for l in sub_names) * 6
         top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
                                                  active=[],
                                                  width=width,
@@ -282,7 +282,7 @@ def plot(exps,
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
     highest_level_chooser.callback = external_coffeescript(callback_name,
-                                                           args=dict(fig=fig, **injection),
+                                                           args=injection,
                                                           )
     table_col_names = [
         ('sample_name', 250),
@@ -304,15 +304,13 @@ def plot(exps,
     table = bokeh.models.widgets.DataTable(source=filtered_source,
                                            columns=columns,
                                            width=1200,
-                                           height=1000,
+                                           height=400,
                                            sortable=False,
                                            name='table',
+                                           row_headers=False,
                                           )
     grid = bokeh.layouts.layout([
-        #top_groups + [bokeh.layouts.widgetbox([highest_level_chooser, clear_selection])],
         sub_groups + [bokeh.layouts.widgetbox([highest_level_chooser, clear_selection])],
-        #sub_groups,
-        #[fig, bokeh.layouts.widgetbox([highest_level_chooser, clear_selection])],
         [fig],
         [table],
     ])
