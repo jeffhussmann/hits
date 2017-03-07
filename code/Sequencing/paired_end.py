@@ -63,7 +63,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     left_md = dict(left_mapping.tags)['MD']
     right_md = dict(right_mapping.tags)['MD']
 
-    right_aligned_pairs = right_mapping.aligned_pairs
+    right_aligned_pairs = sam.cigar_to_aligned_pairs(right_mapping.cigar, right_mapping.reference_start)
 
     right_after_overlap_pair_index = len(right_aligned_pairs)
     for i, (read, ref) in enumerate(right_aligned_pairs):
@@ -74,7 +74,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     right_overlap_pairs = right_aligned_pairs[:right_after_overlap_pair_index]
     right_after_overlap_pairs = right_aligned_pairs[right_after_overlap_pair_index:]
     
-    right_reads_after = [read for read, ref in right_after_overlap_pairs if read != None]
+    right_reads_after = [read for read, ref in right_after_overlap_pairs if read != None and read != 'N']
     right_refs_after = [ref for read, ref in right_after_overlap_pairs if ref != None]
     
     right_overlap_cigar = sam.aligned_pairs_to_cigar(right_overlap_pairs)
@@ -90,7 +90,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     right_after_overlap_qual = right_mapping.qual[right_after_overlap_read_start:]
     
     
-    left_aligned_pairs = left_mapping.aligned_pairs
+    left_aligned_pairs = sam.cigar_to_aligned_pairs(left_mapping.cigar, left_mapping.reference_start)
 
     left_before_overlap_pair_index = -1
     for i, (read, ref) in list(enumerate(left_aligned_pairs))[::-1]:
@@ -101,7 +101,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     left_overlap_pairs = left_aligned_pairs[left_before_overlap_pair_index + 1:]
     left_before_overlap_pairs = left_aligned_pairs[:left_before_overlap_pair_index + 1]
 
-    left_reads_before = [read for read, ref in left_before_overlap_pairs if read != None]
+    left_reads_before = [read for read, ref in left_before_overlap_pairs if read != None and read != 'N']
     left_refs_before = [ref for read, ref in left_before_overlap_pairs if ref != None]
     
     left_overlap_cigar = sam.aligned_pairs_to_cigar(left_overlap_pairs)
@@ -251,7 +251,7 @@ def realigned_mismatches(seq, start, realigned_cigar, ref_dict):
     realigned_pairs = sam.cigar_to_aligned_pairs(realigned_cigar, start)
     mismatches = []
     for read_position, ref_position in realigned_pairs:
-        if read_position != None and ref_position != None:
+        if read_position != None and read_position != 'N' and ref_position != None:
             read_base = seq[read_position]
             ref_base = ref_dict[ref_position]
             if read_base != ref_base:
