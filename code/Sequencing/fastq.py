@@ -208,7 +208,13 @@ def read_pairs(R1_file_name, R2_file_name, **kwargs):
 def read_pairs_interleaved(lines, **kwargs):
     interleaved_reads = reads(lines, **kwargs)
     grouped = group_by(interleaved_reads, key=lambda r: get_pair_name(r.name))
-    return ((g[0], g[-1]) for _, g in grouped)
+    for pair_name, group in grouped:
+        if len(group) != 2:
+            raise ValueError(group)
+        R1, R2 = group
+        R1_renamed = Read(pair_name, R1.seq, R1.qual)
+        R2_renamed = Read(pair_name, R2.seq, R2.qual)
+        yield R1_renamed, R2_renamed
 
 make_record = '@{0}\n{1}\n+\n{2}\n'.format
 
