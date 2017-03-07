@@ -2,9 +2,13 @@ import bokeh
 from bokeh.core.properties import List, Instance
 from bokeh.models.tickers import SingleIntervalTicker
 from bokeh.models.annotations import LegendItem
+import copy
+import json
+import os.path
 import numpy as np
-import positions
+import Sequencing.genetic_code as genetic_code
 from itertools import cycle
+from collections import defaultdict
 from . import external_coffeescript, colors_list
 
 class ToggleLegend(bokeh.models.annotations.Legend):
@@ -21,8 +25,10 @@ export class ToggleLegend extends Legend
     }
 '''
 
-def codon(xs, ys, colors, groupings,
-          toggle_resolution=True,
+def codon(enrichments=None,
+          group_by='codon',
+          groupings=None,
+          colors=None,
           y_max=5,
           x_lims=(-25, 25),
           unselected_alpha=0.2,
@@ -31,42 +37,155 @@ def codon(xs, ys, colors, groupings,
           initial_sub_group_selections=None,
           intial_resolution='codon',
          ):
+    ''' An interactive plot of metacodon enrichment profiles using bokeh. Call
+    without any arguments for an example using data from Jan et al. Science 2014.
+
+    enrichments: A multi-level dictionary of enrichment values to plot, laid out
+        like:
+        
+        enrichments = {
+            'codon': {
+                'xs': [list of codon offset values],
+                'experiment_1': {
+                    'TTT': [list of codon-resolution enrichments],
+                    'TTC': ...,
+                    ...,
+                },
+                'experiment_2': {...},
+            },
+            'nucleotide': {
+                'xs': [list of nucleotide offset values],
+                'experiment_1': {
+                    'TTT': [list of nucleotide-resolution enrichments],
+                    'TTC': ...,
+                    ...,
+                },
+                'experiment_2': {...},
+            },
+        }
+
+        See example_metacodon_enrichments.json in the same directory as this
+        file for an example. (If enrichments == None, loads this file, which
+        contains processed data from Jan et al. Science 2014, as an example.
+        Other arguments are overwritten to highlight interesting features.)
+    
+    group_by: If 'codon', plot enrichments around one codon for all experiments.
+        If 'experiment', plot enrichments around all codons for one experiment.
+
+    groupings: If not None, a dictionary of groups of experiments/codons to list
+        together for convenient selection.
+        If None and group_by == 'experiment', experiment names will be grouped
+        by name.split(':')[0].
+        If None and group_by == 'codon', codons will be grouped by amino acid.
+
+    '''
     if initial_top_group_selections is None:
         initial_top_group_selections = []
     if initial_sub_group_selections is None:
         initial_sub_group_selections = []
-
-    initial_sub_group_selections = set(initial_sub_group_selections)
-    for top_name, sub_names in sorted(groupings.items()):
-        if top_name in initial_top_group_selections:
-            initial_sub_group_selections.update(sub_names)
     
-    sources = {}
+    if enrichments is None:
+        # Load example data
+        dirname = os.path.dirname(__file__)
+        fn = os.path.join(dirname, 'example_metacodon_enrichments.json')
+        with open(fn) as fh:
+            enrichments = json.load(fh)
 
-    highest_level_keys = sorted(ys)
+        # Prepare example groupings.
+        exp_names = set(enrichments['codon'].keys())
+        exp_names.remove('xs')
+        group_names = ['-CHX', '+CHX_2min', '+CHX_7min']
+        groupings = {}
+        for group_name in group_names:
+            groupings[group_name] = [n for n in exp_names if group_name in n]
+
+        # Overrule other arguments to highlight interesting features in data.
+        x_lims = (-18, 81)
+        y_max = 3.2
+        group_by = 'experiment'
+        initial_menu_selection = 'CGA'
+        initial_sub_group_selections = [
+            'BirA_+CHX_2minBiotin_input',
+            'BirAmVenusUbc6_+CHX_7minBiotin_input',
+            'sec63mVenusBirA_-CHX_1minBiotin_input',
+        ]
+
+    # enrichments has experiments as top level keys and codons as lower level
+    # keys. Building ColumnDataSource's below assumes a dictionary with
+    # checkbox_names as the top keys, so if grouping by experiment, don't need
+    # to do anything. If grouping by codon, need to invert the order of the
+    # dictionary.
+
+    # Copy enrichments since xs will be popped.
+    enrichments = copy.deepcopy(enrichments)
+
+    xs = {
+        'codon': enrichments['codon'].pop('xs'),
+        'nucleotide': enrichments['nucleotide'].pop('xs'),
+    }
     
-    menu_options = sorted(ys[highest_level_keys[0]].values()[0].keys())
+    exp_names = sorted(enrichments['codon'])
+
+    if group_by == 'codon':
+        if groupings is None:
+            groupings = {aa: cs for aa, cs in genetic_code.full_back_table.items() if aa != '*'}
+
+        menu_options = exp_names
+        checkbox_names = genetic_code.non_stop_codons
+        
+        inverted = {}
+        for resolution in enrichments:
+            inverted[resolution] = {}
+            for checkbox_name in checkbox_names:
+                inverted[resolution][checkbox_name] = {}
+                for menu_name in menu_options:
+                    inverted[resolution][checkbox_name][menu_name] = enrichments[resolution][menu_name][checkbox_name]
+
+        enrichments = inverted
+    
+    elif group_by == 'experiment':
+        menu_options = genetic_code.non_stop_codons
+        checkbox_names = sorted(enrichments['codon'])
+        
+        if groupings is None:
+            groupings = defaultdict(list)
+            for checkbox_name in sorted(checkbox_names):
+                group_name = checkbox_name.split(':')[0]
+                groupings[group_name].append(checkbox_name)
+
+    if colors is None:
+        colors = dict(zip(checkbox_names, cycle(colors_list)))
 
     if initial_menu_selection is None:
         initial_menu_selection = menu_options[0]
     if initial_menu_selection not in menu_options:
         raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
-    for key in ['plotted'] + highest_level_keys:
+    # Select all members of any initially selected top_group. 
+    initial_sub_group_selections = set(initial_sub_group_selections)
+    for top_name, sub_names in sorted(groupings.items()):
+        if top_name in initial_top_group_selections:
+            initial_sub_group_selections.update(sub_names)
+    
+    # Build ColumnDataSource's from enrichments.
+    sources = {}
+    for key in ['plotted', 'codon', 'nucleotide']:
         if key == 'plotted':
             resolution = intial_resolution
         else:
             resolution = key
         
         sources[key] = {}
-        for checkbox_name in sorted(ys[resolution]):
-            source = bokeh.models.ColumnDataSource(ys[resolution][checkbox_name])
+        for checkbox_name in sorted(enrichments[resolution]):
+            source = bokeh.models.ColumnDataSource(enrichments[resolution][checkbox_name])
             source.data['x'] = xs[resolution]
             source.data['y'] = source.data[initial_menu_selection]
             source.data['name'] = [checkbox_name] * len(xs[resolution])
             source.name = 'source_{0}_{1}'.format(checkbox_name, key)
             sources[key][checkbox_name] = source
    
+
+    # Set up the actual plot.
     tools = [
         'pan',
         'tap',
@@ -83,6 +202,7 @@ def codon(xs, ys, colors, groupings,
                                 active_scroll='wheel_zoom',
                                 name='figure',
                                )
+    fig.toolbar.logo = None
 
     fig.grid.grid_line_alpha = 0.4
 
@@ -103,6 +223,8 @@ def codon(xs, ys, colors, groupings,
 
     fig.xaxis.axis_label_text_font_style = 'normal'
     fig.yaxis.axis_label_text_font_style = 'normal'
+    
+    fig.xaxis[0].ticker = bokeh.models.tickers.SingleIntervalTicker(interval=3, num_minor_ticks=3)
 
     legend_items = []
     initial_legend_items = []
@@ -165,8 +287,6 @@ def codon(xs, ys, colors, groupings,
     fig.legend.location = 'top_right'
     fig.legend.background_fill_alpha = 0.5
 
-    fig.xaxis[0].ticker = bokeh.models.tickers.SingleIntervalTicker(interval=3, num_minor_ticks=3)
-
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
@@ -177,6 +297,7 @@ def codon(xs, ys, colors, groupings,
     hover.tooltips = [('name', '@name')]
     fig.add_tools(hover)
 
+    # Draw horizontal and vertical lines.
     zero_x = bokeh.models.annotations.Span(location=0,
                                            dimension='height',
                                            line_color='black',
@@ -185,15 +306,17 @@ def codon(xs, ys, colors, groupings,
     fig.renderers.append(zero_x)
 
     one_y = bokeh.models.annotations.Span(location=1,
-                                           dimension='width',
-                                           line_color='black',
-                                           line_alpha=0.8,
-                                          )
+                                          dimension='width',
+                                          line_color='black',
+                                          line_alpha=0.8,
+                                         )
     fig.renderers.append(one_y)
 
+    menu_title = 'Codon:' if group_by == 'experiment' else 'Experiment:'
     menu = bokeh.models.widgets.MultiSelect(options=menu_options,
                                             value=[initial_menu_selection],
                                             size=min(30, len(menu_options)),
+                                            title=menu_title,
                                            )
     menu.callback = external_coffeescript('metacodon_menu')
 
@@ -207,7 +330,7 @@ def codon(xs, ys, colors, groupings,
     sub_groups = []
 
     for top_name, sub_names in sorted(groupings.items()):
-        width = 75 + max(len(l) for l in sub_names) * 6
+        width = int(75 + max(len(l) for l in sub_names) * 6.5)
 
         top_active = [0] if top_name in initial_top_group_selections else []
         top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
@@ -227,25 +350,17 @@ def codon(xs, ys, colors, groupings,
                                                 )
         sub_groups.append(sub)
 
-    if toggle_resolution:
-        highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
-                                                                active=0 if intial_resolution == 'codon' else 1,
-                                                                name='highest_level_chooser',
-                                                               )
-        callback_name = 'metacodon_resolution'
-    else:
-        highest_level_chooser = bokeh.models.widgets.Select(options=highest_level_keys,
-                                                            value=highest_level_keys[0],
+    highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
+                                                            active=0 if intial_resolution == 'codon' else 1,
                                                             name='highest_level_chooser',
                                                            )
-        callback_name = 'metacodon_highest_level'
-    
+
     injection_sources = []
-    for key in highest_level_keys:
-        injection_sources.extend(sources[key].values())
+    for resolution in ['codon', 'nucleotide']:
+        injection_sources.extend(sources[resolution].values())
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    highest_level_chooser.callback = external_coffeescript(callback_name,
+    highest_level_chooser.callback = external_coffeescript('metacodon_resolution',
                                                            args=injection,
                                                           )
 
@@ -260,52 +375,103 @@ def codon(xs, ys, colors, groupings,
                                       )
     alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
 
+    widgets = [
+        menu,
+        highest_level_chooser,
+        alpha_slider,
+        clear_selection,
+    ]
+
     grid = [
         top_groups,
         sub_groups,
-        [fig, bokeh.layouts.widgetbox([menu, highest_level_chooser, alpha_slider, clear_selection])],
+        [fig, bokeh.layouts.widgetbox(widgets)],
     ]
 
     bokeh.io.show(bokeh.layouts.layout(grid))
 
-def gene(densities,
-         groupings,
+def gene(enrichments=None,
+         groupings=None,
          y_max=5,
          unselected_alpha=0.2,
-         assignment='three_prime',
-         min_density=0,
-         start_grey=False,
          initial_resolution='nucleotide',
          initial_top_group_selections=None,
          initial_sub_group_selections=None,
         ):
+    ''' An interactive plot of metagene enrichment profiles using bokeh. Call
+    without any arguments for an example using data from Jan et al. Science 2014.
+
+    enrichments: A multi-level dictionary of enrichment values to plot, laid out
+        like:
+        
+        enrichments = {
+            'codon': {
+                'start_codon': {
+                    'xs': [list of codon offset values relative to start codon],
+                    'experiment_1': [list of enrichment values],
+                    'experiment_2': [...],
+                    ...,
+                },
+                'stop_codon': {...}
+            },
+            'nucleotide': {...}
+        }
+
+        See example_metagene_enrichments.json in the same directory as this
+        file for an example. (If enrichments == None, loads this file, which
+        contains processed data from Jan et al. Science 2014, as an example.)
+    
+    groupings: If not None, a dictionary of groups of experiments to list
+        together for convenient selection.
+        If None, experiment names will be grouped by name.split(':')[0].
+
+    '''
     if initial_top_group_selections is None:
         initial_top_group_selections = []
     if initial_sub_group_selections is None:
         initial_sub_group_selections = []
 
+    if enrichments is None:
+        # Load example data
+        dirname = os.path.dirname(__file__)
+        fn = os.path.join(dirname, 'example_metagene_enrichments.json')
+        with open(fn) as fh:
+            enrichments = json.load(fh)
+
+        # Prepare example groupings.
+        exp_names = set(enrichments['codon']['start_codon'].keys())
+        exp_names.remove('xs')
+        group_names = ['-CHX', '+CHX_2min', '+CHX_7min']
+        groupings = {}
+        for group_name in group_names:
+            groupings[group_name] = [n for n in exp_names if group_name in n]
+
+        # Overrule other arguments to highlight interesting features in data.
+        initial_resolution = 'codon'
+        y_max = 18
+        initial_sub_group_selections = [
+            'BirA_+CHX_2minBiotin_input',
+            'BirAmVenusUbc6_+CHX_7minBiotin_input',
+            'sec63mVenusBirA_-CHX_1minBiotin_input',
+        ]
+    
     initial_sub_group_selections = set(initial_sub_group_selections)
     for top_name, sub_names in sorted(groupings.items()):
         if top_name in initial_top_group_selections:
             initial_sub_group_selections.update(sub_names)
-    
-    exp_names = sorted(densities['codon'])
-    sources = {}
 
-    highest_level_keys = sorted(densities)
-    
-    max_before = 90
-    max_after = 250
-    xs_dict = {
-        'codon': {
-            'start_codon': np.arange(-max_before, max_after),
-            'stop_codon': np.arange(-max_after, max_before),
-        },
-        'nucleotide': {
-            'start_codon': np.arange(-3 * max_before, 3 * max_after),
-            'stop_codon': np.arange(-3 * max_after, 3 * max_before),
-        },
-    }
+    enrichments = copy.deepcopy(enrichments)
+
+    highest_level_keys = sorted(enrichments)
+
+    all_xs = {}
+    for key in highest_level_keys:
+        all_xs[key] = {}
+        for landmark in enrichments[key]:
+            all_xs[key][landmark] = enrichments[key][landmark].pop('xs')
+
+    exp_names = sorted(enrichments[highest_level_keys[0]]['start_codon'])
+    sources = {}
 
     for key in ['plotted'] + highest_level_keys:
         if key == 'plotted':
@@ -317,20 +483,8 @@ def gene(densities,
         for exp_name in exp_names:
             source = bokeh.models.ColumnDataSource()
             for landmark in ['start_codon', 'stop_codon']:
-                xs = xs_dict[resolution][landmark]
-
-                if resolution == 'codon':
-                    actual_assignment = assignment
-                else:
-                    actual_assignment = 'three_prime'
-
-                density_type = positions.MetageneDensityType(actual_assignment,
-                                                             landmark,
-                                                             'all',
-                                                             'none_nearby',
-                                                             min_density,
-                                                            )
-                ys = densities[resolution][exp_name][str(density_type)]['means'][landmark, xs]
+                xs = all_xs[resolution][landmark]
+                ys = enrichments[resolution][landmark][exp_name]
 
                 source.data['xs_{0}'.format(landmark)] = xs
                 source.data['ys_{0}'.format(landmark)] = ys
@@ -462,6 +616,16 @@ def gene(densities,
                                                line_alpha=0.5,
                                               )
         fig.renderers.append(one_y)
+        
+        
+        remove_underscore = ' '.join(landmark.split('_'))
+        fig.xaxis.axis_label = 'Offset from {0}'.format(remove_underscore)
+        fig.xaxis.axis_label_text_font_style = 'normal'
+        
+        fig.grid.grid_line_alpha = 0.4
+
+    figs['start_codon'].yaxis.axis_label = 'Mean relative enrichment'
+    figs['start_codon'].yaxis.axis_label_text_font_style = 'normal'
     
     source_callback = external_coffeescript('metacodon_selection')
     for source in sources['plotted'].values():
@@ -496,9 +660,8 @@ def gene(densities,
 
     top_groups = []
     sub_groups = []
-    width = 100
     for top_name, sub_names in sorted(groupings.items()):
-        width = 75 + max(len(l) for l in sub_names) * 6
+        width = int(75 + max(len(l) for l in sub_names) * 6.5)
         
         top_active = [0] if top_name in initial_top_group_selections else []
         top = bokeh.models.widgets.CheckboxGroup(labels=[top_name],
@@ -527,6 +690,8 @@ def gene(densities,
     alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
 
     plots = bokeh.layouts.gridplot([[figs['start_codon'], figs['stop_codon']]])
+    plots.children[0].logo = None
+
     grid = [
         top_groups,
         sub_groups,
@@ -569,6 +734,7 @@ def lengths(raw_counts,
     # Need a dictionary with checkbox names as the top keys, so if grouping by
     # type, don't need to do anything. If grouping by experiment, need to invert
     # the order.
+    # 2017_03_06: this comment doesnt seem to make sense.
 
     if group_by == 'experiment':
         menu_options = sorted(ys['raw_counts'])

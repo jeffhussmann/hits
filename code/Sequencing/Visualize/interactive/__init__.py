@@ -588,7 +588,7 @@ def hex_to_CSS(hex_string, alpha=1.):
     return CSS
 
 def example(**extra_kwargs):
-    fn = os.path.join(os.path.dirname(__file__), 'example_df.txt') 
+    fn = os.path.join(os.path.dirname(__file__), 'example_df.txt')
     df = pd.read_csv(fn, index_col='alias')
     kwargs = dict(size=800,
                   log_scale=True,
