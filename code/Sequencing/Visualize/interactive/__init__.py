@@ -61,10 +61,10 @@ def build_selected(indices):
 
     return selected
 
-def scatter(df,
+def scatter(df=None,
             hover_keys=None,
             table_keys=None,
-            size=900,
+            size=800,
             axis_label_size=20,
             log_scale=False,
             volcano=False,
@@ -76,32 +76,47 @@ def scatter(df,
             data_lims=None,
             hide_widgets=None,
            ):
-    ''' Makes an interactive scatter plot using bokeh.
+    ''' Makes an interactive scatter plot using bokeh. Call without any
+    arguments for an example using data from Jan et al. Science 2014.
 
     Args:
-            df: A pandas DataFrame with columns containing numerical data to plot.
+            df: A pandas DataFrame with columns containing numerical data to
+                plot. 
                 If 'color' is a column, it will be used to color the points. 
                 Index values will be used as labels for points.
                 Any text columns will be searchable through the 'Search:' field.
                 Any boolean columns will be used to define subsets of points for
                 selection from a dropdown menu.
-            hover_keys: Names of columns in df to display in the tooltip that appears
-                when you hover over a point.
-            table_keys: Names of columns in df to display in the table below the plot
-                that is populated with the selected points from the figure.
+                If df is None, loads example data from Jan et al. Science 2014.
+
+            hover_keys: Names of columns in df to display in the tooltip that
+                appears when you hover over a point.
+
+            table_keys: Names of columns in df to display in the table below the
+                plot that is populated with the selected points from the figure.
+
             size: Size of the plot in pixels.
+
             marker_size: Size of the scatter circles.
+
             heatmap: If True, displays a heatmap of correlations between
                 numerical columns in df that can be clicked to select columns
                 to scatter.
+
             grid: If True, defaults to grid instead of diagonal landmarks.
+
             volcano: If True, make some tweaks suitable for volcano plots.
+
             log_scale: If not False, plot on a log scale with base 10 (or, if a
                 set to a number, with base log_scale.)
+
             axis_label_size: Size of the font used for axis labels.
+
             intiial_selection: Names of index value to initially highlight.
+
             initial_xy_names: Tuple (x_name, y_name) of datasets to initially
                 display on x- and y-axes.
+
             hide_widgets: List of widgets to not display. Possible options are
                 ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
                  'grid_radio_buttons'].
@@ -118,6 +133,18 @@ def scatter(df,
 
     if volcano:
         grid = True
+
+    if df is None:
+        # Load example data.
+        fn = os.path.join(os.path.dirname(__file__), 'example_df.txt')
+        df = pd.read_csv(fn, index_col='alias')
+
+        # Override some arguments.
+        log_scale = True
+        hover_keys = ['systematic_name', 'short_description']
+        table_keys = ['systematic_name', 'description']
+        grid = False
+        heatmap = True
 
     # Infer column types.
     
@@ -586,18 +613,6 @@ def hex_to_CSS(hex_string, alpha=1.):
     rgb = [int(v * 255) for v in rgb]
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
-
-def example(**extra_kwargs):
-    fn = os.path.join(os.path.dirname(__file__), 'example_df.txt')
-    df = pd.read_csv(fn, index_col='alias')
-    kwargs = dict(size=800,
-                  log_scale=True,
-                  hover_keys=['systematic_name', 'short_description'],
-                  table_keys=['systematic_name', 'description'],
-                  grid=False,
-                 )
-    kwargs.update(extra_kwargs)
-    scatter(df, **kwargs)
 
 # from http://chris-said.io/
 toggle = '''

@@ -38,46 +38,50 @@ def codon(enrichments=None,
           intial_resolution='codon',
          ):
     ''' An interactive plot of metacodon enrichment profiles using bokeh. Call
-    without any arguments for an example using data from Jan et al. Science 2014.
+    without any arguments for an example using data from Jan et al. Science
+    2014.
 
-    enrichments: A multi-level dictionary of enrichment values to plot, laid out
-        like:
+    Args:
+
+        enrichments: A multi-level dictionary of enrichment values to plot, laid
+            out like:
+            
+            enrichments = {
+                'codon': {
+                    'xs': [list of codon offset values],
+                    'experiment_1': {
+                        'TTT': [list of codon-resolution enrichments],
+                        'TTC': ...,
+                        ...,
+                    },
+                    'experiment_2': {...},
+                },
+                'nucleotide': {
+                    'xs': [list of nucleotide offset values],
+                    'experiment_1': {
+                        'TTT': [list of nucleotide-resolution enrichments],
+                        'TTC': ...,
+                        ...,
+                    },
+                    'experiment_2': {...},
+                },
+            }
+
+            See example_metacodon_enrichments.json in the same directory as this
+            file for an example. (If enrichments == None, loads this file, which
+            contains processed data from Jan et al. Science 2014, as an example.
+            Other arguments are overwritten to highlight interesting features.)
         
-        enrichments = {
-            'codon': {
-                'xs': [list of codon offset values],
-                'experiment_1': {
-                    'TTT': [list of codon-resolution enrichments],
-                    'TTC': ...,
-                    ...,
-                },
-                'experiment_2': {...},
-            },
-            'nucleotide': {
-                'xs': [list of nucleotide offset values],
-                'experiment_1': {
-                    'TTT': [list of nucleotide-resolution enrichments],
-                    'TTC': ...,
-                    ...,
-                },
-                'experiment_2': {...},
-            },
-        }
+        group_by: If 'codon', plot enrichments around one codon for all
+            experiments. If 'experiment', plot enrichments around all codons for
+            one experiment.
 
-        See example_metacodon_enrichments.json in the same directory as this
-        file for an example. (If enrichments == None, loads this file, which
-        contains processed data from Jan et al. Science 2014, as an example.
-        Other arguments are overwritten to highlight interesting features.)
-    
-    group_by: If 'codon', plot enrichments around one codon for all experiments.
-        If 'experiment', plot enrichments around all codons for one experiment.
-
-    groupings: If not None, a dictionary of groups of experiments/codons to list
-        together for convenient selection.
-        If None and group_by == 'experiment', experiment names will be grouped
-        by name.split(':')[0].
-        If None and group_by == 'codon', codons will be grouped by amino acid.
-
+        groupings: If not None, a dictionary of groups of experiments/codons to
+            list together for convenient selection.
+            If None and group_by == 'experiment', experiment names will be
+            grouped by name.split(':')[0].
+            If None and group_by == 'codon', codons will be grouped by amino
+            acid.
     '''
     if initial_top_group_selections is None:
         initial_top_group_selections = []
@@ -399,32 +403,35 @@ def gene(enrichments=None,
          initial_sub_group_selections=None,
         ):
     ''' An interactive plot of metagene enrichment profiles using bokeh. Call
-    without any arguments for an example using data from Jan et al. Science 2014.
+    without any arguments for an example using data from Jan et al. Science
+    2014.
 
-    enrichments: A multi-level dictionary of enrichment values to plot, laid out
-        like:
-        
-        enrichments = {
-            'codon': {
-                'start_codon': {
-                    'xs': [list of codon offset values relative to start codon],
-                    'experiment_1': [list of enrichment values],
-                    'experiment_2': [...],
-                    ...,
+    Args:
+
+        enrichments: A multi-level dictionary of enrichment values to plot, laid
+            out like:
+            
+            enrichments = {
+                'codon': {
+                    'start_codon': {
+                        'xs': [list of codon offset values relative to start codon],
+                        'experiment_1': [list of enrichment values],
+                        'experiment_2': [...],
+                        ...,
+                    },
+                    'stop_codon': {...}
                 },
-                'stop_codon': {...}
-            },
-            'nucleotide': {...}
-        }
+                'nucleotide': {...}
+            }
 
-        See example_metagene_enrichments.json in the same directory as this
-        file for an example. (If enrichments == None, loads this file, which
-        contains processed data from Jan et al. Science 2014, as an example.)
-    
-    groupings: If not None, a dictionary of groups of experiments to list
-        together for convenient selection.
-        If None, experiment names will be grouped by name.split(':')[0].
-
+            See example_metagene_enrichments.json in the same directory as this
+            file for an example. (If enrichments == None, loads this file, which
+            contains processed data from Jan et al. Science 2014, as an 
+            example.)
+        
+        groupings: If not None, a dictionary of groups of experiments to list
+            together for convenient selection.
+            If None, experiment names will be grouped by name.split(':')[0].
     '''
     if initial_top_group_selections is None:
         initial_top_group_selections = []
