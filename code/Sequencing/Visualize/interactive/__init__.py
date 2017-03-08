@@ -2,8 +2,6 @@ import numpy as np
 import bokeh
 import bokeh.io
 import bokeh.plotting
-from bokeh.model import Model
-from bokeh.core.properties import Bool, String, List
 import pandas as pd
 import scipy.stats
 import matplotlib.colors
@@ -12,37 +10,13 @@ import os.path
 import glob
 import IPython.display
 from collections import defaultdict
+from external_coffeescript import build_callback
+import meta
 
 bokeh.io.output_notebook()
 
 # For easier editing, coffeescript callbacks are kept in separate files
 # in the same directory as this file.
-
-def load_callback(key):
-    fn = os.path.join(os.path.dirname(__file__), '{0}.coffee'.format(key))
-    with open(fn) as fh:
-        callback = fh.read()
-    return callback
-
-def external_coffeescript(key, format_kwargs=None, args=None):
-    if args is None:
-        args = {}
-    if format_kwargs is None:
-        format_kwargs = {}
-
-    code_template = load_callback(key)
-    code = code_template.format(**format_kwargs)
-    callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
-
-    return callback
-
-colors_list =  (
-    bokeh.palettes.Dark2[8] +
-    bokeh.palettes.Set1[9] +
-    bokeh.palettes.Set2[8] + 
-    bokeh.palettes.Paired[12] +
-    bokeh.palettes.Accent[8]
-)
 
 def build_selected(indices):
     pvd = bokeh.core.property.containers.PropertyValueDict
@@ -364,7 +338,7 @@ def scatter(df=None,
                                           )
     
     # Callback to filter the table when selection changes.
-    scatter_source.callback = external_coffeescript('scatter_selection')
+    scatter_source.callback = build_callback('scatter_selection')
     
     # Label selected points with their index.
     labels = bokeh.models.LabelSet(x='x',
@@ -442,7 +416,7 @@ def scatter(df=None,
         heatmap_fig.add_tools(hover)
 
         first_row = [heatmap_fig]
-        heatmap_source.callback = external_coffeescript('scatter_heatmap')
+        heatmap_source.callback = build_callback('scatter_heatmap')
 
         code = '''
         dict = {dict}
@@ -476,7 +450,7 @@ def scatter(df=None,
                                                   name='y_menu',
                                                )
 
-        menu_callback = external_coffeescript('scatter_menu')
+        menu_callback = build_callback('scatter_menu')
         x_menu.callback = menu_callback
         y_menu.callback = menu_callback
         
@@ -497,9 +471,9 @@ def scatter(df=None,
                                                       width=50,
                                                       name='zoom_button',
                                                      )
-    zoom_to_data_button.callback = external_coffeescript('scatter_zoom_to_data',
-                                                         format_kwargs=dict(log_scale='true' if log_scale else 'false'),
-                                                        )
+    zoom_to_data_button.callback = build_callback('scatter_zoom_to_data',
+                                                  format_kwargs=dict(log_scale='true' if log_scale else 'false'),
+                                                 )
 
     # Radio group to choose whether to draw a vertical/horizontal grid or
     # diagonal guide lines. 
@@ -507,10 +481,10 @@ def scatter(df=None,
                                                    active=1 if not grid else 0,
                                                    name='grid_radio_buttons',
                                                   )
-    grid_options.callback = external_coffeescript('scatter_grid')
+    grid_options.callback = build_callback('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
-    text_input.callback = external_coffeescript('scatter_search',
+    text_input.callback = build_callback('scatter_search',
                                                 format_kwargs=dict(column_names=str(object_cols)),
                                                )
 
@@ -518,7 +492,7 @@ def scatter(df=None,
                                                         active=[],
                                                         name='case_sensitive',
                                                        )
-    case_sensitive.callback = external_coffeescript('case_sensitive')
+    case_sensitive.callback = build_callback('case_sensitive')
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
@@ -527,14 +501,14 @@ def scatter(df=None,
                                               value='',
                                               name='subset_menu',
                                              )
-    subset_menu.callback = external_coffeescript('scatter_subset_menu')
+    subset_menu.callback = build_callback('scatter_subset_menu')
 
     # Button to dump table to file.
     save_button = bokeh.models.widgets.Button(label='Save table to file',
                                               width=50,
                                               name='save_button',
                                              )
-    save_button.callback = external_coffeescript('scatter_save_button',
+    save_button.callback = build_callback('scatter_save_button',
                                                  format_kwargs=dict(column_names=str(table_col_names)),
                                                 )
 
@@ -545,7 +519,7 @@ def scatter(df=None,
                                        title='alpha',
                                        name='alpha',
                                       )
-    alpha_slider.callback = external_coffeescript('scatter_alpha')
+    alpha_slider.callback = build_callback('scatter_alpha')
     
     size_slider = bokeh.models.Slider(start=1,
                                       end=20.,
@@ -554,7 +528,7 @@ def scatter(df=None,
                                       title='marker size',
                                       name='marker_size',
                                       )
-    size_slider.callback = external_coffeescript('scatter_size')
+    size_slider.callback = build_callback('scatter_size')
 
     fig.min_border = min_border
 

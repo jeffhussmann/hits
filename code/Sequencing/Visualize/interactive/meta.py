@@ -9,7 +9,8 @@ import numpy as np
 import Sequencing.genetic_code as genetic_code
 from itertools import cycle
 from collections import defaultdict
-from . import external_coffeescript, colors_list
+from external_coffeescript import build_callback
+from colors_list import colors_list
 
 class ToggleLegend(bokeh.models.annotations.Legend):
     all_items = List(Instance(LegendItem))
@@ -215,7 +216,7 @@ def codon(enrichments=None,
     fig.x_range = bokeh.models.Range1d(*x_lims)
     fig.x_range.name = 'x_range'
 
-    range_callback = external_coffeescript('metacodon_range')
+    range_callback = build_callback('metacodon_range')
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
@@ -291,7 +292,7 @@ def codon(enrichments=None,
     fig.legend.location = 'top_right'
     fig.legend.background_fill_alpha = 0.5
 
-    source_callback = external_coffeescript('metacodon_selection')
+    source_callback = build_callback('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
 
@@ -322,13 +323,13 @@ def codon(enrichments=None,
                                             size=min(30, len(menu_options)),
                                             title=menu_title,
                                            )
-    menu.callback = external_coffeescript('metacodon_menu')
+    menu.callback = build_callback('metacodon_menu')
 
-    sub_group_callback = external_coffeescript('metacodon_sub_group',
-                                               format_kwargs=dict(color_unselected='false'),
-                                              )
+    sub_group_callback = build_callback('metacodon_sub_group',
+                                        format_kwargs=dict(color_unselected='false'),
+                                       )
 
-    top_group_callback = external_coffeescript('metacodon_top_group')
+    top_group_callback = build_callback('metacodon_top_group')
 
     top_groups = []
     sub_groups = []
@@ -364,12 +365,12 @@ def codon(enrichments=None,
         injection_sources.extend(sources[resolution].values())
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    highest_level_chooser.callback = external_coffeescript('metacodon_resolution',
-                                                           args=injection,
-                                                          )
+    highest_level_chooser.callback = build_callback('metacodon_resolution',
+                                                    args=injection,
+                                                   )
 
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
-    clear_selection.callback = external_coffeescript('metacodon_clear_selection')
+    clear_selection.callback = build_callback('metacodon_clear_selection')
     
     alpha_slider = bokeh.models.Slider(start=0.,
                                        end=1.,
@@ -377,7 +378,7 @@ def codon(enrichments=None,
                                        step=.05,
                                        title='unselected alpha',
                                       )
-    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
+    alpha_slider.callback = build_callback('lengths_unselected_alpha')
 
     widgets = [
         menu,
@@ -509,7 +510,7 @@ def gene(enrichments=None,
     }
 
     x_ranges = {}
-    x_range_callback = external_coffeescript('metagene_x_range')
+    x_range_callback = build_callback('metagene_x_range')
     for landmark in ('start_codon', 'stop_codon'):
         x_range = bokeh.models.Range1d(*initial_lims[landmark])
         x_range.name = 'x_range_{0}'.format(landmark)
@@ -518,7 +519,7 @@ def gene(enrichments=None,
 
     y_range = bokeh.models.Range1d(0, y_max)
     y_range.name = 'y_range'
-    y_range.callback = external_coffeescript('metagene_y_range')
+    y_range.callback = build_callback('metagene_y_range')
 
     tools = [
         'pan',
@@ -634,7 +635,7 @@ def gene(enrichments=None,
     figs['start_codon'].yaxis.axis_label = 'Mean relative enrichment'
     figs['start_codon'].yaxis.axis_label_text_font_style = 'normal'
     
-    source_callback = external_coffeescript('metacodon_selection')
+    source_callback = build_callback('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
 
@@ -655,15 +656,15 @@ def gene(enrichments=None,
         injection_sources.extend(sources[key].values())
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    resolution.callback = external_coffeescript('metacodon_resolution',
-                                                args=injection,
-                                               )
+    resolution.callback = build_callback('metacodon_resolution',
+                                         args=injection,
+                                        )
     
-    sub_group_callback = external_coffeescript('metacodon_sub_group',
-                                               format_kwargs=dict(color_unselected='false'),
-                                              )
+    sub_group_callback = build_callback('metacodon_sub_group',
+                                        format_kwargs=dict(color_unselected='false'),
+                                       )
 
-    top_group_callback = external_coffeescript('metacodon_top_group')
+    top_group_callback = build_callback('metacodon_top_group')
 
     top_groups = []
     sub_groups = []
@@ -694,7 +695,7 @@ def gene(enrichments=None,
                                        step=.05,
                                        title='unselected alpha',
                                       )
-    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
+    alpha_slider.callback = build_callback('lengths_unselected_alpha')
 
     plots = bokeh.layouts.gridplot([[figs['start_codon'], figs['stop_codon']]])
     plots.children[0].logo = None
@@ -831,7 +832,7 @@ def lengths(raw_counts,
     fig.x_range.name = 'x_range'
     fig.x_range.end = x_max
 
-    range_callback = external_coffeescript('lengths_range')
+    range_callback = build_callback('lengths_range')
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
@@ -902,7 +903,7 @@ def lengths(raw_counts,
                                 )
     fig.add_layout(legend)
     
-    source_callback = external_coffeescript('metacodon_selection')
+    source_callback = build_callback('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
     
@@ -916,12 +917,12 @@ def lengths(raw_counts,
                                             value=[initial_menu_selection],
                                             size=min(40, len(menu_options)),
                                            )
-    menu.callback = external_coffeescript('metacodon_menu')
+    menu.callback = build_callback('metacodon_menu')
     
-    sub_group_callback = external_coffeescript('metacodon_sub_group',
-                                               format_kwargs=dict(color_unselected='true'),
-                                              )
-    top_group_callback = external_coffeescript('metacodon_top_group')
+    sub_group_callback = build_callback('metacodon_sub_group',
+                                        format_kwargs=dict(color_unselected='true'),
+                                       )
+    top_group_callback = build_callback('metacodon_top_group')
 
     top_groups = []
     sub_groups = []
@@ -953,7 +954,7 @@ def lengths(raw_counts,
                                        step=.05,
                                        title='alpha',
                                       )
-    alpha_slider.callback = external_coffeescript('lengths_unselected_alpha')
+    alpha_slider.callback = build_callback('lengths_unselected_alpha')
     
     highest_level_chooser = bokeh.models.widgets.Select(options=ys.keys(),
                                                         value='raw_counts',
@@ -966,9 +967,9 @@ def lengths(raw_counts,
     # characters in names.
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    highest_level_chooser.callback = external_coffeescript('metacodon_highest_level',
-                                                           args=injection,
-                                                          )
+    highest_level_chooser.callback = build_callback('metacodon_highest_level',
+                                                    args=injection,
+                                                   )
 
     grid = [
         top_groups,
