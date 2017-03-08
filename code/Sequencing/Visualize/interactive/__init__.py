@@ -15,9 +15,6 @@ import meta
 
 bokeh.io.output_notebook()
 
-# For easier editing, coffeescript callbacks are kept in separate files
-# in the same directory as this file.
-
 def build_selected(indices):
     pvd = bokeh.core.property.containers.PropertyValueDict
     pvl = bokeh.core.property.containers.PropertyValueList
