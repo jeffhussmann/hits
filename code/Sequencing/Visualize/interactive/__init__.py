@@ -171,6 +171,7 @@ def scatter(df=None,
     
     fig = bokeh.plotting.figure(**fig_kwargs)
     fig.toolbar.logo = None
+    fig.toolbar_location = None
 
     if log_scale:
         for axis in [fig.xaxis, fig.yaxis]:
@@ -226,12 +227,19 @@ def scatter(df=None,
 
         overall_max = nonzero.max(numeric_only=True).max()
         overall_min = nonzero.min(numeric_only=True).min()
+    
+        def log(x):
+            return np.log(x) / np.log(log_scale)
+
+        bins = list(np.logspace(log(overall_min), log(overall_max), 100))
 
         initial = (overall_min * 0.1, overall_max * 10)
         bounds = (overall_min * 0.001, overall_max * 1000)
     else:
         overall_max = df.max(numeric_only=True).max()
         overall_min = df.min(numeric_only=True).min()
+        
+        bins = list(np.linspace(overall_min, overall_max, 100))
 
         extent = overall_max - overall_min
         overhang = extent * 0.05
@@ -283,10 +291,76 @@ def scatter(df=None,
 
     fig.x_range.name = 'x_range'
     fig.y_range.name = 'y_range'
+    
+    fig.outline_line_color = 'black'
 
     scatter.selection_glyph.fill_color = 'orange'
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
+
+    histogram_source = bokeh.models.ColumnDataSource(name='histogram_source')
+    histogram_source.data = {
+        'bins_left': bins[:-1],
+        'bins_right': bins[1:],
+        'zero': [0]*(len(bins) - 1),
+    }
+
+    max_count = 0
+    for name in numerical_cols:
+        counts, _ = np.histogram(scatter_source.data[name], bins=bins)
+        max_count = max(max(counts), max_count)
+        histogram_source.data[name] = list(counts)
+
+    hist_figs = {
+        'top': bokeh.plotting.figure(width=size, height=100, x_range=fig.x_range, x_axis_type='log'),
+        'right': bokeh.plotting.figure(width=100, height=size, y_range=fig.y_range, y_axis_type='log'),
+    }
+
+    histogram_source.data['x_all'] = histogram_source.data[x_name]
+    histogram_source.data['y_all'] = histogram_source.data[y_name]
+    histogram_source.data['x_selected'] = histogram_source.data['zero']
+    histogram_source.data['y_selected'] = histogram_source.data['zero']
+
+    hist_figs['top'].quad(left='bins_left', right='bins_right',
+                          bottom='zero', top='x_all',
+                          source=histogram_source,
+                          color='black',
+                          alpha=0.1,
+                          line_color=None,
+                         )
+    hist_figs['top'].y_range = bokeh.models.Range1d(start=0, end=max_count, bounds='auto')
+
+    hist_figs['top'].quad(left='bins_left', right='bins_right',
+                          bottom='zero', top='x_selected',
+                          source=histogram_source,
+                          color='orange',
+                          alpha=0.8,
+                          line_color=None,
+                         )
+
+    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
+                            left='zero', right='y_all',
+                            source=histogram_source,
+                            color='black',
+                            alpha=0.1,
+                            line_color=None,
+                           )
+    hist_figs['right'].x_range = bokeh.models.Range1d(start=0, end=max_count, bounds='auto')
+
+    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
+                            left='zero', right='y_selected',
+                            source=histogram_source,
+                            color='orange',
+                            alpha=0.8,
+                            line_color=None,
+                           )
+
+    for hist_fig in hist_figs.values():
+        hist_fig.outline_line_color = None
+        hist_fig.axis.visible = False
+        hist_fig.grid.visible = False
+        hist_fig.min_border = 0
+        hist_fig.toolbar_location = None
 
     # Configure tooltips that pop up when hovering over a point.
     
@@ -335,7 +409,10 @@ def scatter(df=None,
                                           )
     
     # Callback to filter the table when selection changes.
-    scatter_source.callback = build_callback('scatter_selection')
+    scatter_source.callback = build_callback('scatter_selection',
+                                             js=True,
+                                             format_kwargs=dict(bins=str(bins)),
+                                            )
     
     # Label selected points with their index.
     labels = bokeh.models.LabelSet(x='x',
@@ -380,7 +457,7 @@ def scatter(df=None,
                 
         heatmap_source = bokeh.models.ColumnDataSource(data)
         num_exps = len(numerical_cols)
-        heatmap_size = int(size * 1)
+        heatmap_size = size - 100
         heatmap_fig = bokeh.plotting.figure(tools='tap',
                                             x_range=(-0.5, num_exps - 0.5),
                                             y_range=(num_exps - 0.5, -0.5),
@@ -527,7 +604,7 @@ def scatter(df=None,
                                       )
     size_slider.callback = build_callback('scatter_size')
 
-    fig.min_border = min_border
+    fig.min_border = 1
 
     widgets = [
         label_button,
@@ -558,15 +635,21 @@ def scatter(df=None,
 
     widget_box = bokeh.layouts.widgetbox(children=widgets)
 
+    toolbar = bokeh.models.ToolbarBox(tools=fig.toolbar.tools)
+    toolbar.logo = None
+
     columns = [
-        bokeh.layouts.column(children=[fig]),
+        bokeh.layouts.column(children=[hist_figs['top'], fig]),
+        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), hist_figs['right']]),
+        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), toolbar]),
         bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
                                        widget_box,
                                       ]),
     ]
 
     if heatmap:
-        columns = columns[:1] + [bokeh.layouts.column(children=[heatmap_fig])] + columns[1:]
+        heatmap_column = bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), heatmap_fig])
+        columns = columns[:-1] + [heatmap_column] + columns[-1:]
 
     rows = [
         bokeh.layouts.row(children=columns),

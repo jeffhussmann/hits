@@ -1,20 +1,27 @@
 import os
 import bokeh.models
 
-def load_coffeescript(key):
-    fn = os.path.join(os.path.dirname(__file__), '{0}.coffee'.format(key))
+def load_file(key, ext):
+    fn = os.path.join(os.path.dirname(__file__), '{0}.{1}'.format(key, ext))
     with open(fn) as fh:
         callback = fh.read()
     return callback
 
-def build_callback(key, format_kwargs=None, args=None):
+def build_callback(key, js=False, format_kwargs=None, args=None):
     if args is None:
         args = {}
     if format_kwargs is None:
         format_kwargs = {}
 
-    code_template = load_coffeescript(key)
+    if js:
+        ext = 'js'
+        model = bokeh.models.CustomJS
+    else:
+        ext = 'coffee'
+        model = bokeh.models.CustomJS.from_coffeescript
+
+    code_template = load_file(key, ext)
     code = code_template.format(**format_kwargs)
-    callback = bokeh.models.CustomJS.from_coffeescript(code=code, args=args)
+    callback = model(code=code, args=args)
 
     return callback
