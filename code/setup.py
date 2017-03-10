@@ -23,6 +23,7 @@ setup(
               'Sequencing/Visualize/interactive',
              ],
     package_data={'Sequencing/Visualize/interactive': ['*.coffee',
+                                                       '*.js',
                                                        'example_df.txt',
                                                        '*.json',
                                                       ],
