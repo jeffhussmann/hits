@@ -311,9 +311,20 @@ def scatter(df=None,
         max_count = max(max(counts), max_count)
         histogram_source.data[name] = list(counts)
 
+    if log_scale:
+        axis_type = 'log'
+    else:
+        axis_type = 'linear'
+
     hist_figs = {
-        'top': bokeh.plotting.figure(width=size, height=100, x_range=fig.x_range, x_axis_type='log'),
-        'right': bokeh.plotting.figure(width=100, height=size, y_range=fig.y_range, y_axis_type='log'),
+        'top': bokeh.plotting.figure(width=size, height=100,
+                                     x_range=fig.x_range,
+                                     x_axis_type=axis_type,
+                                    ),
+        'right': bokeh.plotting.figure(width=100, height=size,
+                                       y_range=fig.y_range,
+                                       y_axis_type=axis_type,
+                                      ),
     }
 
     histogram_source.data['x_all'] = histogram_source.data[x_name]
