@@ -286,11 +286,17 @@ def scatter(df=None,
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
         fig.x_range = bokeh.models.Range1d(-1, 1)
     else:
-        fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
-        fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
+        fig.y_range = bokeh.models.Range1d(*initial)
+        fig.x_range = bokeh.models.Range1d(*initial)
 
     fig.x_range.name = 'x_range'
     fig.y_range.name = 'y_range'
+    
+    lower_bound, upper_bound = bounds
+    range_kwargs = dict(lower_bound=lower_bound, upper_bound=upper_bound)
+    
+    fig.x_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
+    fig.y_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
     
     fig.outline_line_color = 'black'
 
