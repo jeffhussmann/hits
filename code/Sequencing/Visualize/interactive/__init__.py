@@ -286,17 +286,25 @@ def scatter(df=None,
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
         fig.x_range = bokeh.models.Range1d(-1, 1)
     else:
-        fig.y_range = bokeh.models.Range1d(*initial, bounds=bounds)
-        fig.x_range = bokeh.models.Range1d(*initial, bounds=bounds)
+        fig.y_range = bokeh.models.Range1d(*initial)
+        fig.x_range = bokeh.models.Range1d(*initial)
 
     fig.x_range.name = 'x_range'
     fig.y_range.name = 'y_range'
+    
+    lower_bound, upper_bound = bounds
+    range_kwargs = dict(lower_bound=lower_bound, upper_bound=upper_bound)
+    
+    fig.x_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
+    fig.y_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
     
     fig.outline_line_color = 'black'
 
     scatter.selection_glyph.fill_color = 'orange'
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
+
+    # Make marginal histograms.
 
     histogram_source = bokeh.models.ColumnDataSource(name='histogram_source')
     histogram_source.data = {
@@ -311,24 +319,42 @@ def scatter(df=None,
         max_count = max(max(counts), max_count)
         histogram_source.data[name] = list(counts)
 
+    if log_scale:
+        axis_type = 'log'
+    else:
+        axis_type = 'linear'
+
     hist_figs = {
-        'top': bokeh.plotting.figure(width=size, height=100, x_range=fig.x_range, x_axis_type='log'),
-        'right': bokeh.plotting.figure(width=100, height=size, y_range=fig.y_range, y_axis_type='log'),
+        'top': bokeh.plotting.figure(width=size, height=100,
+                                     x_range=fig.x_range,
+                                     x_axis_type=axis_type,
+                                    ),
+        'right': bokeh.plotting.figure(width=100, height=size,
+                                       y_range=fig.y_range,
+                                       y_axis_type=axis_type,
+                                      ),
     }
+
+    initial_xs = df[x_name].iloc[initial_indices]
+    initial_x_counts, _ = np.histogram(initial_xs, bins)
+    
+    initial_ys = df[y_name].iloc[initial_indices]
+    initial_y_counts, _ = np.histogram(initial_ys, bins)
 
     histogram_source.data['x_all'] = histogram_source.data[x_name]
     histogram_source.data['y_all'] = histogram_source.data[y_name]
-    histogram_source.data['x_selected'] = histogram_source.data['zero']
-    histogram_source.data['y_selected'] = histogram_source.data['zero']
+    histogram_source.data['x_selected'] = initial_x_counts
+    histogram_source.data['y_selected'] = initial_y_counts
 
+    initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
     hist_figs['top'].quad(left='bins_left', right='bins_right',
                           bottom='zero', top='x_all',
                           source=histogram_source,
                           color='black',
-                          alpha=0.1,
+                          alpha=initial_hist_alpha,
                           line_color=None,
+                          name='hist_x_all',
                          )
-    hist_figs['top'].y_range = bokeh.models.Range1d(start=0, end=max_count, bounds='auto')
 
     hist_figs['top'].quad(left='bins_left', right='bins_right',
                           bottom='zero', top='x_selected',
@@ -342,11 +368,11 @@ def scatter(df=None,
                             left='zero', right='y_all',
                             source=histogram_source,
                             color='black',
-                            alpha=0.1,
+                            alpha=initial_hist_alpha,
                             line_color=None,
+                            name='hist_y_all',
                            )
-    hist_figs['right'].x_range = bokeh.models.Range1d(start=0, end=max_count, bounds='auto')
-
+    
     hist_figs['right'].quad(top='bins_left', bottom='bins_right',
                             left='zero', right='y_selected',
                             source=histogram_source,
@@ -354,6 +380,10 @@ def scatter(df=None,
                             alpha=0.8,
                             line_color=None,
                            )
+    
+    hist_range_kwargs = dict(start=0, end=max_count, bounds='auto')
+    hist_figs['top'].y_range = bokeh.models.Range1d(**hist_range_kwargs)
+    hist_figs['right'].x_range = bokeh.models.Range1d(**hist_range_kwargs)
 
     for hist_fig in hist_figs.values():
         hist_fig.outline_line_color = None
