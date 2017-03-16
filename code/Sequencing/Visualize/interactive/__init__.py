@@ -347,40 +347,56 @@ def scatter(df=None,
     histogram_source.data['y_selected'] = initial_y_counts
 
     initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
-    hist_figs['top'].quad(left='bins_left', right='bins_right',
-                          bottom='zero', top='x_all',
-                          source=histogram_source,
-                          color='black',
-                          alpha=initial_hist_alpha,
-                          line_color=None,
-                          name='hist_x_all',
-                         )
+    quads = {}
+    quads['top_all'] = hist_figs['top'].quad(left='bins_left',
+                                             right='bins_right',
+                                             bottom='zero',
+                                             top='x_all',
+                                             source=histogram_source,
+                                             color='black',
+                                             alpha=initial_hist_alpha,
+                                             line_color=None,
+                                             name='hist_x_all',
+                                            )
 
-    hist_figs['top'].quad(left='bins_left', right='bins_right',
-                          bottom='zero', top='x_selected',
-                          source=histogram_source,
-                          color='orange',
-                          alpha=0.8,
-                          line_color=None,
-                         )
+    quads['top_selected'] = hist_figs['top'].quad(left='bins_left',
+                                                  right='bins_right',
+                                                  bottom='zero',
+                                                  top='x_selected',
+                                                  source=histogram_source,
+                                                  color='orange',
+                                                  alpha=0.8,
+                                                  line_color=None,
+                                                 )
 
-    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
-                            left='zero', right='y_all',
-                            source=histogram_source,
-                            color='black',
-                            alpha=initial_hist_alpha,
-                            line_color=None,
-                            name='hist_y_all',
-                           )
-    
-    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
-                            left='zero', right='y_selected',
-                            source=histogram_source,
-                            color='orange',
-                            alpha=0.8,
-                            line_color=None,
-                           )
-    
+    quads['right_all'] = hist_figs['right'].quad(top='bins_left',
+                                                 bottom='bins_right',
+                                                 left='zero',
+                                                 right='y_all',
+                                                 source=histogram_source,
+                                                 color='black',
+                                                 alpha=initial_hist_alpha,
+                                                 line_color=None,
+                                                 name='hist_y_all',
+                                                )
+
+    quads['right_selected'] = hist_figs['right'].quad(top='bins_left',
+                                                      bottom='bins_right',
+                                                      left='zero',
+                                                      right='y_selected',
+                                                      source=histogram_source,
+                                                      color='orange',
+                                                      alpha=0.8,
+                                                      line_color=None,
+                                                     )
+
+    # Poorly-understood bokeh behavior causes selection changes to sometimes
+    # be broadcast to histogram_source. To prevent this from having any visual
+    # effect, remove any difference in selection/nonselection glyphs.
+    for quad in quads.values():
+        quad.selection_glyph = quad.glyph
+        quad.nonselection_glyph = quad.glyph
+
     hist_range_kwargs = dict(start=0, end=max_count, bounds='auto')
     hist_figs['top'].y_range = bokeh.models.Range1d(**hist_range_kwargs)
     hist_figs['right'].x_range = bokeh.models.Range1d(**hist_range_kwargs)
