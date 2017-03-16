@@ -45,6 +45,7 @@ def scatter(df=None,
             initial_selection=None,
             initial_xy_names=None,
             data_lims=None,
+            alpha_widget_type='slider',
             hide_widgets=None,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
@@ -87,6 +88,9 @@ def scatter(df=None,
 
             initial_xy_names: Tuple (x_name, y_name) of datasets to initially
                 display on x- and y-axes.
+
+            alpha_widget_type: Type of widget ('slider' or 'text') to control
+                scatter circle transparency.
 
             hide_widgets: List of widgets to not display. Possible options are
                 ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
@@ -347,40 +351,56 @@ def scatter(df=None,
     histogram_source.data['y_selected'] = initial_y_counts
 
     initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
-    hist_figs['top'].quad(left='bins_left', right='bins_right',
-                          bottom='zero', top='x_all',
-                          source=histogram_source,
-                          color='black',
-                          alpha=initial_hist_alpha,
-                          line_color=None,
-                          name='hist_x_all',
-                         )
+    quads = {}
+    quads['top_all'] = hist_figs['top'].quad(left='bins_left',
+                                             right='bins_right',
+                                             bottom='zero',
+                                             top='x_all',
+                                             source=histogram_source,
+                                             color='black',
+                                             alpha=initial_hist_alpha,
+                                             line_color=None,
+                                             name='hist_x_all',
+                                            )
 
-    hist_figs['top'].quad(left='bins_left', right='bins_right',
-                          bottom='zero', top='x_selected',
-                          source=histogram_source,
-                          color='orange',
-                          alpha=0.8,
-                          line_color=None,
-                         )
+    quads['top_selected'] = hist_figs['top'].quad(left='bins_left',
+                                                  right='bins_right',
+                                                  bottom='zero',
+                                                  top='x_selected',
+                                                  source=histogram_source,
+                                                  color='orange',
+                                                  alpha=0.8,
+                                                  line_color=None,
+                                                 )
 
-    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
-                            left='zero', right='y_all',
-                            source=histogram_source,
-                            color='black',
-                            alpha=initial_hist_alpha,
-                            line_color=None,
-                            name='hist_y_all',
-                           )
-    
-    hist_figs['right'].quad(top='bins_left', bottom='bins_right',
-                            left='zero', right='y_selected',
-                            source=histogram_source,
-                            color='orange',
-                            alpha=0.8,
-                            line_color=None,
-                           )
-    
+    quads['right_all'] = hist_figs['right'].quad(top='bins_left',
+                                                 bottom='bins_right',
+                                                 left='zero',
+                                                 right='y_all',
+                                                 source=histogram_source,
+                                                 color='black',
+                                                 alpha=initial_hist_alpha,
+                                                 line_color=None,
+                                                 name='hist_y_all',
+                                                )
+
+    quads['right_selected'] = hist_figs['right'].quad(top='bins_left',
+                                                      bottom='bins_right',
+                                                      left='zero',
+                                                      right='y_selected',
+                                                      source=histogram_source,
+                                                      color='orange',
+                                                      alpha=0.8,
+                                                      line_color=None,
+                                                     )
+
+    # Poorly-understood bokeh behavior causes selection changes to sometimes
+    # be broadcast to histogram_source. To prevent this from having any visual
+    # effect, remove any difference in selection/nonselection glyphs.
+    for quad in quads.values():
+        quad.selection_glyph = quad.glyph
+        quad.nonselection_glyph = quad.glyph
+
     hist_range_kwargs = dict(start=0, end=max_count, bounds='auto')
     hist_figs['top'].y_range = bokeh.models.Range1d(**hist_range_kwargs)
     hist_figs['right'].x_range = bokeh.models.Range1d(**hist_range_kwargs)
@@ -616,14 +636,20 @@ def scatter(df=None,
                                                  format_kwargs=dict(column_names=str(table_col_names)),
                                                 )
 
-    alpha_slider = bokeh.models.Slider(start=0.,
-                                       end=1.,
-                                       value=0.5,
-                                       step=.05,
-                                       title='alpha',
-                                       name='alpha',
-                                      )
-    alpha_slider.callback = build_callback('scatter_alpha')
+    if alpha_widget_type == 'slider':
+        alpha_widget = bokeh.models.Slider(start=0.,
+                                           end=1.,
+                                           value=0.5,
+                                           step=.05,
+                                           title='alpha',
+                                           name='alpha',
+                                          )
+    elif alpha_widget_type == 'text':
+        alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value='0.5')
+    else:
+        raise ValueError('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
+
+    alpha_widget.callback = build_callback('scatter_alpha')
     
     size_slider = bokeh.models.Slider(start=1,
                                       end=20.,
@@ -640,7 +666,7 @@ def scatter(df=None,
         label_button,
         zoom_to_data_button,
         grid_options,
-        alpha_slider,
+        alpha_widget,
         size_slider,
         text_input,
         case_sensitive,
