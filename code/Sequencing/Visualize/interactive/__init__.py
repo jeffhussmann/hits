@@ -144,6 +144,8 @@ def scatter(df=None,
 
     bool_cols = [n for n in df.columns if df[n].dtype is np.dtype('bool')]
 
+    subset_indices = {n: [i for i, v in df[n].iteritems() if v] for n in bool_cols}
+
     # Set up the actual scatter plot.
     
     tools = [
@@ -461,7 +463,9 @@ def scatter(df=None,
     # Callback to filter the table when selection changes.
     scatter_source.callback = build_callback('scatter_selection',
                                              js=True,
-                                             format_kwargs=dict(bins=str(bins)),
+                                             format_kwargs=dict(bins=str(bins),
+                                                                subset_indices=str(subset_indices),
+                                                               ),
                                             )
     
     # Label selected points with their index.
@@ -625,7 +629,9 @@ def scatter(df=None,
                                               value='',
                                               name='subset_menu',
                                              )
-    subset_menu.callback = build_callback('scatter_subset_menu')
+    subset_menu.callback = build_callback('scatter_subset_menu',
+                                          format_kwargs=dict(subset_indices=str(subset_indices)),
+                                         )
 
     # Button to dump table to file.
     save_button = bokeh.models.widgets.Button(label='Save table to file',
@@ -633,8 +639,8 @@ def scatter(df=None,
                                               name='save_button',
                                              )
     save_button.callback = build_callback('scatter_save_button',
-                                                 format_kwargs=dict(column_names=str(table_col_names)),
-                                                )
+                                          format_kwargs=dict(column_names=str(table_col_names)),
+                                         )
 
     if alpha_widget_type == 'slider':
         alpha_widget = bokeh.models.Slider(start=0.,
