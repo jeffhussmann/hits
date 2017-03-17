@@ -1,4 +1,4 @@
-var filtered_data, full_data, i, indices, key, models, values;
+var filtered_data, full_data, i, indices, key, models, values, matches_subset;
 
 models = cb_obj.document._all_models_by_name._dict;
 
@@ -7,6 +7,21 @@ full_data = models['scatter_source'].data;
 filtered_data = models['labels_source'].data;
 
 indices = cb_obj.selected['1d'].indices;
+
+subset_indices = {subset_indices}
+
+matches_subset = false;
+
+for (key in subset_indices) {{
+    if (_.isEqual(indices, subset_indices[key])) {{
+        models['subset_menu'].value = key;
+        matches_subset = true;
+    }}
+}}
+
+if (matches_subset == false) {{
+    models['subset_menu'].value = '';
+}}
 
 for (key in full_data) {{
   values = full_data[key];
