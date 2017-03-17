@@ -144,7 +144,7 @@ def scatter(df=None,
 
     bool_cols = [n for n in df.columns if df[n].dtype is np.dtype('bool')]
 
-    subset_indices = {n: [i for i, v in df[n].iteritems() if v] for n in bool_cols}
+    subset_indices = {n: [i for i, v in enumerate(df[n]) if v] for n in bool_cols}
 
     # Set up the actual scatter plot.
     
