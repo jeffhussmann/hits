@@ -463,9 +463,7 @@ def scatter(df=None,
     # Callback to filter the table when selection changes.
     scatter_source.callback = build_callback('scatter_selection',
                                              js=True,
-                                             format_kwargs=dict(bins=str(bins),
-                                                                subset_indices=str(subset_indices),
-                                                               ),
+                                             format_kwargs=dict(bins=str(bins)),
                                             )
     
     # Label selected points with their index.
