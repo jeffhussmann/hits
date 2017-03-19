@@ -462,7 +462,6 @@ def scatter(df=None,
     
     # Callback to filter the table when selection changes.
     scatter_source.callback = build_callback('scatter_selection',
-                                             js=True,
                                              format_kwargs=dict(bins=str(bins)),
                                             )
     
