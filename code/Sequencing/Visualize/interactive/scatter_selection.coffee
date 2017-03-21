@@ -14,7 +14,7 @@ indices = cb_obj.selected['1d'].indices
 
 # Make the histograms of all data slightly darker if nothing is selected. 
 if indices.length == 0
-    models['hist_x_all'].glyph.fill_alpha = 0.3
+    models['hist_x_all'].glyph.fill_alpha = 0.2
     models['hist_y_all'].glyph.fill_alpha = 0.2
 else
     models['hist_x_all'].glyph.fill_alpha = 0.1
