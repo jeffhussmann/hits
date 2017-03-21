@@ -3,10 +3,11 @@ models = cb_obj.document._all_models_by_name._dict
 # cb_data is used to flag if this callback was triggered manually by
 # the search button or subset menu callback's. If not, reset the values of those
 # widgets.
-if cb_data != 'from_search'
+
+if (models['search']?) and cb_data != 'from_search'
     models['search'].value = ''
 
-if cb_data != 'from_subset'
+if (models['subset_menu']?) and cb_data != 'from_subset'
     models['subset_menu'].value = ''
 
 indices = cb_obj.selected['1d'].indices
