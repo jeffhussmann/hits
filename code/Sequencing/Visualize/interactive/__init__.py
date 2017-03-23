@@ -49,6 +49,7 @@ def scatter(df=None,
             hide_widgets=None,
             identical_bins=True,
             num_bins=100,
+            label_by=None,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -495,9 +496,12 @@ def scatter(df=None,
     scatter_source.callback = build_callback('scatter_selection')
     
     # Label selected points with their index.
+    if label_by is None:
+        label_by = df.index.name
+
     labels = bokeh.models.LabelSet(x='x',
                                    y='y',
-                                   text=df.index.name,
+                                   text=label_by,
                                    level='glyph',
                                    x_offset=0,
                                    y_offset=2,
