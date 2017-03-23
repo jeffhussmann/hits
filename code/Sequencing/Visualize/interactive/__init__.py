@@ -3,7 +3,6 @@ import bokeh
 import bokeh.io
 import bokeh.plotting
 import pandas as pd
-import scipy.stats
 import matplotlib.colors
 import matplotlib.cm
 import os.path
@@ -529,9 +528,10 @@ def scatter(df=None,
             'color': [],
         }
 
+        correlations = df.corr()
         for y, row in enumerate(numerical_cols):
             for x, col in enumerate(numerical_cols):
-                r, p = scipy.stats.pearsonr(df[row], df[col])
+                r = correlations[row][col]
                 data['r'].append(r)
                 data['x'].append(x)
                 data['x_name'].append(col)
