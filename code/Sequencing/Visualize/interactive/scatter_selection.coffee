@@ -31,12 +31,15 @@ if (models['table']?)
 
 models['labels_source'].trigger('change')
 
-bins = {bins}
-bounds = [bins[0], bins[bins.length - 1]]
+get_bins = (name) ->
+    bins_left = models['histogram_source'].data[name + '_bins_left']
+    bins_right = models['histogram_source'].data[name + '_bins_right']
+    # slice() to make copy
+    bins = bins_left.slice()
+    bins.push(bins_right[bins_right.length - 1])
+    return bins
 
 binned_to_counts = (binned) -> (b.length for b in binned)
-xs = filtered_data['x']
-ys = filtered_data['y']
 
 `
 requirejs.config({{
@@ -46,20 +49,18 @@ requirejs.config({{
 }});
 
 requirejs(["d3"], function(d3) {{
-    var histogram, data_to_counts, binned, xs_counts, ys_counts
+    var bins, bounds, binner, data, binned, counts 
 
-    histogram = d3.histogram().domain(bounds).thresholds(bins);
-
-    data_to_counts = function(data) {{
-        binned = histogram(data);
-        return binned_to_counts(binned);
+    for (name of ['x', 'y']) {{
+        bins = get_bins(name);
+        bounds = [bins[0], bins[bins.length - 1]];
+        binner = d3.histogram().domain(bounds).thresholds(bins);
+        data = filtered_data[name];
+        binned = binner(data);
+        counts = binned_to_counts(binned);
+        models['histogram_source'].data[name + '_selected'] = counts;
     }};
 
-    xs_counts = data_to_counts(xs);
-    ys_counts = data_to_counts(ys);
-
-    models['histogram_source'].data['x_selected'] = xs_counts;
-    models['histogram_source'].data['y_selected'] = ys_counts;
     models['histogram_source'].trigger('change');
 }});
 `

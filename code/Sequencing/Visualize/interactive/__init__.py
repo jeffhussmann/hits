@@ -47,6 +47,8 @@ def scatter(df=None,
             data_lims=None,
             alpha_widget_type='slider',
             hide_widgets=None,
+            identical_bins=True,
+            num_bins=100,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -95,6 +97,12 @@ def scatter(df=None,
             hide_widgets: List of widgets to not display. Possible options are
                 ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
                  'grid_radio_buttons'].
+
+            identical_bins: If True, use the same set of bins for histograms of
+                all data sets. If False, use bins tailored to the range of each
+                data set.
+
+            num_bins: Number of bins to use for marginal histograms.
     '''
 
     if hover_keys is None:
@@ -233,26 +241,45 @@ def scatter(df=None,
 
         overall_max = nonzero.max(numeric_only=True).max()
         overall_min = nonzero.min(numeric_only=True).min()
+        
+        initial = (overall_min * 0.1, overall_max * 10)
+        bounds = (overall_min * 0.001, overall_max * 1000)
     
         def log(x):
             return np.log(x) / np.log(log_scale)
 
-        bins = list(np.logspace(log(overall_min), log(overall_max), 100))
+        bins = {}
+        for name in numerical_cols:
+            if identical_bins:
+                left = overall_min
+                right = overall_max
+            else:
+                left = nonzero[name].min()
+                right = nonzero[name].max()
 
-        initial = (overall_min * 0.1, overall_max * 10)
-        bounds = (overall_min * 0.001, overall_max * 1000)
+            bins[name] = list(np.logspace(log(left), log(right), num_bins))
+
     else:
         overall_max = df.max(numeric_only=True).max()
         overall_min = df.min(numeric_only=True).min()
         
-        bins = list(np.linspace(overall_min, overall_max, 100))
-
         extent = overall_max - overall_min
         overhang = extent * 0.05
         max_overhang = extent * 0.5
 
         initial = (overall_min - overhang, overall_max + overhang)
         bounds = (overall_min - max_overhang, overall_max + max_overhang)
+        
+        bins = {}
+        for name in numerical_cols:
+            if identical_bins:
+                left = overall_min
+                right = overall_max
+            else:
+                left = df[name].min()
+                right = df[name].max()
+
+            bins[name] = list(np.linspace(left, right, num_bins))
 
     if data_lims is not None:
         initial = data_lims
@@ -314,16 +341,20 @@ def scatter(df=None,
 
     histogram_source = bokeh.models.ColumnDataSource(name='histogram_source')
     histogram_source.data = {
-        'bins_left': bins[:-1],
-        'bins_right': bins[1:],
-        'zero': [0]*(len(bins) - 1),
+        'zero': [0]*(num_bins - 1),
     }
+
+    for name in numerical_cols:
+        histogram_source.data.update({
+            '{0}_bins_left'.format(name): bins[name][:-1],
+            '{0}_bins_right'.format(name): bins[name][1:],
+        })
 
     max_count = 0
     for name in numerical_cols:
-        counts, _ = np.histogram(scatter_source.data[name], bins=bins)
+        counts, _ = np.histogram(scatter_source.data[name], bins=bins[name])
         max_count = max(max(counts), max_count)
-        histogram_source.data[name] = list(counts)
+        histogram_source.data['{0}_all'.format(name)] = list(counts)
 
     if log_scale:
         axis_type = 'log'
@@ -341,21 +372,21 @@ def scatter(df=None,
                                       ),
     }
 
-    initial_xs = df[x_name].iloc[initial_indices]
-    initial_x_counts, _ = np.histogram(initial_xs, bins)
-    
-    initial_ys = df[y_name].iloc[initial_indices]
-    initial_y_counts, _ = np.histogram(initial_ys, bins)
+    for axis, name in [('x', x_name), ('y', y_name)]:
+        for data_type in ['all', 'bins_left', 'bins_right']:
+            left_key = '{0}_{1}'.format(axis, data_type)
+            right_key = '{0}_{1}'.format(name, data_type)
+            histogram_source.data[left_key] = histogram_source.data[right_key]
 
-    histogram_source.data['x_all'] = histogram_source.data[x_name]
-    histogram_source.data['y_all'] = histogram_source.data[y_name]
-    histogram_source.data['x_selected'] = initial_x_counts
-    histogram_source.data['y_selected'] = initial_y_counts
+        initial_vals = df[name].iloc[initial_indices]
+        initial_counts, _ = np.histogram(initial_vals, bins[name])
+    
+        histogram_source.data['{0}_selected'.format(axis)] = initial_counts
 
     initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
     quads = {}
-    quads['top_all'] = hist_figs['top'].quad(left='bins_left',
-                                             right='bins_right',
+    quads['top_all'] = hist_figs['top'].quad(left='x_bins_left',
+                                             right='x_bins_right',
                                              bottom='zero',
                                              top='x_all',
                                              source=histogram_source,
@@ -365,8 +396,8 @@ def scatter(df=None,
                                              name='hist_x_all',
                                             )
 
-    quads['top_selected'] = hist_figs['top'].quad(left='bins_left',
-                                                  right='bins_right',
+    quads['top_selected'] = hist_figs['top'].quad(left='x_bins_left',
+                                                  right='x_bins_right',
                                                   bottom='zero',
                                                   top='x_selected',
                                                   source=histogram_source,
@@ -375,8 +406,8 @@ def scatter(df=None,
                                                   line_color=None,
                                                  )
 
-    quads['right_all'] = hist_figs['right'].quad(top='bins_left',
-                                                 bottom='bins_right',
+    quads['right_all'] = hist_figs['right'].quad(top='y_bins_left',
+                                                 bottom='y_bins_right',
                                                  left='zero',
                                                  right='y_all',
                                                  source=histogram_source,
@@ -386,8 +417,8 @@ def scatter(df=None,
                                                  name='hist_y_all',
                                                 )
 
-    quads['right_selected'] = hist_figs['right'].quad(top='bins_left',
-                                                      bottom='bins_right',
+    quads['right_selected'] = hist_figs['right'].quad(top='y_bins_left',
+                                                      bottom='y_bins_right',
                                                       left='zero',
                                                       right='y_selected',
                                                       source=histogram_source,
@@ -461,9 +492,7 @@ def scatter(df=None,
                                           )
     
     # Callback to filter the table when selection changes.
-    scatter_source.callback = build_callback('scatter_selection',
-                                             format_kwargs=dict(bins=str(bins)),
-                                            )
+    scatter_source.callback = build_callback('scatter_selection')
     
     # Label selected points with their index.
     labels = bokeh.models.LabelSet(x='x',

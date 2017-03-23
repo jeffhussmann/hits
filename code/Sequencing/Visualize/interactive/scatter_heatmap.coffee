@@ -20,20 +20,18 @@ else
     index = cb_obj.selected['1d'].indices[num_selected - 1]
 
 cb_obj.selected['1d'].indices = [index]
-x_name = cb_obj.data['x_name'][index]
-y_name = cb_obj.data['y_name'][index]
 
-scatter_data.x = scatter_data[x_name]
-scatter_data.y = scatter_data[y_name]
 
-label_data.x = label_data[x_name]
-label_data.y = label_data[y_name]
+for axis in ['x', 'y']
+    name = cb_obj.data[axis + '_name'][index]
 
-hist_data['x_all'] = hist_data[x_name]
-hist_data['y_all'] = hist_data[y_name]
+    scatter_data[axis] = scatter_data[name]
+    label_data[axis] = label_data[name]
 
-models['x_axis'].axis_label = x_name
-models['y_axis'].axis_label = y_name
+    for suffix in ['_all', '_bins_left', '_bins_right']
+        hist_data[axis + suffix] = hist_data[name + suffix]
+    
+    models[axis + '_axis'].axis_label = name
 
 # Call to recompute selection histograms.
 models['scatter_source'].callback.func(models['scatter_source'])

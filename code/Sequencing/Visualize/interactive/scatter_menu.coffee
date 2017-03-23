@@ -11,20 +11,16 @@ squeeze = (possibly_array) ->
         squeezed = possibly_array
     return squeezed
 
-x_name = squeeze models['x_menu'].value
-y_name = squeeze models['y_menu'].value
+for axis in ['x', 'y']
+    name = squeeze models[axis + '_menu'].value
 
-scatter_data.x = scatter_data[x_name]
-scatter_data.y = scatter_data[y_name]
+    scatter_data[axis] = scatter_data[name]
+    label_data[axis] = label_data[name]
 
-label_data.x = label_data[x_name]
-label_data.y = label_data[y_name]
+    for suffix in ['_all', '_bins_left', '_bins_right']
+        hist_data[axis + suffix] = hist_data[name + suffix]
 
-hist_data['x_all'] = hist_data[x_name]
-hist_data['y_all'] = hist_data[y_name]
-
-models['x_axis'].axis_label = x_name
-models['y_axis'].axis_label = y_name
+    models[axis + '_axis'].axis_label = name
 
 # Call to recompute selection histograms.
 models['scatter_source'].callback.func(models['scatter_source'])
