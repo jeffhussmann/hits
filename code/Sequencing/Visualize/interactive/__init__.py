@@ -86,7 +86,7 @@ def scatter(df=None,
 
             axis_label_size: Size of the font used for axis labels.
 
-            intiial_selection: Names of index value to initially highlight.
+            initial_selection: Names of index value to initially highlight.
 
             initial_xy_names: Tuple (x_name, y_name) of datasets to initially
                 display on x- and y-axes.
