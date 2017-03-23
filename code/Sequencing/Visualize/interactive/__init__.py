@@ -352,7 +352,7 @@ def scatter(df=None,
 
     max_count = 0
     for name in numerical_cols:
-        counts, _ = np.histogram(scatter_source.data[name], bins=bins[name])
+        counts, _ = np.histogram(df[name].dropna(), bins=bins[name])
         max_count = max(max(counts), max_count)
         histogram_source.data['{0}_all'.format(name)] = list(counts)
 
@@ -379,7 +379,7 @@ def scatter(df=None,
             histogram_source.data[left_key] = histogram_source.data[right_key]
 
         initial_vals = df[name].iloc[initial_indices]
-        initial_counts, _ = np.histogram(initial_vals, bins[name])
+        initial_counts, _ = np.histogram(initial_vals.dropna(), bins[name])
     
         histogram_source.data['{0}_selected'.format(axis)] = initial_counts
 
