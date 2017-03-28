@@ -34,6 +34,8 @@ def build_selected(indices):
 def scatter(df=None,
             hover_keys=None,
             table_keys=None,
+            color_by=None,
+            label_by=None,
             size=800,
             axis_label_size=20,
             log_scale=False,
@@ -48,7 +50,6 @@ def scatter(df=None,
             hide_widgets=None,
             identical_bins=True,
             num_bins=100,
-            label_by=None,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -56,7 +57,6 @@ def scatter(df=None,
     Args:
             df: A pandas DataFrame with columns containing numerical data to
                 plot. 
-                If 'color' is a column, it will be used to color the points. 
                 Index values will be used as labels for points.
                 Any text columns will be searchable through the 'Search:' field.
                 Any boolean columns will be used to define subsets of points for
@@ -68,6 +68,13 @@ def scatter(df=None,
 
             table_keys: Names of columns in df to display in the table below the
                 plot that is populated with the selected points from the figure.
+
+            color_by: The name of a column in df to use as colors of points, or
+                a list of such names to choose from a menu.
+            
+            label_by: The name of a column in df to use as labels of points, or
+                a list of such names to choose from a menu. If None, df.index
+                is used.
 
             size: Size of the plot in pixels.
 
@@ -216,9 +223,34 @@ def scatter(df=None,
     
     scatter_source.data['index'] = list(df.index)
 
-    scatter_source.data['no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
-    if 'color' not in scatter_source.data:
-        scatter_source.data['color'] = scatter_source.data['no_color']
+    scatter_source.data['_no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
+    
+    if color_by is None:
+        color_by = '_no_color'
+        show_color_by_menu = False
+    else:
+        show_color_by_menu = True
+
+    if isinstance(color_by, basestring):
+        color_options = ['', color_by]
+    else:
+        show_color_by_menu = True
+        color_options = [''] + list(color_by)
+    
+    scatter_source.data['_color'] = scatter_source.data[color_options[1]]
+    
+    if label_by is None:
+        label_by = df.index.name
+
+    if isinstance(label_by, basestring):
+        show_label_by_menu = False
+        label_options = [label_by]
+    else:
+        show_label_by_menu = True
+        label_options = list(label_by)
+    
+    scatter_source.data['_label'] = scatter_source.data[label_options[0]]
+
 
     scatter_source.selected = build_selected(initial_indices)
 
@@ -226,10 +258,10 @@ def scatter(df=None,
                           'y',
                           source=scatter_source,
                           size=marker_size,
-                          fill_color='color',
+                          fill_color='_color',
                           fill_alpha=0.5,
                           line_color=None,
-                          nonselection_color='color',
+                          nonselection_color='_color',
                           nonselection_alpha=0.1,
                           selection_color='color',
                           selection_alpha=0.9,
@@ -480,6 +512,7 @@ def scatter(df=None,
     filtered_data = {k: [scatter_source.data[k][i] for i in initial_indices]
                      for k in scatter_source.data
                     }
+    
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data, name='labels_source')
     
     table = bokeh.models.widgets.DataTable(source=filtered_source,
@@ -494,13 +527,9 @@ def scatter(df=None,
     # Callback to filter the table when selection changes.
     scatter_source.callback = build_callback('scatter_selection')
     
-    # Label selected points with their index.
-    if label_by is None:
-        label_by = df.index.name
-
     labels = bokeh.models.LabelSet(x='x',
                                    y='y',
-                                   text=label_by,
+                                   text='_label',
                                    level='glyph',
                                    x_offset=0,
                                    y_offset=2,
@@ -632,6 +661,23 @@ def scatter(df=None,
     zoom_to_data_button.callback = build_callback('scatter_zoom_to_data',
                                                   format_kwargs=dict(log_scale='true' if log_scale else 'false'),
                                                  )
+    
+    
+    # Menu to choose label source.
+    label_menu = bokeh.models.widgets.Select(title='Label by:',
+                                             options=label_options,
+                                             value=label_options[0],
+                                             name='label_menu',
+                                            )
+    label_menu.callback = build_callback('scatter_label')
+
+    # Menu to choose color source.
+    color_menu = bokeh.models.widgets.Select(title='Color by:',
+                                             options=color_options,
+                                             value=color_options[1],
+                                             name='color_menu',
+                                            )
+    color_menu.callback = build_callback('scatter_color')
 
     # Radio group to choose whether to draw a vertical/horizontal grid or
     # diagonal guide lines. 
@@ -701,6 +747,8 @@ def scatter(df=None,
     widgets = [
         label_button,
         zoom_to_data_button,
+        label_menu,
+        color_menu,
         grid_options,
         alpha_widget,
         size_slider,
@@ -711,11 +759,18 @@ def scatter(df=None,
     ]
 
     hide_widgets = set(hide_widgets)
+
     if 'table' in hide_widgets:
         hide_widgets.add('save_button')
 
     if 'search' in hide_widgets:
         hide_widgets.add('case_sensitive')
+
+    if not show_color_by_menu:
+        hide_widgets.add('color_menu')
+
+    if not show_label_by_menu:
+        hide_widgets.add('label_menu')
 
     if len(subset_options) == 1:
         hide_widgets.add('subset_menu')
