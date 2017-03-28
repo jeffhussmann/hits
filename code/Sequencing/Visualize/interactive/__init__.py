@@ -117,7 +117,7 @@ def scatter(df=None,
 
     if table_keys is None:
         table_keys = []
-    
+
     if hide_widgets is None:
         hide_widgets = []
 
@@ -616,6 +616,10 @@ def scatter(df=None,
             ax.major_label_text_font_size = '8pt'
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
+
+        # Turn off black lines on bottom and left.
+        for axis in (heatmap_fig.xaxis, heatmap_fig.yaxis):
+            axis.axis_line_color = None
 
         name_pairs = zip(heatmap_source.data['x_name'], heatmap_source.data['y_name'])
         initial_index = name_pairs.index((x_name, y_name))
