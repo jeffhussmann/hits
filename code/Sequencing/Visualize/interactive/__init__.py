@@ -41,7 +41,7 @@ def scatter(df=None,
             log_scale=False,
             volcano=False,
             heatmap=False,
-            grid=False,
+            grid='diagonal',
             marker_size=6,
             initial_selection=None,
             initial_xy_names=None,
@@ -84,7 +84,7 @@ def scatter(df=None,
                 numerical columns in df that can be clicked to select columns
                 to scatter.
 
-            grid: If True, defaults to grid instead of diagonal landmarks.
+            grid: Draw a 'grid', 'diagonal' lines, or 'nothing' as guide lines.
 
             volcano: If True, make some tweaks suitable for volcano plots.
 
@@ -122,7 +122,7 @@ def scatter(df=None,
         hide_widgets = []
 
     if volcano:
-        grid = True
+        grid = 'grid'
 
     if df is None:
         # Load example data.
@@ -133,7 +133,7 @@ def scatter(df=None,
         log_scale = True
         hover_keys = ['systematic_name', 'short_description']
         table_keys = ['systematic_name', 'description']
-        grid = False
+        grid = 'diagonal'
         heatmap = True
 
     # Infer column types.
@@ -199,7 +199,7 @@ def scatter(df=None,
             axis[0].ticker.base = log_scale
             axis[0].formatter.ticker = axis[0].ticker
 
-    fig.grid.visible = grid
+    fig.grid.visible = (grid == 'grid')
     fig.grid.name = 'grid'
     
     lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
@@ -317,7 +317,7 @@ def scatter(df=None,
         initial = data_lims
         bounds = data_lims
 
-    diagonals_visible = not grid # i.e. normally True
+    diagonals_visible = (grid == 'diagonal')
 
     fig.line(x=bounds, y=bounds,
              color='black',
@@ -685,16 +685,18 @@ def scatter(df=None,
 
     # Radio group to choose whether to draw a vertical/horizontal grid or
     # diagonal guide lines. 
-    grid_options = bokeh.models.widgets.RadioGroup(labels=['grid', 'diagonal'],
-                                                   active=1 if not grid else 0,
+    options = ['grid', 'diagonal', 'none']
+    active = options.index(grid)
+    grid_options = bokeh.models.widgets.RadioGroup(labels=options,
+                                                   active=active,
                                                    name='grid_radio_buttons',
                                                   )
     grid_options.callback = build_callback('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
     text_input.callback = build_callback('scatter_search',
-                                                format_kwargs=dict(column_names=str(object_cols)),
-                                               )
+                                         format_kwargs=dict(column_names=str(object_cols)),
+                                        )
 
     case_sensitive = bokeh.models.widgets.CheckboxGroup(labels=['Case sensitive'],
                                                         active=[],
