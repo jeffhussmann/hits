@@ -136,8 +136,13 @@ def scatter(df=None,
         grid = 'diagonal'
         heatmap = True
 
+    # Copy before changing
+    df = df.copy()
+
+    # Collapse multiindex if present
+    df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
+
     # Infer column types.
-    
     scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
 
     if 'index' in scatter_source.data:
