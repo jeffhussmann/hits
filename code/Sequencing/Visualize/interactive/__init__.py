@@ -48,7 +48,7 @@ def scatter(df=None,
             data_lims=None,
             alpha_widget_type='slider',
             hide_widgets=None,
-            identical_bins=True,
+            identical_bins=False,
             num_bins=100,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
@@ -106,7 +106,7 @@ def scatter(df=None,
                  'grid_radio_buttons'].
 
             identical_bins: If True, use the same set of bins for histograms of
-                all data sets. If False, use bins tailored to the range of each
+                all data sets. If False, use bins specific to the range of each
                 data set.
 
             num_bins: Number of bins to use for marginal histograms.
@@ -135,6 +135,7 @@ def scatter(df=None,
         table_keys = ['systematic_name', 'description']
         grid = 'diagonal'
         heatmap = True
+        identical_bins = True
 
     # Copy before changing
     df = df.copy()
@@ -399,14 +400,16 @@ def scatter(df=None,
         axis_type = 'linear'
 
     hist_figs = {
-        'top': bokeh.plotting.figure(width=size, height=100,
-                                     x_range=fig.x_range,
-                                     x_axis_type=axis_type,
-                                    ),
-        'right': bokeh.plotting.figure(width=100, height=size,
-                                       y_range=fig.y_range,
-                                       y_axis_type=axis_type,
-                                      ),
+        'x': bokeh.plotting.figure(width=size, height=100,
+                                   x_range=fig.x_range,
+                                   x_axis_type=axis_type,
+                                   name='hists_x',
+                                  ),
+        'y': bokeh.plotting.figure(width=100, height=size,
+                                   y_range=fig.y_range,
+                                   y_axis_type=axis_type,
+                                   name='hists_y',
+                                  ),
     }
 
     for axis, name in [('x', x_name), ('y', y_name)]:
@@ -422,47 +425,47 @@ def scatter(df=None,
 
     initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
     quads = {}
-    quads['top_all'] = hist_figs['top'].quad(left='x_bins_left',
-                                             right='x_bins_right',
-                                             bottom='zero',
-                                             top='x_all',
-                                             source=histogram_source,
-                                             color='black',
-                                             alpha=initial_hist_alpha,
-                                             line_color=None,
-                                             name='hist_x_all',
-                                            )
+    quads['x_all'] = hist_figs['x'].quad(left='x_bins_left',
+                                         right='x_bins_right',
+                                         bottom='zero',
+                                         top='x_all',
+                                         source=histogram_source,
+                                         color='black',
+                                         alpha=initial_hist_alpha,
+                                         line_color=None,
+                                         name='hist_x_all',
+                                        )
 
-    quads['top_selected'] = hist_figs['top'].quad(left='x_bins_left',
-                                                  right='x_bins_right',
-                                                  bottom='zero',
-                                                  top='x_selected',
-                                                  source=histogram_source,
-                                                  color='orange',
-                                                  alpha=0.8,
-                                                  line_color=None,
-                                                 )
+    quads['x_selected'] = hist_figs['x'].quad(left='x_bins_left',
+                                              right='x_bins_right',
+                                              bottom='zero',
+                                              top='x_selected',
+                                              source=histogram_source,
+                                              color='orange',
+                                              alpha=0.8,
+                                              line_color=None,
+                                             )
 
-    quads['right_all'] = hist_figs['right'].quad(top='y_bins_left',
-                                                 bottom='y_bins_right',
-                                                 left='zero',
-                                                 right='y_all',
-                                                 source=histogram_source,
-                                                 color='black',
-                                                 alpha=initial_hist_alpha,
-                                                 line_color=None,
-                                                 name='hist_y_all',
-                                                )
+    quads['y_all'] = hist_figs['y'].quad(top='y_bins_left',
+                                         bottom='y_bins_right',
+                                         left='zero',
+                                         right='y_all',
+                                         source=histogram_source,
+                                         color='black',
+                                         alpha=initial_hist_alpha,
+                                         line_color=None,
+                                         name='hist_y_all',
+                                        )
 
-    quads['right_selected'] = hist_figs['right'].quad(top='y_bins_left',
-                                                      bottom='y_bins_right',
-                                                      left='zero',
-                                                      right='y_selected',
-                                                      source=histogram_source,
-                                                      color='orange',
-                                                      alpha=0.8,
-                                                      line_color=None,
-                                                     )
+    quads['y_selected'] = hist_figs['y'].quad(top='y_bins_left',
+                                              bottom='y_bins_right',
+                                              left='zero',
+                                              right='y_selected',
+                                              source=histogram_source,
+                                              color='orange',
+                                              alpha=0.8,
+                                              line_color=None,
+                                             )
 
     # Poorly-understood bokeh behavior causes selection changes to sometimes
     # be broadcast to histogram_source. To prevent this from having any visual
@@ -471,9 +474,9 @@ def scatter(df=None,
         quad.selection_glyph = quad.glyph
         quad.nonselection_glyph = quad.glyph
 
-    hist_range_kwargs = dict(start=0, end=max_count, bounds='auto')
-    hist_figs['top'].y_range = bokeh.models.Range1d(**hist_range_kwargs)
-    hist_figs['right'].x_range = bokeh.models.Range1d(**hist_range_kwargs)
+    common = dict(start=0, end=max_count, bounds='auto')
+    hist_figs['x'].y_range = bokeh.models.Range1d(name='hist_x_range', **common)
+    hist_figs['y'].x_range = bokeh.models.Range1d(name='hist_y_range', **common)
 
     for hist_fig in hist_figs.values():
         hist_fig.outline_line_color = None
@@ -667,11 +670,16 @@ def scatter(df=None,
                                                       width=50,
                                                       name='zoom_button',
                                                      )
+    def bool_to_js(b):
+        return 'true' if b else 'false'
+
+    format_kwargs = dict(log_scale=bool_to_js(log_scale),
+                         identical_bins=bool_to_js(identical_bins),
+                        )
     zoom_to_data_button.callback = build_callback('scatter_zoom_to_data',
-                                                  format_kwargs=dict(log_scale='true' if log_scale else 'false'),
+                                                  format_kwargs=format_kwargs,
                                                  )
-    
-    
+
     # Menu to choose label source.
     label_menu = bokeh.models.widgets.Select(title='Label by:',
                                              options=label_options,
@@ -797,8 +805,8 @@ def scatter(df=None,
     toolbar.logo = None
 
     columns = [
-        bokeh.layouts.column(children=[hist_figs['top'], fig]),
-        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), hist_figs['right']]),
+        bokeh.layouts.column(children=[hist_figs['x'], fig]),
+        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), hist_figs['y']]),
         bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), toolbar]),
         bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
                                        widget_box,

@@ -1,41 +1,49 @@
 models = cb_obj.document._all_models_by_name._dict
 
 log_scale = {log_scale}
+identical_bins = {identical_bins}
 
 scatter_data = models['scatter_source'].data
-x_range = models['x_range']
-y_range = models['y_range']
+ranges = {{
+    'x': models['x_range'],
+    'y': models['y_range'],
+}}
 
 xs = scatter_data.x
 ys = scatter_data.y
 
-if log_scale
-    clean_xs = (x for x, i in xs when x isnt 0 and x isnt 'NaN' and ys[i] isnt 'NaN')
-else
-    clean_xs = (x for x, i in xs when x isnt 'NaN' and ys[i] isnt 'NaN')
-x_max = Math.max(clean_xs...)
-x_min = Math.min(clean_xs...)
+clean_xs = []
+clean_ys = []
 
 if log_scale
-    x_range.start = x_min / 2
-    x_range.end = x_max * 2
+    is_clean = (i) -> xs[i] isnt 0 and xs[i] isnt 'NaN' and ys[i] isnt 0 and ys[i] isnt 'NaN'
 else
-    x_buffer = (x_max - x_min) * 0.05
-    x_range.start = x_min - x_buffer
-    x_range.end = x_max + x_buffer
+    is_clean = (i) -> xs[i] isnt 'NaN' and ys[i] isnt 'NaN'
 
-if log_scale
-    clean_ys = (y for y, i in ys when y isnt 0 and y isnt 'NaN' and xs[i] isnt 'NaN')
-else
-    clean_ys = (y for y, i in ys when y isnt 'NaN' and xs[i] isnt 'NaN')
+for i in [0...xs.length]
+    if is_clean(i)
+        clean_xs.push(xs[i])
+        clean_ys.push(ys[i])
 
-y_max = Math.max(clean_ys...)
-y_min = Math.min(clean_ys...)
+clean_values = {{
+    'x': clean_xs,
+    'y': clean_ys,
+}}
 
-if log_scale
-    y_range.start = y_min / 2
-    y_range.end = y_max * 2
-else
-    y_buffer = (y_max - y_min) * 0.05
-    y_range.start = y_min - y_buffer
-    y_range.end = y_max + y_buffer
+for axis_name in ['x', 'y']
+    min = Math.min(clean_values[axis_name]...)
+    max = Math.max(clean_values[axis_name]...)
+    
+    if log_scale
+        ranges[axis_name].start = min / 2
+        ranges[axis_name].end = max * 2
+    else
+        buffer = (max - min) * 0.05
+        ranges[axis_name].start = min - buffer
+        ranges[axis_name].end = max + buffer
+
+    if not identical_bins
+        hist_counts = models['histogram_source'].data[axis_name + '_all']
+        hist_max = Math.max(hist_counts...)
+        hist_range = models['hist_' + axis_name + '_range']
+        hist_range.end = hist_max
