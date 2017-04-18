@@ -78,7 +78,7 @@ def scatter(df=None,
 
             size: Size of the plot in pixels.
 
-            marker_size: Size of the scatter circles.
+            marker_size: Size of the scatter circles. Can be a column name.
 
             heatmap: If True, displays a heatmap of correlations between
                 numerical columns in df that can be clicked to select columns
@@ -119,7 +119,9 @@ def scatter(df=None,
         table_keys = []
 
     if hide_widgets is None:
-        hide_widgets = []
+        hide_widgets = set()
+    else:
+        hide_widgets = set(hide_widgets)
 
     if volcano:
         grid = 'grid'
@@ -752,14 +754,23 @@ def scatter(df=None,
 
     alpha_widget.callback = build_callback('scatter_alpha')
     
-    size_slider = bokeh.models.Slider(start=1,
-                                      end=20.,
-                                      value=marker_size,
-                                      step=1,
-                                      title='marker size',
-                                      name='marker_size',
-                                      )
-    size_slider.callback = build_callback('scatter_size')
+    if isinstance(marker_size, basestring):
+        size_slider = bokeh.models.Slider(start=1,
+                                          end=20.,
+                                          value=0,
+                                          step=1,
+                                          title='marker size',
+                                          name='marker_size',
+                                          )
+        hide_widgets.add('marker_size')
+    else:
+        size_slider = bokeh.models.Slider(start=1,
+                                          end=20.,
+                                          value=marker_size,
+                                          step=1,
+                                          title='marker size',
+                                          name='marker_size',
+                                         )
 
     fig.min_border = 1
 
@@ -776,8 +787,6 @@ def scatter(df=None,
         subset_menu,
         save_button,
     ]
-
-    hide_widgets = set(hide_widgets)
 
     if 'table' in hide_widgets:
         hide_widgets.add('save_button')
