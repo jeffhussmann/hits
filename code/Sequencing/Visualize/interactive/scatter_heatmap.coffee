@@ -21,7 +21,6 @@ else
 
 cb_obj.selected['1d'].indices = [index]
 
-
 for axis in ['x', 'y']
     name = cb_obj.data[axis + '_name'][index]
 
@@ -34,7 +33,7 @@ for axis in ['x', 'y']
     models[axis + '_axis'].axis_label = name
 
 # Call to recompute selection histograms.
-models['scatter_source'].callback.func(models['scatter_source'])
+models['scatter_source'].callback.func(models['scatter_source'], cb_data, require, exports)
 
 models['scatter_source'].trigger('change')
 models['labels_source'].trigger('change')
