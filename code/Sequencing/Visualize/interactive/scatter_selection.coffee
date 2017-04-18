@@ -42,6 +42,10 @@ get_bins = (name) ->
 binned_to_counts = (binned) -> (b.length for b in binned)
 
 `
+if (!window.requirejs) {{
+    return
+}}
+
 requirejs.config({{
     paths: {{
         d3: "http://d3js.org/d3.v4.min"
