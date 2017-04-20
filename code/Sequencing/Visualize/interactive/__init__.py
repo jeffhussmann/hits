@@ -47,10 +47,12 @@ def scatter(df=None,
             initial_selection=None,
             initial_xy_names=None,
             data_lims=None,
+            zoom_to_initial_data=False,
             alpha_widget_type='slider',
             hide_widgets=None,
             identical_bins=False,
             num_bins=100,
+            return_layout=False,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -115,6 +117,12 @@ def scatter(df=None,
                 data set.
 
             num_bins: Number of bins to use for marginal histograms.
+
+            zoom_to_inital_data: If True, zoom to data limits of the initially
+                selected columns rather than global data limits..
+
+            return_layout: If True, return the final layout object to allowing
+                embedding.
     '''
 
     if hover_keys is None:
@@ -370,8 +378,15 @@ def scatter(df=None,
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
         fig.x_range = bokeh.models.Range1d(-1, 1)
     else:
-        fig.y_range = bokeh.models.Range1d(*initial)
-        fig.x_range = bokeh.models.Range1d(*initial)
+        if zoom_to_inital_data:
+            x_min, x_max = bins[x_name][0], bins[x_name][-1]
+            y_min, y_max = bins[y_name][0], bins[y_name][-1]
+        else:
+            x_min, x_max = initial
+            y_min, y_max = initial
+
+        fig.y_range = bokeh.models.Range1d(y_min, y_max)
+        fig.x_range = bokeh.models.Range1d(x_min, x_max)
 
     fig.x_range.name = 'x_range'
     fig.y_range.name = 'y_range'
@@ -843,9 +858,12 @@ def scatter(df=None,
     if 'table' not in hide_widgets:
         rows.append(table)
 
-    full = bokeh.layouts.column(children=rows)
+    full_layout = bokeh.layouts.column(children=rows)
 
-    bokeh.io.show(full)
+    bokeh.io.show(full_layout)
+
+    if return_layout:
+        return full_layout
 
 def hex_to_CSS(hex_string, alpha=1.):
     ''' Converts an RGB hex value and optional alpha value to a CSS-format RGBA string. '''
