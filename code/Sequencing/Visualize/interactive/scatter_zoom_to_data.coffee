@@ -4,10 +4,9 @@ log_scale = {log_scale}
 identical_bins = {identical_bins}
 
 scatter_data = models['scatter_source'].data
-ranges = {{
-    'x': models['x_range'],
-    'y': models['y_range'],
-}}
+ranges =
+    'x': models['x_range']
+    'y': models['y_range']
 
 xs = scatter_data.x
 ys = scatter_data.y
@@ -16,24 +15,25 @@ clean_xs = []
 clean_ys = []
 
 if log_scale
-    is_clean = (i) -> xs[i] isnt 0 and xs[i] isnt 'NaN' and ys[i] isnt 0 and ys[i] isnt 'NaN'
+    number_is_clean = (x) -> x isnt 0 and not Number.isNaN(x)
 else
-    is_clean = (i) -> xs[i] isnt 'NaN' and ys[i] isnt 'NaN'
+    number_is_clean = (x) -> not Number.isNaN(x)
+
+index_is_clean = (i) -> number_is_clean(xs[i]) and number_is_clean(ys[i])
 
 for i in [0...xs.length]
-    if is_clean(i)
+    if index_is_clean(i)
         clean_xs.push(xs[i])
         clean_ys.push(ys[i])
 
-clean_values = {{
-    'x': clean_xs,
-    'y': clean_ys,
-}}
+clean_values =
+    'x': clean_xs
+    'y': clean_ys
 
 for axis_name in ['x', 'y']
     min = Math.min(clean_values[axis_name]...)
     max = Math.max(clean_values[axis_name]...)
-    
+
     if log_scale
         ranges[axis_name].start = min / 2
         ranges[axis_name].end = max * 2
