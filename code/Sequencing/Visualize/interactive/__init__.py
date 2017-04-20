@@ -85,7 +85,9 @@ def scatter(df=None,
 
             size: Size of the plot in pixels.
 
-            marker_size: Size of the scatter circles. Can be a column name.
+            marker_size: Size of the scatter circles. Can be a scalar value, a
+                column name, or a list of column names to choose from via
+                dropdown menu.
 
             heatmap: If True, displays a heatmap of correlations between
                 numerical columns in df that can be clicked to select columns
@@ -278,6 +280,21 @@ def scatter(df=None,
     
     scatter_source.data['_label'] = scatter_source.data[label_options[0]]
 
+    if isinstance(marker_size, (int, long, float)):
+        show_marker_size_menu = False
+        size_widget_type = 'slider'
+    else:
+        if isinstance(marker_size, basestring):
+            size_options = ['', marker_size]
+        else:
+            size_options = [''] + list(marker_size)
+    
+        show_marker_size_menu = True
+        size_widget_type = 'menu'
+        marker_size = '_size'
+        scatter_source.data[marker_size] = scatter_source.data[size_options[1]]
+
+        scatter_source.data['_uniform_size'] = [6]*len(scatter_source.data[marker_size])
 
     scatter_source.selected = build_selected(initial_indices)
 
@@ -802,23 +819,23 @@ def scatter(df=None,
 
     alpha_widget.callback = build_callback('scatter_alpha')
     
-    if isinstance(marker_size, basestring):
-        size_slider = bokeh.models.Slider(start=1,
-                                          end=20.,
-                                          value=0,
-                                          step=1,
-                                          title='marker size',
-                                          name='marker_size',
-                                          )
-        hide_widgets.add('marker_size')
-    else:
-        size_slider = bokeh.models.Slider(start=1,
+    if size_widget_type == 'slider':
+        size_widget = bokeh.models.Slider(start=1,
                                           end=20.,
                                           value=marker_size,
                                           step=1,
                                           title='marker size',
                                           name='marker_size',
                                          )
+        size_widget.callback = build_callback('scatter_size')
+    else:
+        size_widget = bokeh.models.widgets.Select(title='Size by:',
+                                                  options=size_options,
+                                                  value=size_options[1],
+                                                  name='marker_size',
+                                                 )
+        size_widget.callback = build_callback('scatter_size_menu')
+
 
     fig.min_border = 1
 
@@ -827,9 +844,9 @@ def scatter(df=None,
         zoom_to_data_button,
         label_menu,
         color_menu,
-        grid_options,
         alpha_widget,
-        size_slider,
+        size_widget,
+        grid_options,
         text_input,
         case_sensitive,
         subset_menu,
