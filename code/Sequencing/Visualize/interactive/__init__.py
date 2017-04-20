@@ -510,9 +510,23 @@ def scatter(df=None,
         quad.selection_glyph = quad.glyph
         quad.nonselection_glyph = quad.glyph
 
-    common = dict(start=0, end=max_count, bounds='auto')
-    hist_figs['x'].y_range = bokeh.models.Range1d(name='hist_x_range', **common)
-    hist_figs['y'].x_range = bokeh.models.Range1d(name='hist_y_range', **common)
+    if identical_bins:
+        x_end = max_count
+        y_end = max_count
+    else:
+        x_end = max(histogram_source.data['x_all'])
+        y_end = max(histogram_source.data['y_all'])
+
+    hist_figs['x'].y_range = bokeh.models.Range1d(name='hist_x_range',
+                                                  start=0,
+                                                  end=x_end,
+                                                  bounds='auto',
+                                                 )
+    hist_figs['y'].x_range = bokeh.models.Range1d(name='hist_y_range',
+                                                  start=0,
+                                                  end=y_end,
+                                                  bounds='auto',
+                                                 )
 
     for hist_fig in hist_figs.values():
         hist_fig.outline_line_color = None
