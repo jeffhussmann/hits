@@ -300,6 +300,7 @@ def scatter(df=None,
 
         overall_max = nonzero.max(numeric_only=True).max()
         overall_min = nonzero.min(numeric_only=True).min()
+        overall_buffer = (overall_max - overall_min) * 0.05
         
         initial = (overall_min * 0.1, overall_max * 10)
         bounds = (overall_min * 0.001, overall_max * 1000)
@@ -310,17 +311,21 @@ def scatter(df=None,
         bins = {}
         for name in numerical_cols:
             if identical_bins:
-                left = overall_min
-                right = overall_max
+                left = overall_min - overall_buffer
+                right = overall_max + overall_buffer
             else:
-                left = nonzero[name].min()
-                right = nonzero[name].max()
+                name_min = nonzero[name].min()
+                name_max = nonzero[name].max()
+                name_buffer = (name_max - name_min) * 0.05
+                left = name_min - name_buffer
+                right = name_max + name_buffer
 
             bins[name] = list(np.logspace(log(left), log(right), num_bins))
 
     else:
         overall_max = df.max(numeric_only=True).max()
         overall_min = df.min(numeric_only=True).min()
+        overall_buffer = (overall_max - overall_min) * 0.05
         
         extent = overall_max - overall_min
         overhang = extent * 0.05
@@ -332,12 +337,15 @@ def scatter(df=None,
         bins = {}
         for name in numerical_cols:
             if identical_bins:
-                left = overall_min
-                right = overall_max
+                left = overall_min - overall_buffer
+                right = overall_max + overall_buffer
             else:
-                left = df[name].min()
-                right = df[name].max()
-
+                name_min = df[name].min()
+                name_max = df[name].max()
+                name_buffer = (name_max - name_min) * 0.05
+                left = name_min - name_buffer
+                right = name_max + name_buffer
+            
             bins[name] = list(np.linspace(left, right, num_bins))
 
     if data_lims is not None:
