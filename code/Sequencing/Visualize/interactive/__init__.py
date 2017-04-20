@@ -42,7 +42,7 @@ def scatter(df=None,
             log_scale=False,
             volcano=False,
             heatmap=False,
-            grid='diagonal',
+            grid='none',
             marker_size=6,
             initial_selection=None,
             initial_xy_names=None,
@@ -93,7 +93,7 @@ def scatter(df=None,
                 numerical columns in df that can be clicked to select columns
                 to scatter.
 
-            grid: Draw a 'grid', 'diagonal' lines, or 'nothing' as guide lines.
+            grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
 
             volcano: If True, make some tweaks suitable for volcano plots.
 
