@@ -32,6 +32,7 @@ def build_selected(indices):
     return selected
 
 def scatter(df=None,
+            numerical_cols=None,
             hover_keys=None,
             table_keys=None,
             color_by=None,
@@ -62,6 +63,10 @@ def scatter(df=None,
                 Any boolean columns will be used to define subsets of points for
                 selection from a dropdown menu.
                 If df is None, loads example data from Jan et al. Science 2014.
+
+            numerical_cols: If given, a list of columns to use as plotting
+                choices. (If not given, all columns containing numerical data
+                will be used.)
 
             hover_keys: Names of columns in df to display in the tooltip that
                 appears when you hover over a point.
@@ -159,7 +164,13 @@ def scatter(df=None,
 
     initial_indices = [i for i, n in enumerate(df.index) if n in initial_selection]
 
-    numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
+    auto_numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
+    if numerical_cols is not None:
+        for col in numerical_cols:
+            if col not in auto_numerical_cols:
+                raise ValueError(col + ' not a numerical column')
+    else:
+        numerical_cols = auto_numerical_cols
 
     object_cols = [n for n in df.columns if df[n].dtype is np.dtype('O')]
     if df.index.dtype is np.dtype('O'):
