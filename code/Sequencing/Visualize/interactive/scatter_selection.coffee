@@ -41,30 +41,37 @@ get_bins = (name) ->
 
 binned_to_counts = (binned) -> (b.length for b in binned)
 
-`
-if (!window.requirejs) {{
-    return
-}}
+loaded =
+    'd3': if (d3?) then d3 else null
 
+update_bins = () ->
+    for name in ['x', 'y']
+        bins = get_bins(name)
+        bounds = [bins[0], bins[bins.length - 1]]
+        binner = loaded['d3'].histogram().domain(bounds).thresholds(bins)
+        data = filtered_data[name]
+        binned = binner(data)
+        counts = binned_to_counts(binned)
+        models['histogram_source'].data[name + '_selected'] = counts
+    
+    models['histogram_source'].trigger('change')
+
+if (d3?)
+    update_bins()
+    return
+
+if not (window.requirejs?)
+    return
+
+`
 requirejs.config({{
     paths: {{
-        d3: "http://d3js.org/d3.v4.min"
+        d3: "https://d3js.org/d3-array.v1.min"
     }}
 }});
 
-requirejs(["d3"], function(d3) {{
-    var bins, bounds, binner, data, binned, counts 
-
-    for (name of ['x', 'y']) {{
-        bins = get_bins(name);
-        bounds = [bins[0], bins[bins.length - 1]];
-        binner = d3.histogram().domain(bounds).thresholds(bins);
-        data = filtered_data[name];
-        binned = binner(data);
-        counts = binned_to_counts(binned);
-        models['histogram_source'].data[name + '_selected'] = counts;
-    }};
-
-    models['histogram_source'].trigger('change');
+requirejs(['d3'], function(d3) {{
+    loaded['d3'] = d3;
+    update_bins();
 }});
 `
