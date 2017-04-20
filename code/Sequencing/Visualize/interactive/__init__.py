@@ -118,7 +118,7 @@ def scatter(df=None,
 
             num_bins: Number of bins to use for marginal histograms.
 
-            zoom_to_inital_data: If True, zoom to data limits of the initially
+            zoom_to_initial_data: If True, zoom to data limits of the initially
                 selected columns rather than global data limits..
 
             return_layout: If True, return the final layout object to allowing
@@ -386,7 +386,7 @@ def scatter(df=None,
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
         fig.x_range = bokeh.models.Range1d(-1, 1)
     else:
-        if zoom_to_inital_data:
+        if zoom_to_initial_data:
             x_min, x_max = bins[x_name][0], bins[x_name][-1]
             y_min, y_max = bins[y_name][0], bins[y_name][-1]
         else:
