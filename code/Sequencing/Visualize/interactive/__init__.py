@@ -32,6 +32,9 @@ def build_selected(indices):
     })
 
     return selected
+    
+def bool_to_js(b):
+    return 'true' if b else 'false'
 
 def scatter(df=None,
             numerical_cols=None,
@@ -737,9 +740,6 @@ def scatter(df=None,
                                                       width=50,
                                                       name='zoom_button',
                                                      )
-    def bool_to_js(b):
-        return 'true' if b else 'false'
-
     format_kwargs = dict(log_scale=bool_to_js(log_scale),
                          identical_bins=bool_to_js(identical_bins),
                         )
@@ -911,7 +911,11 @@ def hex_to_CSS(hex_string, alpha=1.):
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
-def parallel_coordinates(df, link_axes=True, log_scale=True):
+def parallel_coordinates(df=None, link_axes=True, log_scale=True):
+    if df is None:
+        example_fn = os.path.join(os.path.dirname(__file__), 'jan_ratios.csv')
+        df = pd.read_csv(example_fn, index_col='systematic_name')
+
     template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')
     html_template = open(template_fn).read()
 
@@ -920,12 +924,11 @@ def parallel_coordinates(df, link_axes=True, log_scale=True):
 
     injections = {
         'encoded_data': URI,
-        'link_axes': 'false',
-        'log_scale': 'false',
+        'link_axes': bool_to_js(link_axes),
+        'log_scale': bool_to_js(log_scale),
     }
 
     def match_to_injection(match):
-        print 'found', match
         return injections[match.group(1)]
 
     template_with_data = re.sub("\/\*INJECT:(.*)\*\/", match_to_injection, html_template)

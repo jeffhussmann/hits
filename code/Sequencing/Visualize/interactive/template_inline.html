@@ -8453,9 +8453,9 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     var max_val = 0;
     var val;
 
-    //if (/*INJECT:link_axes*/) {
-    //    parcoords.only_show_leftmost_labels(true);
-    //}
+    if (/*INJECT:link_axes*/) {
+        parcoords.only_show_leftmost_labels(true);
+    }
 
     for (var row of data) {
         for (var k of numerical_cols) {
@@ -8690,7 +8690,6 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
                 [old_k, [old_start, old_end]] = domains_computed_for[i];
                 [new_start, new_end] = dimensions[new_k].yscale.domain();
                 if (new_k != old_k || new_start != old_start || new_end != new_end) {
-                    console.log(new_k, old_k, new_start, old_start, new_end, old_end);
                     need_to_update = true;
                 }
             });
