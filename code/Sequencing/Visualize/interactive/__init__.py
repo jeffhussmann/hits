@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.colors
 import matplotlib.cm
 import os.path
+import re
+import base64
 import glob
 import IPython.display
 from collections import defaultdict
@@ -910,6 +912,27 @@ def hex_to_CSS(hex_string, alpha=1.):
     rgb = [int(v * 255) for v in rgb]
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
+
+def parallel_coordinates(df, link_axes=True, log_scale=True):
+    template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')
+    html_template = open(template_fn).read()
+
+    encoded_data = base64.b64encode(df.to_csv())
+    URI = "'data:text/plain;base64,{0}'".format(encoded_data)
+
+    injections = {
+        'encoded_data': URI,
+        'link_axes': 'false',
+        'log_scale': 'false',
+    }
+
+    def match_to_injection(match):
+        print 'found', match
+        return injections[match.group(1)]
+
+    template_with_data = re.sub("\/\*INJECT:(.*)\*\/", match_to_injection, html_template)
+
+    return IPython.display.HTML(template_with_data.decode('utf8'))
 
 # from http://chris-said.io/
 toggle = '''
