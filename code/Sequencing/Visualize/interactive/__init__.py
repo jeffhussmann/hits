@@ -63,73 +63,69 @@ def scatter(df=None,
     arguments for an example using data from Jan et al. Science 2014.
 
     Args:
-            df: A pandas DataFrame with columns containing numerical data to
-                plot. 
-                Index values will be used as labels for points.
-                Any text columns will be searchable through the 'Search:' field.
-                Any boolean columns will be used to define subsets of points for
-                selection from a dropdown menu.
-                If df is None, loads example data from Jan et al. Science 2014.
+        df: A pandas DataFrame with columns containing numerical data to plot. 
+            Index values will be used as labels for points.
+            Any text columns will be searchable through the 'Search:' field.
+            Any boolean columns will be used to define subsets of points for
+            selection from a dropdown menu.
+            If df is None, loads example data from Jan et al. Science 2014.
 
-            numerical_cols: If given, a list of columns to use as plotting
-                choices. (If not given, all columns containing numerical data
-                will be used.)
+        numerical_cols: If given, a list of columns to use as plotting choices.
+            (If not given, all columns containing numerical data will be used.)
 
-            hover_keys: Names of columns in df to display in the tooltip that
-                appears when you hover over a point.
+        hover_keys: Names of columns in df to display in the tooltip that
+            appears when you hover over a point.
 
-            table_keys: Names of columns in df to display in the table below the
-                plot that is populated with the selected points from the figure.
+        table_keys: Names of columns in df to display in the table below the
+            plot that is populated with the selected points from the figure.
 
-            color_by: The name of a column in df to use as colors of points, or
-                a list of such names to choose from a menu.
-            
-            label_by: The name of a column in df to use as labels of points, or
-                a list of such names to choose from a menu. If None, df.index
-                is used.
+        color_by: The name of a column in df to use as colors of points, or a
+            list of such names to choose from a menu.
+        
+        label_by: The name of a column in df to use as labels of points, or a
+            list of such names to choose from a menu. If None, df.index is used.
 
-            size: Size of the plot in pixels.
+        size: Size of the plot in pixels.
 
-            marker_size: Size of the scatter circles. Can be a scalar value, a
-                column name, or a list of column names to choose from via
-                dropdown menu.
+        marker_size: Size of the scatter circles. Can be a scalar value, a
+            column name, or a list of column names to choose from via dropdown
+            menu.
 
-            heatmap: If True, displays a heatmap of correlations between
-                numerical columns in df that can be clicked to select columns
-                to scatter.
+        heatmap: If True, displays a heatmap of correlations between numerical
+            columns in df that can be clicked to select columns to scatter.
 
-            grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
+        grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
 
-            volcano: If True, make some tweaks suitable for volcano plots.
+        volcano: If True, make some tweaks suitable for volcano plots.
 
-            log_scale: If not False, plot on a log scale with base 10 (or, if a
-                set to a number, with base log_scale.)
+        log_scale: If not False, plot on a log scale with base 10 (or, if a set
+            to a number, with base log_scale.)
 
-            axis_label_size: Size of the font used for axis labels.
+        axis_label_size: Size of the font used for axis labels.
 
-            initial_selection: Names of index value to initially highlight.
+        initial_selection: Names of index value to initially highlight.
 
-            initial_xy_names: Tuple (x_name, y_name) of datasets to initially
-                display on x- and y-axes.
+        initial_xy_names: Tuple (x_name, y_name) of datasets to initially
+            display on x- and y-axes.
 
-            alpha_widget_type: Type of widget ('slider' or 'text') to control
-                scatter circle transparency.
+        alpha_widget_type: Type of widget ('slider' or 'text') to control
+            scatter circle transparency.
 
-            hide_widgets: List of widgets to not display. Possible options are
-                ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
-                 'grid_radio_buttons'].
+        hide_widgets: List of widgets to not display. Possible options are
+            ['table', 'alpha', 'marker_size', 'search', 'subset_menu',
+             'grid_radio_buttons'].
 
-            identical_bins: If True, use the same set of bins for histograms of
-                all data sets. If False, use bins specific to the range of each
-                data set.
+        identical_bins: If True, use the same set of bins for histograms of all
+            data sets. If False, use bins specific to the range of each data
+            set.
 
-            num_bins: Number of bins to use for marginal histograms.
+        num_bins: Number of bins to use for marginal histograms.
 
-            zoom_to_initial_data: If True, zoom to data limits of the initially
-                selected columns rather than global data limits..
+        zoom_to_initial_data: If True, zoom to data limits of the initially
+            selected columns rather than global data limits..
 
-            return_layout: If True, return the final layout object to allowing
-                embedding.
+        return_layout: If True, return the final layout object to allowing
+            embedding.
     '''
 
     if hover_keys is None:
@@ -912,6 +908,22 @@ def hex_to_CSS(hex_string, alpha=1.):
     return CSS
 
 def parallel_coordinates(df=None, link_axes=True, log_scale=True):
+    ''' Makes an interactive parallel coordinates plot using d3. Call without
+    any arguments for an example using data from Jan et al. Science 2014.
+    Uses the parallel-coordinates library (github.com/syntagmatic/parallel-coordinates)
+    Slickgrid integration taken from the example at github.com/syntagmatic/parallel-coordinates/blob/master/examples/slickgrid.html
+    and highlight-on-hover taken from bl.ocks.org/mostaphaRoudsari/b4e090bb50146d88aec4.
+
+    Args:
+        df: A pandas DataFrame with columns containing numerical data to plot. 
+            Any text columns will be searchable through the 'Search:' field.
+            If df is None, loads example data from Jan et al. Science 2014.
+
+        link_axes: If True, all axes have the same range.
+
+        log_scale: If link_axes=True, whether or not to use a (base 10) log scale.
+    '''
+
     if df is None:
         example_fn = os.path.join(os.path.dirname(__file__), 'jan_ratios.csv')
         df = pd.read_csv(example_fn, index_col='systematic_name')
