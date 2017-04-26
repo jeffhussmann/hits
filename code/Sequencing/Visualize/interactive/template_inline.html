@@ -8396,16 +8396,7 @@ Label by: <select id="label_by"></select>
 <div id="grid"></div>
 <script id="brushing">function color_from_alpha(alpha) {
     return function(d) {
-        red = "rgba(228, 26, 28, " + alpha + ")"
-        blue = "rgba(10, 203, 238, " + alpha + ")"
-        black = "rgba(0, 0, 0, " + alpha + ")"
-        //if (d.secretome == 'True')
-        //    return blue
-        //else if (d.mitop2 == 'True')
-        //    return red
-        //else
-        //    return black
-        return black
+        return d['_color'] + alpha + ")";
     }
 }
 
@@ -8435,7 +8426,8 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
 
     var dimension_types = parcoords.detectDimensionTypes(data);
     function should_hide(name) {
-        return name == 'id' || dimension_types[name] != 'number';
+        return name == 'id' ||
+               dimension_types[name] != 'number';
     }
     var dimensions_to_hide = column_keys.filter(should_hide);
     var text_columns = column_keys.filter(function(k) { return dimension_types[k] == 'string'; });
@@ -8506,7 +8498,9 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     addHighlightSettings();
 
     // setting up grid
-    var table_column_keys = column_keys.filter(function(k) { return k != 'id'; });
+    var table_column_keys = column_keys.filter(function(k) {
+        return k != 'id' && k != '_color';
+    });
 
     var columns = table_column_keys.map(function(key,i) {
         var width;

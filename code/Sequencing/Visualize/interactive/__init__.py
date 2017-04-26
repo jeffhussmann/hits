@@ -911,12 +911,14 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
     ''' Makes an interactive parallel coordinates plot using d3. Call without
     any arguments for an example using data from Jan et al. Science 2014.
     Uses the parallel-coordinates library (github.com/syntagmatic/parallel-coordinates)
-    Slickgrid integration taken from the example at github.com/syntagmatic/parallel-coordinates/blob/master/examples/slickgrid.html
-    and highlight-on-hover taken from bl.ocks.org/mostaphaRoudsari/b4e090bb50146d88aec4.
+    Slickgrid integration taken from github.com/syntagmatic/parallel-coordinates/blob/master/examples/slickgrid.html
+    Highlight-on-hover taken from bl.ocks.org/mostaphaRoudsari/b4e090bb50146d88aec4.
 
     Args:
         df: A pandas DataFrame with columns containing numerical data to plot. 
             Any text columns will be searchable through the 'Search:' field.
+            A column named 'color' can be provided to color lines using any
+            format understood by matplotlib.colors.to_rgb.
             If df is None, loads example data from Jan et al. Science 2014.
 
         link_axes: If True, all axes have the same range.
@@ -927,6 +929,20 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
     if df is None:
         example_fn = os.path.join(os.path.dirname(__file__), 'jan_ratios.csv')
         df = pd.read_csv(example_fn, index_col='systematic_name')
+        red = '#e41a1c'
+        blue = '#0acbee'
+        color = pd.Series('black', index=df.index)
+        color[df['secretome']] = blue
+        color[df['mitop2']] = red
+        df['color'] = color
+
+    if 'color' not in df:
+        df['color'] = pd.Series('black', index=df.index)
+
+    def make_color_string(c):
+        array = map(int, np.array(matplotlib.colors.to_rgb(c)) * 255)
+        return 'rgba({0}, {1}, {2}, '.format(*array)
+    df['_color'] = df['color'].map(make_color_string)
 
     template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')
     html_template = open(template_fn).read()
