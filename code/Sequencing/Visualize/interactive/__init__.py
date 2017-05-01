@@ -989,6 +989,9 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
         color[df['secretome']] = blue
         color[df['mitop2']] = red
         df['color'] = color
+    
+    # Copy before changing
+    df = df.copy()
 
     if 'color' not in df:
         df['color'] = pd.Series('black', index=df.index)
