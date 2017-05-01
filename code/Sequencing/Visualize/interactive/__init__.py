@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.cluster.hierarchy
 import bokeh
 import bokeh.io
 import bokeh.plotting
@@ -47,6 +48,7 @@ def scatter(df=None,
             log_scale=False,
             volcano=False,
             heatmap=False,
+            cluster=True,
             grid='none',
             marker_size=6,
             initial_selection=None,
@@ -93,6 +95,9 @@ def scatter(df=None,
 
         heatmap: If True, displays a heatmap of correlations between numerical
             columns in df that can be clicked to select columns to scatter.
+
+        cluster: If True, performs hierarchical clustering on (correlations of)
+            numerical columns and draws a dendrogram.
 
         grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
 
@@ -616,11 +621,28 @@ def scatter(df=None,
     # Set up menus or heatmap to select columns from df to put on x- and y-axis.
 
     if heatmap:
-        norm = matplotlib.colors.Normalize(vmin=-1, vmax=1)
+        correlations = df[numerical_cols].corr()
+        if np.array(correlations).min() > 0:
+            v_min = 0
+            c_map = matplotlib.cm.viridis
+        else:
+            v_min = -1
+            c_map = matplotlib.cm.RdBu_r
 
+        norm = matplotlib.colors.Normalize(vmin=v_min, vmax=1)
         def r_to_color(r):
-            color = matplotlib.colors.rgb2hex(matplotlib.cm.RdBu_r(norm(r)))
+            color = matplotlib.colors.rgb2hex(c_map(norm(r)))
             return color
+        
+        if cluster:
+            linkage = scipy.cluster.hierarchy.linkage(correlations)
+            dendro = scipy.cluster.hierarchy.dendrogram(linkage,
+                                                        no_plot=True,
+                                                        labels=numerical_cols,
+                                                       )
+            order = dendro['ivl']
+        else:
+            order = numerical_cols
 
         data = {
             'x': [],
@@ -631,9 +653,11 @@ def scatter(df=None,
             'color': [],
         }
 
-        correlations = df.corr()
         for y, row in enumerate(numerical_cols):
             for x, col in enumerate(numerical_cols):
+                row = order[y]
+                col = order[x]
+
                 r = correlations[row][col]
                 data['r'].append(r)
                 data['x'].append(x)
@@ -682,7 +706,7 @@ def scatter(df=None,
         code = '''
         dict = {dict}
         return dict[tick].slice(0, 15)
-        '''.format(dict=dict(enumerate(numerical_cols)))
+        '''.format(dict=dict(enumerate(order)))
         
         for ax in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
             ax.ticker = bokeh.models.FixedTicker(ticks=range(num_exps))
@@ -699,7 +723,29 @@ def scatter(df=None,
         initial_index = name_pairs.index((x_name, y_name))
         heatmap_source.selected = build_selected([initial_index])
 
-        heatmap_fig.min_border = min_border
+
+        heatmap_fig.min_border = 1
+        
+        if cluster:
+            dendro_fig = bokeh.plotting.figure(height=100, width=heatmap_size,
+                                               x_range=heatmap_fig.x_range,
+                                              )
+            icoord = np.array(dendro['icoord'])
+            # Want to covert the arbitrary scaling that icoord is given in so that
+            # the min value maps to 0 and the max value maps to len(correlations) - 1
+            interval = (icoord.max() - icoord.min()) / (len(correlations) - 1)
+            xs = list((icoord - icoord.min()) / interval)
+            dcoord = np.array(dendro['dcoord'])
+            ys = list(dcoord)
+            dendro_fig.multi_line(xs, ys, color='black')
+            dendro_fig.outline_line_color = None
+            dendro_fig.axis.visible = False
+            dendro_fig.grid.visible = False
+            dendro_fig.min_border = 0
+            dendro_fig.toolbar_location = None
+            dendro_fig.y_range = bokeh.models.Range1d(start=0, end=dcoord.max() * 1.05)
+        else:
+            dendro_fig = bokeh.layouts.Spacer(height=100)
         
     else:
         x_menu = bokeh.models.widgets.MultiSelect(title='X',
@@ -884,7 +930,7 @@ def scatter(df=None,
     ]
 
     if heatmap:
-        heatmap_column = bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), heatmap_fig])
+        heatmap_column = bokeh.layouts.column(children=[dendro_fig, heatmap_fig])
         columns = columns[:-1] + [heatmap_column] + columns[-1:]
 
     rows = [
