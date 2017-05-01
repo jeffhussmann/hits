@@ -167,10 +167,11 @@ def scatter(df=None,
     df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
 
     # Infer column types.
-    scatter_source = bokeh.models.ColumnDataSource(data=df, name='scatter_source')
+    scatter_data = df.to_dict(orient='list')
+    scatter_data[df.index.name] = list(df.index)
 
-    if 'index' in scatter_source.data:
-        scatter_source.data['_index'] = scatter_source.data['index']
+    if 'index' in scatter_data:
+        scatter_data['_index'] = scatter_data['index']
 
     if df.index.name is None:
         df.index.name = 'index'
@@ -253,12 +254,12 @@ def scatter(df=None,
         axis.axis_label_text_font_size = '{0}pt'.format(axis_label_size)
         axis.axis_label_text_font_style = 'normal'
 
-    scatter_source.data['x'] = scatter_source.data[x_name]
-    scatter_source.data['y'] = scatter_source.data[y_name]
+    scatter_data['x'] = scatter_data[x_name]
+    scatter_data['y'] = scatter_data[y_name]
     
-    scatter_source.data['index'] = list(df.index)
+    scatter_data['index'] = list(df.index)
 
-    scatter_source.data['_no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_source.data['x']]
+    scatter_data['_no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_data['x']]
     
     if color_by is None:
         color_by = '_no_color'
@@ -272,7 +273,7 @@ def scatter(df=None,
         show_color_by_menu = True
         color_options = [''] + list(color_by)
     
-    scatter_source.data['_color'] = scatter_source.data[color_options[1]]
+    scatter_data['_color'] = scatter_data[color_options[1]]
     
     if label_by is None:
         label_by = df.index.name
@@ -284,7 +285,7 @@ def scatter(df=None,
         show_label_by_menu = True
         label_options = list(label_by)
     
-    scatter_source.data['_label'] = scatter_source.data[label_options[0]]
+    scatter_data['_label'] = scatter_data[label_options[0]]
 
     if isinstance(marker_size, (int, long, float)):
         show_marker_size_menu = False
@@ -298,10 +299,13 @@ def scatter(df=None,
         show_marker_size_menu = True
         size_widget_type = 'menu'
         marker_size = '_size'
-        scatter_source.data[marker_size] = scatter_source.data[size_options[1]]
+        scatter_data[marker_size] = scatter_data[size_options[1]]
 
-        scatter_source.data['_uniform_size'] = [6]*len(scatter_source.data[marker_size])
+        scatter_data['_uniform_size'] = [6]*len(scatter_data[marker_size])
 
+    scatter_source = bokeh.models.ColumnDataSource(data=scatter_data,
+                                                   name='scatter_source',
+                                                  )
     scatter_source.selected = build_selected(initial_indices)
 
     scatter = fig.scatter('x',
@@ -430,13 +434,13 @@ def scatter(df=None,
 
     # Make marginal histograms.
 
-    histogram_source = bokeh.models.ColumnDataSource(name='histogram_source')
-    histogram_source.data = {
+    histogram_data = {}
+    histogram_data = {
         'zero': [0]*(num_bins - 1),
     }
 
     for name in numerical_cols:
-        histogram_source.data.update({
+        histogram_data.update({
             '{0}_bins_left'.format(name): bins[name][:-1],
             '{0}_bins_right'.format(name): bins[name][1:],
         })
@@ -445,7 +449,7 @@ def scatter(df=None,
     for name in numerical_cols:
         counts, _ = np.histogram(df[name].dropna(), bins=bins[name])
         max_count = max(max(counts), max_count)
-        histogram_source.data['{0}_all'.format(name)] = list(counts)
+        histogram_data['{0}_all'.format(name)] = list(counts)
 
     if log_scale:
         axis_type = 'log'
@@ -469,13 +473,16 @@ def scatter(df=None,
         for data_type in ['all', 'bins_left', 'bins_right']:
             left_key = '{0}_{1}'.format(axis, data_type)
             right_key = '{0}_{1}'.format(name, data_type)
-            histogram_source.data[left_key] = histogram_source.data[right_key]
+            histogram_data[left_key] = histogram_data[right_key]
 
         initial_vals = df[name].iloc[initial_indices]
         initial_counts, _ = np.histogram(initial_vals.dropna(), bins[name])
     
-        histogram_source.data['{0}_selected'.format(axis)] = initial_counts
+        histogram_data['{0}_selected'.format(axis)] = initial_counts
 
+    histogram_source = bokeh.models.ColumnDataSource(data=histogram_data,
+                                                     name='histogram_source',
+                                                    )
     initial_hist_alpha = 0.1 if len(initial_indices) > 0 else 0.2
     quads = {}
     quads['x_all'] = hist_figs['x'].quad(left='x_bins_left',
