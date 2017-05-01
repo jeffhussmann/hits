@@ -8425,21 +8425,29 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     var column_keys = d3.keys(data[0]);
 
     var dimension_types = parcoords.detectDimensionTypes(data);
-    function should_hide(name) {
-        return name == 'id' ||
-               dimension_types[name] != 'number';
-    }
-    var dimensions_to_hide = column_keys.filter(should_hide);
-    var text_columns = column_keys.filter(function(k) { return dimension_types[k] == 'string'; });
+    
+    var dimensions_to_hide = column_keys.filter(function(k) {
+        return k == 'id' ||
+               dimension_types[k] != 'number';
+    });
+    
+    var text_columns = column_keys.filter(function(k) {
+        return dimension_types[k] == 'string' &&
+               k != '_color' &&
+               k != 'color';
+    });
+    
+    var numerical_cols = column_keys.filter(function(k) {
+        return dimension_types[k] == 'number' &&
+               k != 'id';
+    });
 
     d3.select("#label_by").selectAll('option')
-        .data(dimensions_to_hide)
+        .data(text_columns)
         .enter()
         .append('option')
         .attr('value', function(d) { return d; })
         .text(function(d) { return d; } );
-
-    var numerical_cols = column_keys.filter(function(n) { return !should_hide(n); });
 
     var min_nonzero_val = 1e10;
     var max_val = 0;
@@ -8703,15 +8711,12 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     }
 
     function highlightLines(mouseCoordinates) {
-        var highlightedLines = getLinesForHighlight(mouseCoordinates);
+        var to_highlight = getLinesForHighlight(mouseCoordinates);
 
-        if (highlightedLines && highlightedLines[0].length) {
-            var currentData = highlightedLines[0];
-            var currentIntersectionPoints = highlightedLines[1];
-
-            parcoords.highlight(currentData);
+        if (to_highlight && to_highlight.data.length) {
+            parcoords.highlight(to_highlight.data);
             cleanTooltip();
-            addTooltip(currentData, currentIntersectionPoints);
+            addTooltip(to_highlight.data, to_highlight.intersection_points);
         } else {
             parcoords.unhighlight();
             cleanTooltip();
@@ -8736,7 +8741,9 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
                 }
             });
 
-            return [currentData, currentIntersectionPoints];
+            return {'data': currentData,
+                    'intersection_points': currentIntersectionPoints,
+            };
         }
     }
 
