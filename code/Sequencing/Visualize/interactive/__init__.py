@@ -94,10 +94,13 @@ def scatter(df=None,
             menu.
 
         heatmap: If True, displays a heatmap of correlations between numerical
-            columns in df that can be clicked to select columns to scatter.
+            columns in df that can be clicked to select columns to scatter. If
+            any negative correlations exist, uses a red/blue colormap, otherwise
+            uses viridis.
 
-        cluster: If True, performs hierarchical clustering on (correlations of)
-            numerical columns and draws a dendrogram.
+        cluster: If True, forces heatmap=True and performs hierarchical
+            clustering on (correlations of) numerical columns and draws a
+            dendrogram.
 
         grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
 
@@ -977,7 +980,6 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
 
         log_scale: If link_axes=True, whether or not to use a (base 10) log scale.
     '''
-
     if df is None:
         example_fn = os.path.join(os.path.dirname(__file__), 'jan_ratios.csv')
         df = pd.read_csv(example_fn, index_col='systematic_name')
