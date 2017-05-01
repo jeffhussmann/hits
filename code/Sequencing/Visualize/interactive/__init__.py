@@ -375,15 +375,6 @@ def scatter(df=None,
 
     diagonals_visible = (grid == 'diagonal')
 
-    fig.line(x=bounds, y=bounds,
-             color='black',
-             nonselection_color='black',
-             alpha=0.4,
-             nonselection_alpha=0.4,
-             name='diagonal',
-             visible=diagonals_visible,
-            )
-
     if log_scale:
         upper_ys = np.array(bounds) * 10
         lower_ys = np.array(bounds) * 0.1
@@ -396,12 +387,17 @@ def scatter(df=None,
         nonselection_color='black',
         alpha=0.4,
         nonselection_alpha=0.4,
-        line_dash=[5, 5],
         name='diagonal',
-        visible=diagonals_visible,
     ) 
-    fig.line(x=bounds, y=upper_ys, **line_kwargs)
-    fig.line(x=bounds, y=lower_ys, **line_kwargs)
+
+    lines = [
+        fig.line(x=bounds, y=bounds, **line_kwargs),
+        fig.line(x=bounds, y=upper_ys, line_dash=[5, 5], **line_kwargs),
+        fig.line(x=bounds, y=lower_ys, line_dash=[5, 5], **line_kwargs),
+    ]
+
+    for line in lines:
+        line.visible = diagonals_visible
     
     if volcano:
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
