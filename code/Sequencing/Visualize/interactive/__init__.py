@@ -48,7 +48,7 @@ def scatter(df=None,
             log_scale=False,
             volcano=False,
             heatmap=False,
-            cluster=True,
+            cluster=False,
             grid='none',
             marker_size=6,
             initial_selection=None,
@@ -146,6 +146,9 @@ def scatter(df=None,
 
     if volcano:
         grid = 'grid'
+
+    if cluster:
+        heatmap = True
 
     if df is None:
         # Load example data.
