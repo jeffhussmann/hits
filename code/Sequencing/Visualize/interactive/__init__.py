@@ -564,7 +564,7 @@ def scatter(df=None,
 
     # Configure tooltips that pop up when hovering over a point.
     
-    hover = bokeh.models.HoverTool()
+    hover = bokeh.models.HoverTool(renderers=[scatter])
     hover.tooltips = [
         (df.index.name, '@{0}'.format(df.index.name)),
     ]
