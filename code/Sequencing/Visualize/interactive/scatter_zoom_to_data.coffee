@@ -15,9 +15,9 @@ clean_xs = []
 clean_ys = []
 
 if log_scale
-    number_is_clean = (x) -> x isnt 0 and not Number.isNaN(x)
+    number_is_clean = (x) -> x isnt 0 and not Number.isNaN(x) and x isnt 'NaN'
 else
-    number_is_clean = (x) -> not Number.isNaN(x)
+    number_is_clean = (x) -> not Number.isNaN(x) and x isnt 'NaN'
 
 index_is_clean = (i) -> number_is_clean(xs[i]) and number_is_clean(ys[i])
 
