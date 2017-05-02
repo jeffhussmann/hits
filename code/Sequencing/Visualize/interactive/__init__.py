@@ -643,39 +643,40 @@ def scatter(df=None,
             color = matplotlib.colors.rgb2hex(c_map(norm(r)))
             return color
         
-        if cluster:
-            linkage = scipy.cluster.hierarchy.linkage(correlations)
-            dendro = scipy.cluster.hierarchy.dendrogram(linkage,
-                                                        no_plot=True,
-                                                        labels=numerical_cols,
-                                                       )
-            order = dendro['ivl']
-        else:
-            order = numerical_cols
-
-        data = {
-            'x': [],
-            'x_name': [],
-            'y': [],
-            'y_name': [],
-            'r': [],
-            'color': [],
+        linkage = scipy.cluster.hierarchy.linkage(correlations)
+        dendro = scipy.cluster.hierarchy.dendrogram(linkage,
+                                                    no_plot=True,
+                                                    labels=numerical_cols,
+                                                   )
+        orders = {
+            'original': numerical_cols,
+            'clustered': dendro['ivl'],
         }
+        data = defaultdict(list)
 
         for y, row in enumerate(numerical_cols):
             for x, col in enumerate(numerical_cols):
-                row = order[y]
-                col = order[x]
+                for order_key, order in orders.items():
+                    row = order[y]
+                    col = order[x]
 
-                r = correlations[row][col]
-                data['r'].append(r)
-                data['x'].append(x)
-                data['x_name'].append(col)
-                data['y'].append(y)
-                data['y_name'].append(row)
-                data['color'].append(r_to_color(r))
-                
-        heatmap_source = bokeh.models.ColumnDataSource(data)
+                    r = correlations[row][col]
+                    data['r_{0}'.format(order_key)].append(r)
+                    data['x_{0}'.format(order_key)].append(x)
+                    data['x_name_{0}'.format(order_key)].append(col)
+                    data['y_{0}'.format(order_key)].append(y)
+                    data['y_name_{0}'.format(order_key)].append(row)
+                    data['color_{0}'.format(order_key)].append(r_to_color(r))
+
+        if cluster:
+            order_key = 'clustered'
+        else:
+            order_key = 'original'
+
+        for k in ['r', 'x', 'x_name', 'y', 'y_name', 'color']:
+            data[k] = data['{0}_{1}'.format(k, order_key)]
+
+        heatmap_source = bokeh.models.ColumnDataSource(data, name='heatmap_source')
         num_exps = len(numerical_cols)
         heatmap_size = size - 100
         heatmap_fig = bokeh.plotting.figure(tools='tap',
@@ -683,6 +684,7 @@ def scatter(df=None,
                                             y_range=(num_exps - 0.5, -0.5),
                                             width=heatmap_size, height=heatmap_size,
                                             toolbar_location=None,
+                                            name='heatmap_fig',
                                            )
 
         heatmap_fig.grid.visible = False
@@ -700,6 +702,8 @@ def scatter(df=None,
                                  source=heatmap_source,
                                  width=1, height=1,
                                 )
+        for axis in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
+            axis.name = 'heatmap_axis'
 
         hover = bokeh.models.HoverTool()
         hover.tooltips = [
@@ -712,14 +716,12 @@ def scatter(df=None,
         first_row = [heatmap_fig]
         heatmap_source.callback = build_callback('scatter_heatmap')
 
-        code = '''
-        dict = {dict}
-        return dict[tick].slice(0, 15)
-        '''.format(dict=dict(enumerate(order)))
+        def make_tick_formatter(order):
+            return '''dict = {dict};\nreturn dict[tick].slice(0, 15);'''.format(dict=dict(enumerate(order)))
         
         for ax in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
             ax.ticker = bokeh.models.FixedTicker(ticks=range(num_exps))
-            ax.formatter = bokeh.models.FuncTickFormatter(code=code)
+            ax.formatter = bokeh.models.FuncTickFormatter(code=make_tick_formatter(orders[order_key]))
             ax.major_label_text_font_size = '8pt'
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
@@ -735,27 +737,43 @@ def scatter(df=None,
 
         heatmap_fig.min_border = 1
         
-        if cluster:
-            dendro_fig = bokeh.plotting.figure(height=100, width=heatmap_size,
-                                               x_range=heatmap_fig.x_range,
-                                              )
-            icoord = np.array(dendro['icoord'])
-            # Want to covert the arbitrary scaling that icoord is given in so that
-            # the min value maps to 0 and the max value maps to len(correlations) - 1
-            interval = (icoord.max() - icoord.min()) / (len(correlations) - 1)
-            xs = list((icoord - icoord.min()) / interval)
-            dcoord = np.array(dendro['dcoord'])
-            ys = list(dcoord)
-            dendro_fig.multi_line(xs, ys, color='black')
-            dendro_fig.outline_line_color = None
-            dendro_fig.axis.visible = False
-            dendro_fig.grid.visible = False
-            dendro_fig.min_border = 0
-            dendro_fig.toolbar_location = None
-            dendro_fig.y_range = bokeh.models.Range1d(start=0, end=dcoord.max() * 1.05)
-        else:
-            dendro_fig = bokeh.layouts.Spacer(height=100)
-        
+        dendro_fig = bokeh.plotting.figure(height=100, width=heatmap_size,
+                                           x_range=heatmap_fig.x_range,
+                                          )
+        icoord = np.array(dendro['icoord'])
+        # Want to covert the arbitrary scaling that icoord is given in so that
+        # the min value maps to 0 and the max value maps to len(correlations) - 1
+        interval = (icoord.max() - icoord.min()) / (len(correlations) - 1)
+        xs = list((icoord - icoord.min()) / interval)
+        dcoord = np.array(dendro['dcoord'])
+        ys = list(dcoord)
+        lines = dendro_fig.multi_line(xs, ys, color='black', name='dendrogram')
+
+        if not cluster:
+            lines.visible = False
+
+        dendro_fig.outline_line_color = None
+        dendro_fig.axis.visible = False
+        dendro_fig.grid.visible = False
+        dendro_fig.min_border = 0
+        dendro_fig.toolbar_location = None
+        dendro_fig.y_range = bokeh.models.Range1d(start=0, end=dcoord.max() * 1.05)
+    
+        # Button to toggle clustering.
+        cluster_button = bokeh.models.widgets.Toggle(label='cluster heatmap',
+                                                     width=50,
+                                                     name='cluster_button',
+                                                     active=cluster,
+                                                    )
+        format_kwargs = {
+            # The callback expects code surrounded by double quotes.
+            'clustered_formatter': '"{}"'.format(make_tick_formatter(orders['clustered'])),
+            'original_formatter': '"{}"'.format(make_tick_formatter(orders['original'])),
+        }
+        cluster_button.callback = build_callback('scatter_cluster_button',
+                                                 format_kwargs=format_kwargs,
+                                                )
+
     else:
         x_menu = bokeh.models.widgets.MultiSelect(title='X',
                                                   options=numerical_cols,
@@ -854,7 +872,7 @@ def scatter(df=None,
     save_button.callback = build_callback('scatter_save_button',
                                           format_kwargs=dict(column_names=str(table_col_names)),
                                          )
-
+    
     if alpha_widget_type == 'slider':
         alpha_widget = bokeh.models.Slider(start=0.,
                                            end=1.,
@@ -893,6 +911,7 @@ def scatter(df=None,
     widgets = [
         label_button,
         zoom_to_data_button,
+        cluster_button,
         label_menu,
         color_menu,
         alpha_widget,
@@ -909,6 +928,9 @@ def scatter(df=None,
 
     if 'search' in hide_widgets:
         hide_widgets.add('case_sensitive')
+
+    if not heatmap:
+        hide_widgets.add('cluster_button')
 
     if not show_color_by_menu:
         hide_widgets.add('color_menu')
