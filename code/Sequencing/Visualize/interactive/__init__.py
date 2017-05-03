@@ -13,7 +13,6 @@ import glob
 import IPython.display
 from collections import defaultdict
 from external_coffeescript import build_callback
-import meta
 
 bokeh.io.output_notebook()
 
@@ -984,7 +983,7 @@ def hex_to_CSS(hex_string, alpha=1.):
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
-def parallel_coordinates(df=None, link_axes=True, log_scale=True):
+def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None):
     ''' Makes an interactive parallel coordinates plot using d3. Call without
     any arguments for an example using data from Jan et al. Science 2014.
     Uses the parallel-coordinates library (github.com/syntagmatic/parallel-coordinates)
@@ -1001,6 +1000,10 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
         link_axes: If True, all axes have the same range.
 
         log_scale: If link_axes=True, whether or not to use a (base 10) log scale.
+
+        save_as: A filename (relative to the current directory, and probably 
+            ending in .html) in which to save a standalone HTML file containing
+            the figure. Opens a download dialog to save the file locally as well.
     '''
     if df is None:
         example_fn = os.path.join(os.path.dirname(__file__), 'jan_ratios.csv')
@@ -1043,29 +1046,17 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True):
         return injections[match.group(1)]
 
     template_with_data = re.sub("\/\*INJECT:(.*)\*\/", match_to_injection, html_template)
-
-    return IPython.display.HTML(template_with_data.decode('utf8'))
-
-# from http://chris-said.io/
-toggle = '''
-<script>
-  function code_toggle() {
-    if (code_shown){
-      $('div.input').hide('100');
-      $('#toggleButton').val('Show Code')
-    } else {
-      $('div.input').show('100');
-      $('#toggleButton').val('Hide Code')
-    }
-    code_shown = !code_shown
-  }
-
-  $( document ).ready(function(){
-    code_shown=false;
-    $('div.input').hide()
-  });
-</script>
-<form action="javascript:code_toggle()"><input type="submit" id="toggleButton" value="Show Code"></form>
-'''
-
-toggle_cell = IPython.display.HTML(toggle)
+    
+    if save_as is not None:
+        with open(save_as, 'w') as fh:
+            fh.write(template_with_data)
+            js = '''\
+var link = document.createElement('a')
+link.setAttribute('href', '{0}')
+link.setAttribute('download', '{0}')
+link.click()\
+'''.format(save_as)
+        output = IPython.display.Javascript(js)
+    else:
+        output = IPython.display.HTML(template_with_data.decode('utf8'))
+    return output
