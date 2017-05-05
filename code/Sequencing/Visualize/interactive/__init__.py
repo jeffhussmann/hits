@@ -786,6 +786,9 @@ def scatter(df=None,
                                                   size=min(6, len(numerical_cols)),
                                                   name='y_menu',
                                                )
+        
+        # Just a placeholder so that we can assume cluster_button exists.
+        cluster_button = bokeh.models.widgets.Toggle()
 
         menu_callback = build_callback('scatter_menu')
         x_menu.callback = menu_callback
