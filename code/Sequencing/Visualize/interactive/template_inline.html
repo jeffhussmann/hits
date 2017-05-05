@@ -8469,6 +8469,14 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         }
     }
 
+    var y_min, y_max;
+    if (/*INJECT:initial_limits*/) {
+        [y_min, y_max] = /*INJECT:initial_limits*/;
+    } else {
+        y_min = min_nonzero_val * 0.9;
+        y_max = max_val * 1.1;
+    }
+
     var range = parcoords.height() - parcoords.margin().top - parcoords.margin().bottom;
     var scale;
     if (/*INJECT:log_scale*/) {
@@ -8477,7 +8485,7 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         scale = d3.scale.linear();
     }
 
-    scale = scale.domain([min_nonzero_val * 0.9, max_val * 1.1])
+    scale = scale.domain([y_min, y_max])
                  .range([range, 1]);
 
     var dimensions = {}

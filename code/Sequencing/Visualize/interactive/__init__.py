@@ -983,7 +983,7 @@ def hex_to_CSS(hex_string, alpha=1.):
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
-def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None):
+def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None, initial_limits=None):
     ''' Makes an interactive parallel coordinates plot using d3. Call without
     any arguments for an example using data from Jan et al. Science 2014.
     Uses the parallel-coordinates library (github.com/syntagmatic/parallel-coordinates)
@@ -1000,6 +1000,9 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None):
         link_axes: If True, all axes have the same range.
 
         log_scale: If link_axes=True, whether or not to use a (base 10) log scale.
+
+        initial_limits: If link_axes=True, the intial start and end points of 
+            axes limits.
 
         save_as: A filename (relative to the current directory, and probably 
             ending in .html) in which to save a standalone HTML file containing
@@ -1040,6 +1043,7 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None):
         'encoded_data': URI,
         'link_axes': bool_to_js(link_axes),
         'log_scale': bool_to_js(log_scale),
+        'initial_limits': str(list(initial_limits)) if initial_limits is not None else 'false',
     }
 
     def match_to_injection(match):
