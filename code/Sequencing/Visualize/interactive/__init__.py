@@ -165,8 +165,9 @@ def scatter(df=None,
         heatmap = True
         identical_bins = True
 
-    # Copy before changing
-    df = df.copy()
+    # Drop NaNs and copy before changing.
+    # (Before 0.12.5, dropna wasn't necessary.)
+    df = df.dropna().copy()
 
     # Collapse multiindex if present
     df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
@@ -733,7 +734,6 @@ def scatter(df=None,
         initial_index = name_pairs.index((x_name, y_name))
         heatmap_source.selected = build_selected([initial_index])
 
-
         heatmap_fig.min_border = 1
         
         dendro_fig = bokeh.plotting.figure(height=100, width=heatmap_size,
@@ -1023,12 +1023,8 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
 
         log_scale = True
     
-    if df.isnull().values.any():
-        print 'Warning: dropping NaNs'
-        df = df.dropna()
-    else:
-        # Copy before changing
-        df = df.copy()
+    # Drop NaNs and copy before changing
+    df = df.dropna().copy()
 
     if 'color' not in df:
         df['color'] = pd.Series('black', index=df.index)
