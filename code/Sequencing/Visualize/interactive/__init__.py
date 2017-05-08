@@ -986,7 +986,7 @@ def hex_to_CSS(hex_string, alpha=1.):
     CSS = 'rgba({1}, {2}, {3}, {0})'.format(alpha, *rgb)
     return CSS
 
-def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None, initial_limits=None):
+def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None, initial_limits=None):
     ''' Makes an interactive parallel coordinates plot using d3. Call without
     any arguments for an example using data from Jan et al. Science 2014.
     Uses the parallel-coordinates library (github.com/syntagmatic/parallel-coordinates)
@@ -1020,6 +1020,8 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None, 
         color[df['secretome']] = blue
         color[df['mitop2']] = red
         df['color'] = color
+
+        log_scale = True
     
     if df.isnull().values.any():
         print 'Warning: dropping NaNs'
@@ -1042,10 +1044,18 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=True, save_as=None, 
     encoded_data = base64.b64encode(df.to_csv())
     URI = "'data:text/plain;base64,{0}'".format(encoded_data)
 
+    # Has to be checked in this order since bool subclasses int.
+    if isinstance(log_scale, bool):
+        log_scale = bool_to_js(log_scale)
+    elif isinstance(log_scale, int):
+        log_scale = str(log_scale)
+    else:
+        raise ValueError('log_scale should be an int or a bool', log_scale)
+
     injections = {
         'encoded_data': URI,
         'link_axes': bool_to_js(link_axes),
-        'log_scale': bool_to_js(log_scale),
+        'log_scale': log_scale,
         'initial_limits': str(list(initial_limits)) if initial_limits is not None else 'false',
     }
 

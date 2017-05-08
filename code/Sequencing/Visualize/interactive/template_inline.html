@@ -8449,8 +8449,9 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         .attr('value', function(d) { return d; })
         .text(function(d) { return d; } );
 
-    var min_nonzero_val = 1e10;
-    var max_val = 0;
+    var min_nonzero_val = Number.POSITIVE_INFINITY;
+    var min_val = Number.POSITIVE_INFINITY;
+    var max_val = Number.NEGATIVE_INFINITY;
     var val;
 
     if (/*INJECT:link_axes*/) {
@@ -8460,12 +8461,12 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     for (var row of data) {
         for (var k of numerical_cols) {
             val = parseFloat(row[k]);
-            if (val > 0 && val < min_nonzero_val) {
+            if (val > 0 && val < min_nonzero_val)
                 min_nonzero_val = val;
-            }
-            if (val > max_val) {
+            if (val < min_val)
+                min_val = val;
+            if (val > max_val)
                 max_val = val;
-            }
         }
     }
 
@@ -8473,14 +8474,25 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     if (/*INJECT:initial_limits*/) {
         [y_min, y_max] = /*INJECT:initial_limits*/;
     } else {
-        y_min = min_nonzero_val * 0.9;
-        y_max = max_val * 1.1;
+        if (/*INJECT:log_scale*/) {
+            y_min = min_nonzero_val * 0.9;
+            y_max = max_val * 1.1;
+        } else {
+            y_min = min_val - 0.01 * (max_val - min_val);
+            y_max = max_val + 0.01 * (max_val - min_val);
+        }
     }
 
     var range = parcoords.height() - parcoords.margin().top - parcoords.margin().bottom;
-    var scale;
+    var scale, base;
     if (/*INJECT:log_scale*/) {
-        scale = d3.scale.log().base(10);
+        if (Number.isInteger(/*INJECT:log_scale*/)) {
+            base = /*INJECT:log_scale*/;
+        } else {
+            base = 10;
+        }
+        console.log(base);
+        scale = d3.scale.log().base(base);
     } else {
         scale = d3.scale.linear();
     }
