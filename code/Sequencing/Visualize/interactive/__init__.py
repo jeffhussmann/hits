@@ -1027,12 +1027,14 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
     df = df.dropna().copy()
 
     if 'color' not in df:
-        df['color'] = pd.Series('black', index=df.index)
+        color_series = pd.Series('black', index=df.index)
+    else:
+        color_series = df['color']
 
     def make_color_string(c):
         array = map(int, np.array(matplotlib.colors.to_rgb(c)) * 255)
         return 'rgba({0}, {1}, {2}, '.format(*array)
-    df['_color'] = df['color'].map(make_color_string)
+    df['_color'] = color_series.map(make_color_string)
 
     template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')
     html_template = open(template_fn).read()
