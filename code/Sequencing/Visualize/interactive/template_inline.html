@@ -8219,10 +8219,14 @@ pc.mergeParcoords = function(callback) {
   // Retina display, etc.
   var devicePixelRatio = window.devicePixelRatio || 1;
 
+  var canvas_width = pc.canvas.foreground.clientWidth;
+  var full_width = canvas_width + pc.margin().left + pc.margin().right;
+  var canvas_height = pc.canvas.foreground.clientHeight;
+  var full_height = canvas_height + pc.margin().top + pc.margin().bottom;
   // Create a canvas element to store the merged canvases
   var mergedCanvas = document.createElement("canvas");
-  mergedCanvas.width = pc.canvas.foreground.clientWidth * devicePixelRatio
-  mergedCanvas.height = (pc.canvas.foreground.clientHeight + 30) * devicePixelRatio;
+  mergedCanvas.width = full_width * devicePixelRatio
+  mergedCanvas.height = full_height * devicePixelRatio;
   mergedCanvas.style.width = mergedCanvas.width / devicePixelRatio + "px";
   mergedCanvas.style.height = mergedCanvas.height / devicePixelRatio + "px";
 
@@ -8233,7 +8237,10 @@ pc.mergeParcoords = function(callback) {
 
   // Merge all the canvases
   for (var key in pc.canvas) {
-    context.drawImage(pc.canvas[key], 0, 24 * devicePixelRatio, mergedCanvas.width, mergedCanvas.height - 30 * devicePixelRatio);
+    context.drawImage(pc.canvas[key],
+            pc.margin().left,
+            pc.margin().top,
+            canvas_width, canvas_height);
   }
 
   // Add SVG elements to canvas
@@ -8392,6 +8399,7 @@ Search: <input type="text" id="search" value="">
 <button id="clear_constraints">Clear all constraints</button>
 Highlight on hover: <input type="checkBox" id="hover_checkbox" checked>
 Label by: <select id="label_by"></select>
+<button id="download_screenshot">Download screenshot</button>
 </div>
 <div id="grid"></div>
 <script id="brushing">function color_from_alpha(alpha) {
@@ -8672,6 +8680,10 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         gridUpdate(data);
     });
 
+    d3.select('#download_screenshot').on('click', function() {
+        downloadScreenshot();
+    });
+
     d3.select("body")
         .on("keydown", function() {
             d = parcoords.state.current_object;
@@ -8840,6 +8852,17 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
 
     function cleanTooltip() {
         parcoords.svg.selectAll('.hover_tooltip').remove();
+    }
+
+    function downloadScreenshot() {
+        var callback = function (canvas) {
+            // Download the image
+            var download = document.createElement("a");
+            download.href = canvas.toDataURL("image/png");
+            download.download = "parallel-coordinate.png";
+            download.click();
+        };
+        parcoords.mergeParcoords(callback);
     }
 });
 </script>
