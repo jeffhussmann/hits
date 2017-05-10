@@ -8499,7 +8499,6 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         } else {
             base = 10;
         }
-        console.log(base);
         scale = d3.scale.log().base(base);
     } else {
         scale = d3.scale.linear();
@@ -8826,6 +8825,7 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
             .attr('class', 'hover_tooltip')
             .attr('fill', 'black')
             .attr('text-anchor', 'start')
+            .attr('alignment-baseline', 'central')
             .attr('font-size', fontSize)
             .text(function(d) { return d.text; });
     }
