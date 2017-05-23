@@ -8825,11 +8825,11 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         parcoords.svg.selectAll('text .hover_tooltip')
             .data(tooltipData).enter()
             .append('text')
-            .attr('x', function(d) { return d.x + 5; })
+            .attr('x', function(d) { return d.x; })
             .attr('y', function(d) { return d.y; })
             .attr('class', 'hover_tooltip')
             .attr('fill', 'black')
-            .attr('text-anchor', 'start')
+            .attr('text-anchor', function(d) { return d.anchor; })
             .attr('alignment-baseline', 'central')
             .attr('font-size', fontSize)
             .text(function(d) { return d.text; });
@@ -8842,13 +8842,27 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         var label_by = d3.select('#label_by').property('value');
 
         for (var i = 0; i < currentData.length; i++) {
-            var j = currentIntersectionPoints[i].length - 1
-            var text = currentData[i][label_by];
-            var x = currentIntersectionPoints[i][j][0];
-            var y = currentIntersectionPoints[i][j][1];
+            for (var column of [0, currentIntersectionPoints[i].length - 1]) {
+                var text = currentData[i][label_by];
+                var x = currentIntersectionPoints[i][column][0];
+                var y = currentIntersectionPoints[i][column][1];
 
-            if (!isNaN(y)) {
-                tooltipData.push({x: x - margins.left, y: y - margins.top, text: text});
+                if (!isNaN(y)) {
+                    var tip = {
+                        y: y - margins.top,
+                        text: text,
+                    };
+                    if (column == 0) {
+                        //left-most
+                        tip.x = x - margins.left - 5;
+                        tip.anchor = 'end';
+                    } else {
+                        //right-most
+                        tip.x = x - margins.left + 5;
+                        tip.anchor = 'start';
+                    }
+                    tooltipData.push(tip);
+                }
             }
         }
 
