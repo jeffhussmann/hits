@@ -8400,6 +8400,7 @@ Search: <input type="text" id="search" value="">
 Highlight on hover: <input type="checkBox" id="hover_checkbox" checked>
 Label by: <select id="label_by"></select>
 <button id="download_screenshot">Download screenshot</button>
+<button id="export_table">Export table</button>
 </div>
 <div id="grid"></div>
 <script id="brushing">function color_from_alpha(alpha) {
@@ -8682,6 +8683,10 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     d3.select('#download_screenshot').on('click', function() {
         downloadScreenshot();
     });
+    
+    d3.select('#export_table').on('click', function() {
+        exportTable();
+    });
 
     d3.select("body")
         .on("keydown", function() {
@@ -8863,6 +8868,27 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
             download.click();
         };
         parcoords.mergeParcoords(callback);
+    }
+
+    function exportTable() {
+        var data = grid.getData().getItems();
+        var line;
+        var lines = [table_column_keys.join('\t')]
+        for (var row of data) {
+            line = [];
+            for (var column_name of table_column_keys) {
+                line.push(row[column_name]);
+            }
+            line = line.join('\t');
+            lines.push(line);
+        }
+        var csv_content = "data:text/csv;charset=utf-8,";
+        csv_content += lines.join('\n');
+        var encoded = encodeURI(csv_content)
+        var link = document.createElement('a')
+        link.setAttribute('href', encoded)
+        link.setAttribute('download', 'table_contents.txt')
+        link.click()
     }
 });
 </script>
