@@ -44,7 +44,9 @@ def generate_matrices(char* query,
 
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
-            if query[row - 1] == target[col - 1]:
+            if query[row - 1] == 'N':
+                match_or_mismatch = match_bonus
+            elif query[row - 1] == target[col - 1]:
                 match_or_mismatch = match_bonus
             else:
                 match_or_mismatch = mismatch_penalty
@@ -76,15 +78,15 @@ def generate_matrices(char* query,
     return matrices
 
 def backtrack_cython(char* query,
-              char* target,
-              matrices,
-              cells_seen,
+                     char* target,
+                     matrices,
+                     cells_seen,
                      int end_row,
                      int end_col,
-              int force_query_start,
-              int force_target_start,
-              int force_either_start,
-             ):
+                     int force_query_start,
+                     int force_target_start,
+                     int force_either_start,
+                    ):
     cdef int row, col, next_row, next_col, target_index, query_index
     query_mappings = np.full(len(query), SOFT_CLIPPED_typed, int)
     cdef long [:] query_mappings_view = query_mappings
@@ -134,7 +136,7 @@ def backtrack_cython(char* query,
             target_mappings_view[target_index] = query_index
         if query_index != GAP_typed:
             query_mappings_view[query_index] = target_index
-        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != target[target_index]:
+        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != 'N' and query[query_index] != target[target_index]:
             mismatches.add((query_index, target_index))
 
         path.append((query_index, target_index))
