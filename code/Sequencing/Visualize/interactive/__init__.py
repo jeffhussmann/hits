@@ -1025,6 +1025,9 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
     
     # Drop NaNs and copy before changing
     df = df.dropna().copy()
+    
+    # Collapse multiindex if present
+    df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
 
     if 'color' not in df:
         color_series = pd.Series('black', index=df.index)
