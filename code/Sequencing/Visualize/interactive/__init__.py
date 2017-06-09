@@ -171,6 +171,7 @@ def scatter(df=None,
 
     # Collapse multiindex if present
     df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
+    df.index = [' '.join(n) if isinstance(n, tuple) else n for n in df.index.values]
 
     # Infer column types.
     scatter_data = df.to_dict(orient='list')
