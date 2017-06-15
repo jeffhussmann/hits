@@ -167,11 +167,13 @@ def scatter(df=None,
 
     # Drop NaNs and copy before changing.
     # (Before 0.12.5, dropna wasn't necessary.)
+    original_index_name = df.index.name
     df = df.dropna().copy()
 
     # Collapse multiindex if present
     df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
     df.index = [' '.join(n) if isinstance(n, tuple) else n for n in df.index.values]
+    df.index.name = original_index_name
 
     # Infer column types.
     scatter_data = df.to_dict(orient='list')
