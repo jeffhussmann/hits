@@ -165,9 +165,8 @@ def scatter(df=None,
         heatmap = True
         identical_bins = True
 
-    # Drop NaNs and copy before changing.
-    # (Before 0.12.5, dropna wasn't necessary.)
-    df = df.dropna().copy()
+    # Copy before changing.
+    df = df.copy()
 
     # Collapse multiindex if present
     df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
@@ -194,6 +193,10 @@ def scatter(df=None,
                 raise ValueError(col + ' not a numerical column')
     else:
         numerical_cols = auto_numerical_cols
+
+    # bokeh can handle NaNs in numpy arrays but not in lists. 
+    for numerical_col in numerical_cols:
+        scatter_data[numerical_col] = np.array(scatter_data[numerical_col])
 
     object_cols = [n for n in df.columns if df[n].dtype is np.dtype('O')]
     if df.index.dtype is np.dtype('O'):
