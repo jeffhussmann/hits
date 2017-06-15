@@ -2,7 +2,7 @@ import subprocess32 as subprocess
 import os
 import contextlib
 import Sequencing.Parallel
-import download_GSE
+import ribosomes.download_GSE as download_GSE
 import sys
 
 def piece(srr_fn, num_pieces, which_piece, paired=False):

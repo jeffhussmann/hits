@@ -165,7 +165,7 @@ def generate_alignments(query,
                                 )
     cells_seen = set()
     if force_edge_end:
-        possible_ends = propose_edge_ends(matrices['scores'], cells_seen, min_score)
+        possible_ends = propose_edge_ends(matrices['scores'], cells_seen, min_score, max_alignments=max_alignments)
     else:
         possible_ends = propose_all_ends(matrices['scores'], cells_seen, min_score)
 
