@@ -482,9 +482,9 @@ def scatter(df=None,
 
     for axis, name in [('x', x_name), ('y', y_name)]:
         for data_type in ['all', 'bins_left', 'bins_right']:
-            left_key = '{0}_{1}'.format(axis, data_type)
-            right_key = '{0}_{1}'.format(name, data_type)
-            histogram_data[left_key] = histogram_data[right_key]
+            axis_key = '{0}_{1}'.format(axis, data_type)
+            name_key = '{0}_{1}'.format(name, data_type)
+            histogram_data[axis_key] = histogram_data[name_key]
 
         initial_vals = df[name].iloc[initial_indices]
         initial_counts, _ = np.histogram(initial_vals.dropna(), bins[name])
