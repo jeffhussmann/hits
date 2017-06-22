@@ -858,7 +858,7 @@ def scatter(df=None,
                                                         active=[],
                                                         name='case_sensitive',
                                                        )
-    case_sensitive.callback = build_callback('case_sensitive')
+    case_sensitive.callback = build_callback('scatter_case_sensitive')
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
