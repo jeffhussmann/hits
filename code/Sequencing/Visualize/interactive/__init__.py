@@ -271,21 +271,27 @@ def scatter(df=None,
     
     scatter_data['index'] = list(df.index)
 
-    scatter_data['_no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_data['x']]
+    scatter_data['_black'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_data['x']]
+    scatter_data['_orange'] = ['orange' for _ in scatter_data['x']]
     
     if color_by is None:
-        color_by = '_no_color'
+        color_by = ''
         show_color_by_menu = False
+        color_options = ['']
+
+        scatter_data['_color'] = scatter_data['_black']
+        scatter_data['_selection_color'] = scatter_data['_orange']
+    
     else:
         show_color_by_menu = True
 
-    if isinstance(color_by, basestring):
-        color_options = ['', color_by]
-    else:
-        show_color_by_menu = True
-        color_options = [''] + list(color_by)
+        if isinstance(color_by, basestring):
+            color_options = ['', color_by]
+        else:
+            color_options = [''] + list(color_by)
     
-    scatter_data['_color'] = scatter_data[color_options[1]]
+        scatter_data['_color'] = scatter_data[color_options[-1]]
+        scatter_data['_selection_color'] = scatter_data[color_options[-1]]
     
     if label_by is None:
         label_by = df.index.name
@@ -327,10 +333,10 @@ def scatter(df=None,
                           fill_color='_color',
                           fill_alpha=initial_alpha,
                           line_color=None,
+                          selection_color='_selection_color',
+                          selection_alpha=0.9,
                           nonselection_color='_color',
                           nonselection_alpha=0.1,
-                          selection_color='color',
-                          selection_alpha=0.9,
                           name='scatter',
                          )
     
@@ -440,7 +446,6 @@ def scatter(df=None,
     
     fig.outline_line_color = 'black'
 
-    scatter.selection_glyph.fill_color = 'orange'
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
 
