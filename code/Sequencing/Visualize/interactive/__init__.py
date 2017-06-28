@@ -82,7 +82,8 @@ def scatter(df=None,
             plot that is populated with the selected points from the figure.
 
         color_by: The name of a column in df to use as colors of points, or a
-            list of such names to choose from a menu.
+            list of such names to choose from a menu. (These columns will be
+            excluded from text searches.)
         
         label_by: The name of a column in df to use as labels of points, or a
             list of such names to choose from a menu. If None, df.index is used.
@@ -833,7 +834,7 @@ def scatter(df=None,
     # Menu to choose color source.
     color_menu = bokeh.models.widgets.Select(title='Color by:',
                                              options=color_options,
-                                             value=color_options[1],
+                                             value=color_options[-1],
                                              name='color_menu',
                                             )
     color_menu.callback = build_callback('scatter_color')
@@ -849,8 +850,10 @@ def scatter(df=None,
     grid_options.callback = build_callback('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
+
+    columns_to_search = [c for c in object_cols if c not in color_options]
     text_input.callback = build_callback('scatter_search',
-                                         format_kwargs=dict(column_names=str(object_cols)),
+                                         format_kwargs=dict(column_names=str(columns_to_search)),
                                         )
 
     case_sensitive = bokeh.models.widgets.CheckboxGroup(labels=['Case sensitive'],
