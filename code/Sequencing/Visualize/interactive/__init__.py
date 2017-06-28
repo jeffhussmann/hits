@@ -43,6 +43,7 @@ def scatter(df=None,
             color_by=None,
             label_by=None,
             size=800,
+            label_size=8,
             axis_label_size=20,
             log_scale=False,
             volcano=False,
@@ -91,6 +92,8 @@ def scatter(df=None,
         marker_size: Size of the scatter circles. Can be a scalar value, a
             column name, or a list of column names to choose from via dropdown
             menu.
+
+        label_size: Size in pts of font for labels of selected point.
 
         heatmap: If True, displays a heatmap of correlations between numerical
             columns in df that can be clicked to select columns to scatter. If
@@ -623,7 +626,7 @@ def scatter(df=None,
                                    x_offset=0,
                                    y_offset=2,
                                    source=filtered_source,
-                                   text_font_size='8pt',
+                                   text_font_size='{0}pt'.format(label_size),
                                    name='labels',
                                   )
     fig.add_layout(labels)
