@@ -170,13 +170,14 @@ def scatter(df=None,
         heatmap = True
         identical_bins = True
 
-    # Drop NaNs and copy before changing.
-    # (Before 0.12.5, dropna wasn't necessary.)
-    df = df.dropna().copy()
+    # Copy before changing.
+    original_index_name = df.index.name
+    df = df.copy()
 
     # Collapse multiindex if present
     df.columns = [' '.join(map(str, n)) if isinstance(n, tuple) else n for n in df.columns]
     df.index = [' '.join(map(str, n)) if isinstance(n, tuple) else n for n in df.index.values]
+    df.index.name = original_index_name
 
     # Infer column types.
     scatter_data = df.to_dict(orient='list')
@@ -200,6 +201,10 @@ def scatter(df=None,
                 raise ValueError(col + ' not a numerical column')
     else:
         numerical_cols = auto_numerical_cols
+
+    # bokeh can handle NaNs in numpy arrays but not in lists. 
+    for numerical_col in numerical_cols:
+        scatter_data[numerical_col] = np.array(scatter_data[numerical_col])
 
     object_cols = [n for n in df.columns if df[n].dtype is np.dtype('O')]
     if df.index.dtype is np.dtype('O'):
@@ -488,9 +493,9 @@ def scatter(df=None,
 
     for axis, name in [('x', x_name), ('y', y_name)]:
         for data_type in ['all', 'bins_left', 'bins_right']:
-            left_key = '{0}_{1}'.format(axis, data_type)
-            right_key = '{0}_{1}'.format(name, data_type)
-            histogram_data[left_key] = histogram_data[right_key]
+            axis_key = '{0}_{1}'.format(axis, data_type)
+            name_key = '{0}_{1}'.format(name, data_type)
+            histogram_data[axis_key] = histogram_data[name_key]
 
         initial_vals = df[name].iloc[initial_indices]
         initial_counts, _ = np.histogram(initial_vals.dropna(), bins[name])
@@ -799,7 +804,7 @@ def scatter(df=None,
                                                )
         
         # Just a placeholder so that we can assume cluster_button exists.
-        cluster_button = bokeh.models.widgets.Toggle()
+        cluster_button = bokeh.models.widgets.Toggle(name='cluster_button')
 
         menu_callback = build_callback('scatter_menu')
         x_menu.callback = menu_callback
@@ -866,7 +871,7 @@ def scatter(df=None,
                                                         active=[],
                                                         name='case_sensitive',
                                                        )
-    case_sensitive.callback = build_callback('case_sensitive')
+    case_sensitive.callback = build_callback('scatter_case_sensitive')
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols

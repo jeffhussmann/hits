@@ -31,13 +31,14 @@ if (models['table']?)
 
 models['labels_source'].trigger('change')
 
-get_bins = (name) ->
+get_domain_info = (name) ->
     bins_left = models['histogram_source'].data[name + '_bins_left']
     bins_right = models['histogram_source'].data[name + '_bins_right']
-    # slice() to make copy
-    bins = bins_left.slice()
-    bins.push(bins_right[bins_right.length - 1])
-    return bins
+    bounds = [bins_left[0], bins_right[bins_right.length - 1]]
+    domain_info =
+        bins: bins_left
+        bounds: bounds
+    return domain_info
 
 binned_to_counts = (binned) -> (b.length for b in binned)
 
@@ -46,9 +47,12 @@ loaded =
 
 update_bins = () ->
     for name in ['x', 'y']
-        bins = get_bins(name)
-        bounds = [bins[0], bins[bins.length - 1]]
-        binner = loaded['d3'].histogram().domain(bounds).thresholds(bins)
+        domain_info = get_domain_info(name)
+        # histogram behavior is a little unintuitive.
+        # Through trial and error, appears that domain needs to be given min
+        # and max data value, and thresholds needs to be given array that
+        # include min but not max
+        binner = loaded['d3'].histogram().domain(domain_info.bounds).thresholds(domain_info.bins)
         data = filtered_data[name]
         binned = binner(data)
         counts = binned_to_counts(binned)
