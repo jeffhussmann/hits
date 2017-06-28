@@ -53,6 +53,7 @@ def scatter(df=None,
             marker_size=6,
             initial_selection=None,
             initial_xy_names=None,
+            initial_alpha=0.5,
             data_lims=None,
             zoom_to_initial_data=False,
             alpha_widget_type='slider',
@@ -324,7 +325,7 @@ def scatter(df=None,
                           source=scatter_source,
                           size=marker_size,
                           fill_color='_color',
-                          fill_alpha=0.5,
+                          fill_alpha=initial_alpha,
                           line_color=None,
                           nonselection_color='_color',
                           nonselection_alpha=0.1,
@@ -885,13 +886,13 @@ def scatter(df=None,
     if alpha_widget_type == 'slider':
         alpha_widget = bokeh.models.Slider(start=0.,
                                            end=1.,
-                                           value=0.5,
+                                           value=initial_alpha,
                                            step=.05,
                                            title='alpha',
                                            name='alpha',
                                           )
     elif alpha_widget_type == 'text':
-        alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value='0.5')
+        alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value=str(initial_alpha))
     else:
         raise ValueError('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
 
