@@ -166,6 +166,7 @@ def scatter(df=None,
         identical_bins = True
 
     # Copy before changing.
+    original_index_name = df.index.name
     df = df.copy()
 
     # Collapse multiindex if present
