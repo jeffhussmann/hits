@@ -253,11 +253,11 @@ def codon(enrichments=None,
             color = colors[checkbox_name]
             line_width = 2
             line_alpha = 0.95
-            circle_visible = True
+            circle_alpha = 0.9
         else:
             color ='black'
             line_width = 1
-            circle_visible = False
+            circle_alpha = 0
             if len(initial_sub_group_selections) > 0:
                 line_alpha = unselected_alpha
             else:
@@ -283,14 +283,12 @@ def codon(enrichments=None,
                             y='y',
                             color=colors[checkbox_name],
                             source=source,
-                            size=2.5,
-                            fill_alpha=0.95,
-                            line_alpha=0.95,
-                            visible=circle_visible,
+                            size=4.5,
+                            fill_alpha=circle_alpha,
+                            line_alpha=0,
                             hover_alpha=0.95,
                             hover_color=colors[checkbox_name],
                            )
-        circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
     
         legend_item = LegendItem(label=checkbox_name, renderers=[line])
