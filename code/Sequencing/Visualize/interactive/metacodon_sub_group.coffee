@@ -51,13 +51,14 @@ else
             line.glyph.line_width = 1
             line.glyph.line_alpha = line.nonselection_glyph.line_alpha
             
+    console.log(circles)
     for circle in circles
         name = circle.name['circle_'.length..]
 
         if name in active_names
-            circle.glyph.visible = true
+            circle.glyph.fill_alpha = 0.95
         else
-            circle.glyph.visible = false
+            circle.glyph.fill_alpha = 0
 
 legend = models['legend']
 
