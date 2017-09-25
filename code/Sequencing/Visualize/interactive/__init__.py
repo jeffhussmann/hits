@@ -368,7 +368,7 @@ def scatter(df=None,
                 left = name_min * 0.9
                 right = name_max / 0.9
 
-            bins[name] = list(np.logspace(log(left), log(right), num_bins))
+            bins[name] = list(np.logspace(log(left), log(right), num_bins, base=log_scale))
 
     else:
         overall_max = df.max(numeric_only=True).max()
