@@ -405,25 +405,30 @@ def visualize_paired_end_mappings(get_read_pairs,
                                   extra_targets,
                                   bowtie2_targets,
                                   output_fn,
+                                  skip_initial=0,
+                                  num_pairs=100,
                                  ):
 
     R1_alignment_groups_list = []
     R2_alignment_groups_list = []
 
+    def relevant_reads(source):
+        return islice(source, skip_initial, skip_initial + num_pairs)
+
     if isinstance(get_read_pairs, tuple):
         R1_fn, R2_fn = get_read_pairs
         def get_R1_reads():
-            return islice(fastq.reads(R1_fn), 100)
+            return relevant_reads(fastq.reads(R1_fn))
         
         def get_R2_rc_reads():
-            return islice(fastq.reverse_complement_reads(R2_fn), 100)
+            return relevant_reads(fastq.reverse_complement_reads(R2_fn))
     else:
         def get_R1_reads():
-            read_pairs = islice(get_read_pairs(), 100)
+            read_pairs = relevant_reads(get_read_pairs())
             return (R1 for R1, R2 in read_pairs)
         
         def get_R2_rc_reads():
-            read_pairs = islice(get_read_pairs(), 100)
+            read_pairs = relevant_reads(get_read_pairs())
             return (fastq.Read(R2.name, utilities.reverse_complement(R2.seq), R2.qual[::-1]) for R1, R2 in read_pairs)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
