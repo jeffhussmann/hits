@@ -16,5 +16,10 @@ for line in lines
     y_max = Math.max(source.data['y']...)
     maxes.push y_max
 
+if cb_obj.value == 'raw_counts'
+    models['y_axis'].axis_label = 'Number of reads'
+else
+    models['y_axis'].axis_label = 'Fraction of reads'
+
 overall_max = Math.max(maxes...)
 models['y_range'].end = overall_max * 1.05

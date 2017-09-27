@@ -3,4 +3,4 @@ checkbox_groups = (v for k, v of models when k.startsWith('sub_') or k.startsWit
 for group in checkbox_groups
     group.active = []
     group.trigger('change')
-group.callback.func(group)
+group.callback.func(group, cb_data, require, exports)

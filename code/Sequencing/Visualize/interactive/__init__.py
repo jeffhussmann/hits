@@ -43,6 +43,7 @@ def scatter(df=None,
             color_by=None,
             label_by=None,
             size=800,
+            label_size=8,
             axis_label_size=20,
             log_scale=False,
             volcano=False,
@@ -52,6 +53,7 @@ def scatter(df=None,
             marker_size=6,
             initial_selection=None,
             initial_xy_names=None,
+            initial_alpha=0.5,
             data_lims=None,
             zoom_to_initial_data=False,
             alpha_widget_type='slider',
@@ -81,7 +83,8 @@ def scatter(df=None,
             plot that is populated with the selected points from the figure.
 
         color_by: The name of a column in df to use as colors of points, or a
-            list of such names to choose from a menu.
+            list of such names to choose from a menu. (These columns will be
+            excluded from text searches.)
         
         label_by: The name of a column in df to use as labels of points, or a
             list of such names to choose from a menu. If None, df.index is used.
@@ -91,6 +94,8 @@ def scatter(df=None,
         marker_size: Size of the scatter circles. Can be a scalar value, a
             column name, or a list of column names to choose from via dropdown
             menu.
+
+        label_size: Size in pts of font for labels of selected point.
 
         heatmap: If True, displays a heatmap of correlations between numerical
             columns in df that can be clicked to select columns to scatter. If
@@ -166,11 +171,13 @@ def scatter(df=None,
         identical_bins = True
 
     # Copy before changing.
+    original_index_name = df.index.name
     df = df.copy()
 
     # Collapse multiindex if present
-    df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
-    df.index = [' '.join(n) if isinstance(n, tuple) else n for n in df.index.values]
+    df.columns = [' '.join(map(str, n)) if isinstance(n, tuple) else n for n in df.columns]
+    df.index = [' '.join(map(str, n)) if isinstance(n, tuple) else n for n in df.index.values]
+    df.index.name = original_index_name
 
     # Infer column types.
     scatter_data = df.to_dict(orient='list')
@@ -269,21 +276,27 @@ def scatter(df=None,
     
     scatter_data['index'] = list(df.index)
 
-    scatter_data['_no_color'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_data['x']]
+    scatter_data['_black'] = ['rgba(0, 0, 0, 1.0)' for _ in scatter_data['x']]
+    scatter_data['_orange'] = ['orange' for _ in scatter_data['x']]
     
     if color_by is None:
-        color_by = '_no_color'
+        color_by = ''
         show_color_by_menu = False
+        color_options = ['']
+
+        scatter_data['_color'] = scatter_data['_black']
+        scatter_data['_selection_color'] = scatter_data['_orange']
+    
     else:
         show_color_by_menu = True
 
-    if isinstance(color_by, basestring):
-        color_options = ['', color_by]
-    else:
-        show_color_by_menu = True
-        color_options = [''] + list(color_by)
+        if isinstance(color_by, basestring):
+            color_options = ['', color_by]
+        else:
+            color_options = [''] + list(color_by)
     
-    scatter_data['_color'] = scatter_data[color_options[1]]
+        scatter_data['_color'] = scatter_data[color_options[-1]]
+        scatter_data['_selection_color'] = scatter_data[color_options[-1]]
     
     if label_by is None:
         label_by = df.index.name
@@ -323,12 +336,12 @@ def scatter(df=None,
                           source=scatter_source,
                           size=marker_size,
                           fill_color='_color',
-                          fill_alpha=0.5,
+                          fill_alpha=initial_alpha,
                           line_color=None,
+                          selection_color='_selection_color',
+                          selection_alpha=0.9,
                           nonselection_color='_color',
                           nonselection_alpha=0.1,
-                          selection_color='color',
-                          selection_alpha=0.9,
                           name='scatter',
                          )
     
@@ -438,7 +451,6 @@ def scatter(df=None,
     
     fig.outline_line_color = 'black'
 
-    scatter.selection_glyph.fill_color = 'orange'
     scatter.selection_glyph.line_color = None
     scatter.nonselection_glyph.line_color = None
 
@@ -481,9 +493,9 @@ def scatter(df=None,
 
     for axis, name in [('x', x_name), ('y', y_name)]:
         for data_type in ['all', 'bins_left', 'bins_right']:
-            left_key = '{0}_{1}'.format(axis, data_type)
-            right_key = '{0}_{1}'.format(name, data_type)
-            histogram_data[left_key] = histogram_data[right_key]
+            axis_key = '{0}_{1}'.format(axis, data_type)
+            name_key = '{0}_{1}'.format(name, data_type)
+            histogram_data[axis_key] = histogram_data[name_key]
 
         initial_vals = df[name].iloc[initial_indices]
         initial_counts, _ = np.histogram(initial_vals.dropna(), bins[name])
@@ -626,7 +638,7 @@ def scatter(df=None,
                                    x_offset=0,
                                    y_offset=2,
                                    source=filtered_source,
-                                   text_font_size='8pt',
+                                   text_font_size='{0}pt'.format(label_size),
                                    name='labels',
                                   )
     fig.add_layout(labels)
@@ -792,7 +804,7 @@ def scatter(df=None,
                                                )
         
         # Just a placeholder so that we can assume cluster_button exists.
-        cluster_button = bokeh.models.widgets.Toggle()
+        cluster_button = bokeh.models.widgets.Toggle(name='cluster_button')
 
         menu_callback = build_callback('scatter_menu')
         x_menu.callback = menu_callback
@@ -833,7 +845,7 @@ def scatter(df=None,
     # Menu to choose color source.
     color_menu = bokeh.models.widgets.Select(title='Color by:',
                                              options=color_options,
-                                             value=color_options[1],
+                                             value=color_options[-1],
                                              name='color_menu',
                                             )
     color_menu.callback = build_callback('scatter_color')
@@ -849,15 +861,17 @@ def scatter(df=None,
     grid_options.callback = build_callback('scatter_grid')
 
     text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
+
+    columns_to_search = [c for c in object_cols if c not in color_options]
     text_input.callback = build_callback('scatter_search',
-                                         format_kwargs=dict(column_names=str(object_cols)),
+                                         format_kwargs=dict(column_names=str(columns_to_search)),
                                         )
 
     case_sensitive = bokeh.models.widgets.CheckboxGroup(labels=['Case sensitive'],
                                                         active=[],
                                                         name='case_sensitive',
                                                        )
-    case_sensitive.callback = build_callback('case_sensitive')
+    case_sensitive.callback = build_callback('scatter_case_sensitive')
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
@@ -882,13 +896,13 @@ def scatter(df=None,
     if alpha_widget_type == 'slider':
         alpha_widget = bokeh.models.Slider(start=0.,
                                            end=1.,
-                                           value=0.5,
+                                           value=initial_alpha,
                                            step=.05,
                                            title='alpha',
                                            name='alpha',
                                           )
     elif alpha_widget_type == 'text':
-        alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value='0.5')
+        alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value=str(initial_alpha))
     else:
         raise ValueError('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
 

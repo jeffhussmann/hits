@@ -1,7 +1,7 @@
 import bokeh
-from bokeh.core.properties import List, Instance
 from bokeh.models.tickers import SingleIntervalTicker
-from bokeh.models.annotations import LegendItem
+from bokeh.models.annotations import Legend, LegendItem
+from bokeh.core.properties import List, Instance
 import copy
 import json
 import os.path
@@ -12,6 +12,8 @@ from collections import defaultdict
 from external_coffeescript import build_callback
 from colors_list import colors_list
 
+# In 0.12.5 and 0.12.6, custom models have to be defined BEFORE output_notebook
+# is called. See https://github.com/codypiersall/bokeh-custom-model.
 class ToggleLegend(bokeh.models.annotations.Legend):
     all_items = List(Instance(LegendItem))
 
@@ -25,6 +27,9 @@ export class ToggleLegend extends Legend
         all_items: [p.Array, []]
     }
 '''
+
+bokeh.io.reset_output()
+bokeh.io.output_notebook()
 
 def codon(enrichments=None,
           group_by='codon',
@@ -107,7 +112,7 @@ def codon(enrichments=None,
         # Overrule other arguments to highlight interesting features in data.
         x_lims = (-18, 81)
         y_max = 3.2
-        group_by = 'experiment'
+        group_by = 'codon'
         initial_menu_selection = 'CGA'
         initial_sub_group_selections = [
             'BirA_+CHX_2minBiotin_input',
@@ -117,8 +122,8 @@ def codon(enrichments=None,
 
     # enrichments has experiments as top level keys and codons as lower level
     # keys. Building ColumnDataSource's below assumes a dictionary with
-    # checkbox_names as the top keys, so if grouping by experiment, don't need
-    # to do anything. If grouping by codon, need to invert the order of the
+    # checkbox_names as the top keys, so if grouping by codon, don't need
+    # to do anything. If grouping by experiment, need to invert the order of the
     # dictionary.
 
     # Copy enrichments since xs will be popped.
@@ -131,7 +136,7 @@ def codon(enrichments=None,
     
     exp_names = sorted(enrichments['codon'])
 
-    if group_by == 'codon':
+    if group_by == 'experiment':
         if groupings is None:
             groupings = {aa: cs for aa, cs in genetic_code.full_back_table.items() if aa != '*'}
 
@@ -148,8 +153,17 @@ def codon(enrichments=None,
 
         enrichments = inverted
     
-    elif group_by == 'experiment':
-        menu_options = genetic_code.non_stop_codons
+    elif group_by == 'codon':
+        menu_options = []
+        for codon in genetic_code.non_stop_codons:
+            aa = genetic_code.forward_table[codon]
+            codon_aa = '{0} ({1})'.format(codon, aa)
+            menu_options.append(codon_aa)
+            for exp_name in exp_names:
+                for resolution in enrichments:
+                    ys = enrichments[resolution][exp_name].pop(codon)
+                    enrichments[resolution][exp_name][codon_aa] = ys
+
         checkbox_names = sorted(enrichments['codon'])
         
         if groupings is None:
@@ -239,11 +253,11 @@ def codon(enrichments=None,
             color = colors[checkbox_name]
             line_width = 2
             line_alpha = 0.95
-            circle_visible = True
+            circle_alpha = 0.9
         else:
             color ='black'
             line_width = 1
-            circle_visible = False
+            circle_alpha = 0
             if len(initial_sub_group_selections) > 0:
                 line_alpha = unselected_alpha
             else:
@@ -269,14 +283,12 @@ def codon(enrichments=None,
                             y='y',
                             color=colors[checkbox_name],
                             source=source,
-                            size=2.5,
-                            fill_alpha=0.95,
-                            line_alpha=0.95,
-                            visible=circle_visible,
+                            size=4.5,
+                            fill_alpha=circle_alpha,
+                            line_alpha=0,
                             hover_alpha=0.95,
                             hover_color=colors[checkbox_name],
                            )
-        circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
     
         legend_item = LegendItem(label=checkbox_name, renderers=[line])
@@ -317,7 +329,7 @@ def codon(enrichments=None,
                                          )
     fig.renderers.append(one_y)
 
-    menu_title = 'Codon:' if group_by == 'experiment' else 'Experiment:'
+    menu_title = 'Codon:' if group_by == 'codon' else 'Experiment:'
     menu = bokeh.models.widgets.MultiSelect(options=menu_options,
                                             value=[initial_menu_selection],
                                             size=min(30, len(menu_options)),
@@ -398,10 +410,14 @@ def codon(enrichments=None,
 def gene(enrichments=None,
          groupings=None,
          y_max=5,
+         x_lims=(-20, 150),
          unselected_alpha=0.2,
-         initial_resolution='nucleotide',
+         initial_assignment=None,
          initial_top_group_selections=None,
          initial_sub_group_selections=None,
+         landmark_pairs=None,
+         group_order=None,
+         colors=None,
         ):
     ''' An interactive plot of metagene enrichment profiles using bokeh. Call
     without any arguments for an example using data from Jan et al. Science
@@ -439,6 +455,9 @@ def gene(enrichments=None,
     if initial_sub_group_selections is None:
         initial_sub_group_selections = []
 
+    if landmark_pairs is None:
+        landmark_pairs = [('start_codon', 'stop_codon')]
+    
     if enrichments is None:
         # Load example data
         dirname = os.path.dirname(__file__)
@@ -463,59 +482,74 @@ def gene(enrichments=None,
             'sec63mVenusBirA_-CHX_1minBiotin_input',
         ]
     
+    enrichments = copy.deepcopy(enrichments)
+
+    assignments = sorted(enrichments)
+    assignment = assignments[0]
+    if initial_assignment is None:
+        initial_assignment = assignment
+    landmarks = sorted(enrichments[assignment])
+
+    all_xs = {}
+    for assignment in assignments:
+        all_xs[assignment] = {}
+        for landmark in landmarks:
+            all_xs[assignment][landmark] = enrichments[assignment][landmark].pop('xs')
+    
+    exp_names = sorted(enrichments[assignment][landmarks[0]])
+
+    if groupings is None:
+        groupings = defaultdict(list)
+        for exp_name in exp_names:
+            group_name = exp_name.split(':')[0]
+            groupings[group_name].append(exp_name)
+
     initial_sub_group_selections = set(initial_sub_group_selections)
     for top_name, sub_names in sorted(groupings.items()):
         if top_name in initial_top_group_selections:
             initial_sub_group_selections.update(sub_names)
 
-    enrichments = copy.deepcopy(enrichments)
-
-    highest_level_keys = sorted(enrichments)
-
-    all_xs = {}
-    for key in highest_level_keys:
-        all_xs[key] = {}
-        for landmark in enrichments[key]:
-            all_xs[key][landmark] = enrichments[key][landmark].pop('xs')
-
-    exp_names = sorted(enrichments[highest_level_keys[0]]['start_codon'])
     sources = {}
 
-    for key in ['plotted'] + highest_level_keys:
-        if key == 'plotted':
-            resolution = initial_resolution
-        else:
-            resolution = key
-        
-        sources[key] = {}
-        for exp_name in exp_names:
-            source = bokeh.models.ColumnDataSource()
-            for landmark in ['start_codon', 'stop_codon']:
-                xs = all_xs[resolution][landmark]
-                ys = enrichments[resolution][landmark][exp_name]
+    landmark_pair_names = []
+    for left, right in landmark_pairs:
+        landmark_pair_name = ':'.join((left, right))
+        landmark_pair_names.append(landmark_pair_name)
+        for assignment in assignments:
+            sources[assignment, landmark_pair_name] = {}
 
-                source.data['xs_{0}'.format(landmark)] = xs
-                source.data['ys_{0}'.format(landmark)] = ys
-                source.data['name'] = [exp_name] * len(xs)
+            for exp_name in exp_names:
+                source = bokeh.models.ColumnDataSource()
+                
+                for side, landmark in (('left', left), ('right', right)):
+                    source.data['xs_{0}'.format(side)] = all_xs[assignment][landmark]
+                    source.data['ys_{0}'.format(side)] = enrichments[assignment][landmark][exp_name]
+                
+                source.data['name'] = [exp_name] * len(source.data['xs_left'])
             
-            source.name = 'source_{0}_{1}'.format(exp_name, key)
-            sources[key][exp_name] = source
+                source.name = 'source_{0}_{1}_{2}'.format(exp_name, assignment, landmark_pair_name)
+                sources[assignment, landmark_pair_name][exp_name] = source
 
-    initial_before = 20
-    initial_after = 150
+    sources['plotted'] = {}
+    initial_sources = sources[initial_assignment, landmark_pair_names[0]]
+    for exp_name in exp_names:
+        initial_data = initial_sources[exp_name].data
+        source = bokeh.models.ColumnDataSource(data=initial_data)
+        source.name = 'source_{0}_plotted'.format(exp_name)
+        sources['plotted'][exp_name] = source
 
     initial_lims = {
-        'start_codon': (-initial_before, initial_after),
-        'stop_codon': (-initial_after, initial_before),
+        'left': x_lims,
+        'right': -1 * np.array(x_lims[::-1]),
     }
 
     x_ranges = {}
     x_range_callback = build_callback('metagene_x_range')
-    for landmark in ('start_codon', 'stop_codon'):
-        x_range = bokeh.models.Range1d(*initial_lims[landmark])
-        x_range.name = 'x_range_{0}'.format(landmark)
+    for side in ('left', 'right'):
+        x_range = bokeh.models.Range1d(*initial_lims[side])
+        x_range.name = 'x_range_{0}'.format(side)
         x_range.callback = x_range_callback
-        x_ranges[landmark] = x_range
+        x_ranges[side] = x_range
 
     y_range = bokeh.models.Range1d(0, y_max)
     y_range.name = 'y_range'
@@ -532,71 +566,72 @@ def gene(enrichments=None,
     ]
 
     figs = {}
-    for key, y_axis_location in [('start_codon', 'left'), ('stop_codon', 'right')]:
-        figs[key] = bokeh.plotting.figure(plot_width=800,
-                                          plot_height=600,
-                                          x_range=x_ranges[key],
-                                          y_range=y_range,
-                                          y_axis_location=y_axis_location,
-                                          tools=tools,
-                                          active_scroll='wheel_zoom',
-                                         )
+    for side in ('left', 'right'):
+        figs[side] = bokeh.plotting.figure(plot_width=800,
+                                           plot_height=600,
+                                           x_range=x_ranges[side],
+                                           y_range=y_range,
+                                           y_axis_location=side,
+                                           tools=tools,
+                                           active_scroll='wheel_zoom',
+                                          )
 
     lines = {
-        'start_codon': [],
-        'stop_codon': [],
+        'left': [],
+        'right': [],
     }
 
     legend_items = []
     initial_legend_items = []
 
-    colors = dict(zip(exp_names, cycle(colors_list)))
+    if colors is None:
+        colors = dict(zip(exp_names, cycle(colors_list)))
+
     for exp_name in exp_names:
         if exp_name in initial_sub_group_selections:
             color = colors[exp_name]
             line_width = 2
             line_alpha = 0.95
-            circle_visible = True
+            circle_alpha = 0.9
         else:
             color = 'black'
             line_width = 1
-            circle_visible = False
+            circle_alpha = 0
             if len(initial_sub_group_selections) > 0:
                 line_alpha = unselected_alpha
             else:
                 line_alpha = 0.6
 
-        for landmark in ('start_codon', 'stop_codon'):
-            line = figs[landmark].line(x='xs_{0}'.format(landmark),
-                                       y='ys_{0}'.format(landmark),
+        for side in ('left', 'right'):
+            line = figs[side].line(x='xs_{0}'.format(side),
+                                   y='ys_{0}'.format(side),
+                                   source=sources['plotted'][exp_name],
+                                   color=color,
+                                   nonselection_line_color=colors[exp_name],
+                                   nonselection_line_alpha=unselected_alpha,
+                                   hover_alpha=1.0,
+                                   hover_color=colors[exp_name],
+                                   line_width=line_width,
+                                   line_alpha=line_alpha,
+                                  )
+            line.hover_glyph.line_width = 3
+            line.name = 'line_{0}'.format(exp_name)
+            lines[side].append(line)
+
+            circle = figs[side].circle(x='xs_{0}'.format(side),
+                                       y='ys_{0}'.format(side),
                                        source=sources['plotted'][exp_name],
-                                       color=color,
-                                       nonselection_line_color=colors[exp_name],
-                                       nonselection_line_alpha=unselected_alpha,
+                                       size=4,
+                                       color=colors[exp_name],
+                                       fill_alpha=circle_alpha,
+                                       line_alpha=circle_alpha,
                                        hover_alpha=1.0,
                                        hover_color=colors[exp_name],
-                                       line_width=line_width,
-                                       line_alpha=line_alpha,
                                       )
-            line.hover_glyph.line_width = 4
-            line.name = 'line_{0}'.format(exp_name)
-            lines[landmark].append(line)
-            
-            circle = figs[landmark].circle(x='xs_{0}'.format(landmark),
-                                           y='ys_{0}'.format(landmark),
-                                           source=sources['plotted'][exp_name],
-                                           size=2,
-                                           color=colors[exp_name],
-                                           fill_alpha=0.9,
-                                           line_alpha=0.9,
-                                           visible=circle_visible,
-                                           hover_alpha=1.0,
-                                           hover_color=colors[exp_name],
-                                          )
-            circle.hover_glyph.visible = True
+            #circle.hover_glyph.visible = True
             circle.name = 'circle_{0}'.format(exp_name)
 
-            if landmark == 'stop_codon':
+            if side == 'right':
                 legend_item = LegendItem(label=exp_name, renderers=[line])
                 legend_items.append(legend_item)
                 if exp_name in initial_sub_group_selections:
@@ -606,11 +641,12 @@ def gene(enrichments=None,
                           items=initial_legend_items,
                           all_items=legend_items,
                          )
-    figs['stop_codon'].add_layout(legend)
-    figs['stop_codon'].legend.location = 'top_left'
-    figs['stop_codon'].legend.background_fill_alpha = 0.5
+    figs['right'].add_layout(legend)
+    figs['right'].legend.location = 'top_left'
+    figs['right'].legend.background_fill_alpha = 0.5
     
-    for landmark, fig in figs.items():
+    for side, landmark in zip(('left', 'right'), landmark_pairs[0]):
+        fig = figs[side]
         zero_x = bokeh.models.annotations.Span(location=0,
                                                dimension='height',
                                                line_color='black',
@@ -619,46 +655,64 @@ def gene(enrichments=None,
         fig.renderers.append(zero_x)
 
         one_y = bokeh.models.annotations.Span(location=1,
-                                               dimension='width',
-                                               line_color='black',
-                                               line_alpha=0.5,
+                                              dimension='width',
+                                              line_color='black',
+                                              line_alpha=0.5,
                                               )
         fig.renderers.append(one_y)
-        
         
         remove_underscore = ' '.join(landmark.split('_'))
         fig.xaxis.axis_label = 'Offset from {0}'.format(remove_underscore)
         fig.xaxis.axis_label_text_font_style = 'normal'
+        fig.xaxis.axis_label_text_font_size = '16pt'
         
         fig.grid.grid_line_alpha = 0.4
 
-    figs['start_codon'].yaxis.axis_label = 'Mean relative enrichment'
-    figs['start_codon'].yaxis.axis_label_text_font_style = 'normal'
+    figs['left'].yaxis.axis_label = 'Mean relative enrichment'
+    figs['left'].yaxis.axis_label_text_font_style = 'normal'
+    figs['left'].yaxis.axis_label_text_font_size = '16pt'
     
     source_callback = build_callback('metacodon_selection')
     for source in sources['plotted'].values():
         source.callback = source_callback
 
-    for landmark in ['start_codon', 'stop_codon']:
+    for side in ['left', 'right']:
         hover = bokeh.models.HoverTool(line_policy='interp',
-                                       renderers=lines[landmark],
+                                       renderers=lines[side],
                                       )
         hover.tooltips = [('name', '@name')]
-        figs[landmark].add_tools(hover)
+        figs[side].add_tools(hover)
 
-    resolution = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
-                                                 active=0 if initial_resolution == 'codon' else 1,
-                                                )
-    resolution.name = 'resolution'
-    
     injection_sources = []
-    for key in highest_level_keys:
-        injection_sources.extend(sources[key].values())
+    for assignment in assignments:
+        for landmark_pair_name in landmark_pair_names:
+            to_inject = sources[assignment, landmark_pair_name].values()
+            injection_sources.extend(to_inject)
+
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    resolution.callback = build_callback('metacodon_resolution',
-                                         args=injection,
-                                        )
+    assignment_menu = bokeh.models.widgets.Select(title='Assignment:',
+                                                  options=assignments,
+                                                  value=initial_assignment,
+                                                 )
+    assignment_menu.name = 'assignment_menu'
+    
+    assignment_menu.callback = build_callback('metacodon_assignment',
+                                              args=injection,
+                                             )
+        
+    landmark_menu = bokeh.models.widgets.Select(title='Landmarks:',
+                                                options=landmark_pair_names,
+                                                value=landmark_pair_names[0],
+                                               )
+    landmark_menu.name = 'landmark_menu'
+    
+    landmark_menu.callback = build_callback('metacodon_assignment',
+                                            args=injection,
+                                           )
+    
+    clear_selection = bokeh.models.widgets.Button(label='Clear selection')
+    clear_selection.callback = build_callback('metacodon_clear_selection')
     
     sub_group_callback = build_callback('metacodon_sub_group',
                                         format_kwargs=dict(color_unselected='false'),
@@ -668,7 +722,11 @@ def gene(enrichments=None,
 
     top_groups = []
     sub_groups = []
-    for top_name, sub_names in sorted(groupings.items()):
+    if group_order is None:
+        group_order = sorted(groupings)
+
+    for top_name in group_order:
+        sub_names = sorted(groupings[top_name])
         width = int(75 + max(len(l) for l in sub_names) * 6.5)
         
         top_active = [0] if top_name in initial_top_group_selections else []
@@ -681,7 +739,7 @@ def gene(enrichments=None,
         top_groups.append(top)
 
         sub_active = [i for i, n in enumerate(sub_names) if n in initial_sub_group_selections]
-        sub = bokeh.models.widgets.CheckboxGroup(labels=sorted(sub_names),
+        sub = bokeh.models.widgets.CheckboxGroup(labels=sub_names,
                                                  active=sub_active,
                                                  width=width,
                                                  callback=sub_group_callback,
@@ -697,13 +755,19 @@ def gene(enrichments=None,
                                       )
     alpha_slider.callback = build_callback('lengths_unselected_alpha')
 
-    plots = bokeh.layouts.gridplot([[figs['start_codon'], figs['stop_codon']]])
+    plots = bokeh.layouts.gridplot([[figs['left'], figs['right']]])
     plots.children[0].logo = None
 
     grid = [
         top_groups,
         sub_groups,
-        [plots, bokeh.layouts.widgetbox([resolution, alpha_slider])],
+        [plots,
+         bokeh.layouts.widgetbox([assignment_menu,
+                                  landmark_menu,
+                                  alpha_slider,
+                                  clear_selection,
+                                 ]),
+        ],
     ]
     bokeh.io.show(bokeh.layouts.layout(grid))
 
@@ -715,15 +779,13 @@ def lengths(raw_counts,
             types=None,
             max_length=1000,
             x_max=500,
+            colors=None,
            ):
     ys = {
         'raw_counts': raw_counts,
         'by_type': {},
         'by_exp': {},
     }
-
-    if types is None:
-        types = raw_counts.values()[0].keys()
 
     for exp_name in ys['raw_counts']:
         total_counts = sum(ys['raw_counts'][exp_name]['insert_lengths'])
@@ -737,6 +799,10 @@ def lengths(raw_counts,
             ys['by_exp'][exp_name][type_name] = np.true_divide(raw, total_counts)
 
     first_exp_name = ys['raw_counts'].keys()[0]
+    
+    if types is None:
+        types = sorted(ys['raw_counts'][first_exp_name])
+
 
     # ys has experiments as top level keys and types as lower level keys.
     # Need a dictionary with checkbox names as the top keys, so if grouping by
@@ -746,7 +812,7 @@ def lengths(raw_counts,
 
     if group_by == 'experiment':
         menu_options = sorted(ys['raw_counts'])
-        checkbox_names = sorted(ys['raw_counts'][first_exp_name])
+        checkbox_names = types
         
         rekeyed_ys = {}
         for normalization in ys:
@@ -763,7 +829,7 @@ def lengths(raw_counts,
         checkbox_names = sorted(ys['raw_counts'])
 
     if initial_sub_group_selections is None:
-        initial_sub_group_selections = checkbox_names
+        initial_sub_group_selections = []
 
     if initial_top_group_selections is None:
         initial_top_group_selections = []
@@ -771,7 +837,8 @@ def lengths(raw_counts,
     if groupings is None:
         groupings = {n: [n] for n in checkbox_names}
 
-    colors = dict(zip(checkbox_names, cycle(colors_list)))
+    if colors is None:
+        colors = dict(zip(checkbox_names, cycle(colors_list)))
 
     initial_menu_selection = None
     if initial_menu_selection is None:
@@ -797,10 +864,10 @@ def lengths(raw_counts,
                 elif len(full_list < max_length):
                     full_list.extend([0]*(max_length + 1 - len(full_list)))
 
-                data[menu_name] = full_list[:max_length + 1]
+                data[menu_name] = np.array(full_list[:max_length + 1])
             source = bokeh.models.ColumnDataSource(data)
 
-            xs = range(max_length + 1)
+            xs = np.arange(max_length + 1)
             source.data['x'] = xs
 
             source.data['y'] = source.data[initial_menu_selection]
@@ -836,13 +903,17 @@ def lengths(raw_counts,
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
-    fig.xaxis.axis_label = 'Length'
-    fig.yaxis.axis_label = 'y'
+    fig.yaxis.axis_label = 'Number of reads'
+    fig.yaxis.axis_label_text_font_style = 'normal'
+    fig.yaxis.axis_label_text_font_size = '16pt'
 
     fig.xaxis.name = 'x_axis'
     fig.yaxis.name = 'y_axis'
 
+    fig.xaxis.axis_label = 'Insert length'
     fig.xaxis.axis_label_text_font_style = 'normal'
+    fig.xaxis.axis_label_text_font_size = '16pt'
+
     fig.yaxis.axis_label_text_font_style = 'normal'
 
     legend_items = []
@@ -853,11 +924,11 @@ def lengths(raw_counts,
             color = colors[checkbox_name]
             line_width = 2
             line_alpha = 0.95
-            circle_visible = True
+            circle_alpha = 0.9
         else:
             color = colors[checkbox_name]
             line_width = 1
-            circle_visible = False
+            circle_alpha = 0
             if len(initial_sub_group_selections) > 0:
                 line_alpha = unselected_alpha
             else:
@@ -884,13 +955,11 @@ def lengths(raw_counts,
                             color=colors[checkbox_name],
                             source=source,
                             size=1,
-                            fill_alpha=0.95,
-                            line_alpha=0.95,
-                            visible=circle_visible,
+                            fill_alpha=circle_alpha,
+                            line_alpha=circle_alpha,
                             hover_alpha=0.95,
                             hover_color=colors[checkbox_name],
                            )
-        circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
     
         legend_item = LegendItem(label=checkbox_name, renderers=[line])
@@ -898,9 +967,10 @@ def lengths(raw_counts,
         if checkbox_name in initial_sub_group_selections:
             initial_legend_items.append(legend_item)
         
-    legend = bokeh.models.Legend(name='legend',
-                                 items=legend_items,
-                                )
+    legend = ToggleLegend(name='legend',
+                          items=initial_legend_items,
+                          all_items=legend_items,
+                         )
     fig.add_layout(legend)
     
     source_callback = build_callback('metacodon_selection')
@@ -967,7 +1037,7 @@ def lengths(raw_counts,
     # characters in names.
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    highest_level_chooser.callback = build_callback('metacodon_highest_level',
+    highest_level_chooser.callback = build_callback('lengths_highest_level',
                                                     args=injection,
                                                    )
 

@@ -1,11 +1,12 @@
 models = cb_obj.document._all_models_by_name._dict
 
 lines = (v for k, v of models when k.startsWith('line_'))
-x_ranges = (v for k, v of models when k.startsWith('x_range'))
 
-resolution = cb_obj.labels[cb_obj.active][...-(' resolution'.length)]
+resolution = cb_obj.value
 
-x_range = x_ranges[0]
+x_range = models['x_range_left']
+
+console.log 'in resolution'
 
 # Record the original values because metacodon_range.coffee might change them.
 original_start = x_range.start
