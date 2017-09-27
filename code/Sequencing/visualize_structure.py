@@ -1,12 +1,12 @@
 from Sequencing import utilities, fastq, genomes, mapping_tools, sw, sam
 from Sequencing import fasta
-from Sequencing.Serialize import counts
 import pysam
 import string
 from itertools import izip, izip_longest, chain, islice
 from Circles import periodicity
 import numpy as np
-import os.path
+import sys
+import contextlib
 
 def mapping_to_alignment(mapping, sam_file, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
@@ -319,7 +319,7 @@ def collapse_representations(representations):
 
     # Sort by leftmost position prior to collapsing
     representations = sorted(set(representations), key=leftmost_position)
-
+    
     collapsed = [representations[0]]
     for read_positions, lines in representations[1:]:
         was_collapsed = False
@@ -400,11 +400,23 @@ def visualize_unpaired_alignments(get_reads,
             output_fh.write(R1_seq + '\n')
             output_fh.write('\n\n')
 
+@contextlib.contextmanager
+def possibly_fn(fn=None):
+    # from https://stackoverflow.com/a/22264583
+    if fn is not None:
+        writer = open(fn, 'w')
+    else:
+        writer = sys.stdout
+
+    yield writer
+
+    if fn != None: writer.close()
+
 def visualize_paired_end_mappings(get_read_pairs,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
-                                  output_fn,
+                                  output_fn=None,
                                  ):
 
     R1_alignment_groups_list = []
@@ -470,7 +482,7 @@ def visualize_paired_end_mappings(get_read_pairs,
                   R2_representation_groups,
                  ]
     
-    with open(output_fn, 'w') as output_fh:
+    with possibly_fn(output_fn) as output_fh:
         for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in izip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)
