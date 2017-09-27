@@ -60,6 +60,7 @@ def scatter(df=None,
             hide_widgets=None,
             identical_bins=False,
             num_bins=100,
+            show_axes_lines=False,
             return_layout=False,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
@@ -425,6 +426,21 @@ def scatter(df=None,
 
     for line in lines:
         line.visible = diagonals_visible
+    
+    axes_line_kwargs = dict(
+        color='black',
+        nonselection_color='black',
+        alpha=0.4,
+        nonselection_alpha=0.4,
+    ) 
+
+    axes_lines = [
+        fig.line(x=bounds, y=1, **line_kwargs),
+        fig.line(x=1, y=bounds, **line_kwargs),
+    ]
+
+    for line in axes_lines:
+        line.visible = show_axes_lines
     
     if volcano:
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
