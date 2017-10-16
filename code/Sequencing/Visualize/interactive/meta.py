@@ -112,7 +112,7 @@ def codon(enrichments=None,
         # Overrule other arguments to highlight interesting features in data.
         x_lims = (-18, 81)
         y_max = 3.2
-        group_by = 'experiment'
+        group_by = 'codon'
         initial_menu_selection = 'CGA'
         initial_sub_group_selections = [
             'BirA_+CHX_2minBiotin_input',
@@ -122,8 +122,8 @@ def codon(enrichments=None,
 
     # enrichments has experiments as top level keys and codons as lower level
     # keys. Building ColumnDataSource's below assumes a dictionary with
-    # checkbox_names as the top keys, so if grouping by experiment, don't need
-    # to do anything. If grouping by codon, need to invert the order of the
+    # checkbox_names as the top keys, so if grouping by codon, don't need
+    # to do anything. If grouping by experiment, need to invert the order of the
     # dictionary.
 
     # Copy enrichments since xs will be popped.
@@ -136,7 +136,7 @@ def codon(enrichments=None,
     
     exp_names = sorted(enrichments['codon'])
 
-    if group_by == 'codon':
+    if group_by == 'experiment':
         if groupings is None:
             groupings = {aa: cs for aa, cs in genetic_code.full_back_table.items() if aa != '*'}
 
@@ -153,8 +153,17 @@ def codon(enrichments=None,
 
         enrichments = inverted
     
-    elif group_by == 'experiment':
-        menu_options = genetic_code.non_stop_codons
+    elif group_by == 'codon':
+        menu_options = []
+        for codon in genetic_code.non_stop_codons:
+            aa = genetic_code.forward_table[codon]
+            codon_aa = '{0} ({1})'.format(codon, aa)
+            menu_options.append(codon_aa)
+            for exp_name in exp_names:
+                for resolution in enrichments:
+                    ys = enrichments[resolution][exp_name].pop(codon)
+                    enrichments[resolution][exp_name][codon_aa] = ys
+
         checkbox_names = sorted(enrichments['codon'])
         
         if groupings is None:
@@ -244,11 +253,11 @@ def codon(enrichments=None,
             color = colors[checkbox_name]
             line_width = 2
             line_alpha = 0.95
-            circle_visible = True
+            circle_alpha = 0.9
         else:
             color ='black'
             line_width = 1
-            circle_visible = False
+            circle_alpha = 0
             if len(initial_sub_group_selections) > 0:
                 line_alpha = unselected_alpha
             else:
@@ -274,14 +283,12 @@ def codon(enrichments=None,
                             y='y',
                             color=colors[checkbox_name],
                             source=source,
-                            size=2.5,
-                            fill_alpha=0.95,
-                            line_alpha=0.95,
-                            visible=circle_visible,
+                            size=4.5,
+                            fill_alpha=circle_alpha,
+                            line_alpha=0,
                             hover_alpha=0.95,
                             hover_color=colors[checkbox_name],
                            )
-        circle.hover_glyph.visible = True
         circle.name = 'circle_{0}'.format(checkbox_name)
     
         legend_item = LegendItem(label=checkbox_name, renderers=[line])
@@ -322,7 +329,7 @@ def codon(enrichments=None,
                                          )
     fig.renderers.append(one_y)
 
-    menu_title = 'Codon:' if group_by == 'experiment' else 'Experiment:'
+    menu_title = 'Codon:' if group_by == 'codon' else 'Experiment:'
     menu = bokeh.models.widgets.MultiSelect(options=menu_options,
                                             value=[initial_menu_selection],
                                             size=min(30, len(menu_options)),
@@ -578,7 +585,7 @@ def gene(enrichments=None,
     initial_legend_items = []
 
     if colors is None:
-        colors = dict(zip(checkbox_names, cycle(colors_list)))
+        colors = dict(zip(exp_names, cycle(colors_list)))
 
     for exp_name in exp_names:
         if exp_name in initial_sub_group_selections:

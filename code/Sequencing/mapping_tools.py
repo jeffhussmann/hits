@@ -150,6 +150,14 @@ class ThreadPairedFastqWriter(threading.Thread):
                 R1_fh.write(str(R1))
                 R2_fh.write(str(R2))
 
+def confirm_index_exists(index_prefix):
+    with open(os.devnull, 'w') as devnull:
+        try:
+            command = ['bowtie2-inspect', '--names', index_prefix]
+            subprocess.check_call(command, stdout=devnull, stderr=devnull)
+        except subprocess.CalledProcessError:
+            raise ValueError('Index prefix {0} does not exist'.format(index_prefix))
+
 def launch_bowtie2(index_prefix,
                    R1_fn,
                    R2_fn,
@@ -164,7 +172,6 @@ def launch_bowtie2(index_prefix,
         ('unaligned_reads_file_name', ['--un', options.get('unaligned_reads_file_name')]),
         ('aligned_pairs_file_name',   ['--al-conc', options.get('aligned_pairs_file_name')]),
         ('unaligned_pairs_file_name', ['--un-conc', options.get('unaligned_pairs_file_name')]),
-        ('suppress_unaligned_SAM',    ['--no-unal']),
         ('omit_secondary_seq',        ['--omit-sec-seq']),
         ('memory_mapped_IO',          ['--mm']),
         ('local',                     ['--local']),
@@ -180,7 +187,7 @@ def launch_bowtie2(index_prefix,
         ('report_up_to',              ['-k', str(options.get('report_up_to'))]),
         ('fasta_input',               ['-f']),
         ('report_timing',             ['-t']),
-        ('omit_unmapped',             ['--no-unal']),
+        ('omit_unaligned',             ['--no-unal']),
         ('min_insert_size',           ['-I', str(options.get('min_insert_size'))]),
         ('max_insert_size',           ['-X', str(options.get('max_insert_size'))]),
         ('forward_forward',           ['--ff']),
@@ -196,6 +203,8 @@ def launch_bowtie2(index_prefix,
     else:
         bowtie2_command = ['bowtie2']
 
+    confirm_index_exists(index_prefix)
+    
     for kwarg, bowtie2_argument in kwarg_to_bowtie2_argument:
         if kwarg in options:
             value = options.pop(kwarg)

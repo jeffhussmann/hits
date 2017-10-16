@@ -1,12 +1,12 @@
 from Sequencing import utilities, fastq, genomes, mapping_tools, sw, sam
 from Sequencing import fasta
-from Sequencing.Serialize import counts
 import pysam
 import string
 from itertools import izip, izip_longest, chain, islice
 from Circles import periodicity
 import numpy as np
-import os.path
+import sys
+import contextlib
 
 def mapping_to_alignment(mapping, sam_file, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
@@ -319,7 +319,7 @@ def collapse_representations(representations):
 
     # Sort by leftmost position prior to collapsing
     representations = sorted(set(representations), key=leftmost_position)
-
+    
     collapsed = [representations[0]]
     for read_positions, lines in representations[1:]:
         was_collapsed = False
@@ -400,30 +400,47 @@ def visualize_unpaired_alignments(get_reads,
             output_fh.write(R1_seq + '\n')
             output_fh.write('\n\n')
 
+@contextlib.contextmanager
+def possibly_fn(fn=None):
+    # from https://stackoverflow.com/a/22264583
+    if fn is not None:
+        writer = open(fn, 'w')
+    else:
+        writer = sys.stdout
+
+    yield writer
+
+    if fn != None: writer.close()
+
 def visualize_paired_end_mappings(get_read_pairs,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
-                                  output_fn,
+                                  output_fn=None,
+                                  skip_initial=0,
+                                  num_pairs=100,
                                  ):
 
     R1_alignment_groups_list = []
     R2_alignment_groups_list = []
 
+    def relevant_reads(source):
+        return islice(source, skip_initial, skip_initial + num_pairs)
+
     if isinstance(get_read_pairs, tuple):
         R1_fn, R2_fn = get_read_pairs
         def get_R1_reads():
-            return islice(fastq.reads(R1_fn), 100)
+            return relevant_reads(fastq.reads(R1_fn))
         
         def get_R2_rc_reads():
-            return islice(fastq.reverse_complement_reads(R2_fn), 100)
+            return relevant_reads(fastq.reverse_complement_reads(R2_fn))
     else:
         def get_R1_reads():
-            read_pairs = islice(get_read_pairs(), 100)
+            read_pairs = relevant_reads(get_read_pairs())
             return (R1 for R1, R2 in read_pairs)
         
         def get_R2_rc_reads():
-            read_pairs = islice(get_read_pairs(), 100)
+            read_pairs = relevant_reads(get_read_pairs())
             return (fastq.Read(R2.name, utilities.reverse_complement(R2.seq), R2.qual[::-1]) for R1, R2 in read_pairs)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
@@ -470,7 +487,7 @@ def visualize_paired_end_mappings(get_read_pairs,
                   R2_representation_groups,
                  ]
     
-    with open(output_fn, 'w') as output_fh:
+    with possibly_fn(output_fn) as output_fh:
         for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in izip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)
