@@ -32,7 +32,7 @@ def dump_spots(srr_fn, first, last, paired):
     command = ['fastq-dump',
                '--dumpbase',
                '--minSpotId', str(first),
-               '-maxSpotId', str(last),
+               '--maxSpotId', str(last),
                '--defline-seq', name_format,
                '--stdout',
                srr_fn,
