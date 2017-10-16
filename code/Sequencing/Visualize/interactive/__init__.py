@@ -294,7 +294,7 @@ def scatter(df=None,
             color_options = ['', color_by]
         else:
             color_options = [''] + list(color_by)
-    
+
         scatter_data['_color'] = scatter_data[color_options[-1]]
         scatter_data['_selection_color'] = scatter_data[color_options[-1]]
     
