@@ -1,9 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image
-import os.path
+import os
 import scipy.signal
 import numpy as np
+import ipywidgets
 from collections import defaultdict
 
 def load_labels(image_fn):
@@ -123,12 +124,15 @@ def plot_gel(image_fn, vertical_range=(0, 1), show_ladders=False, highlight=None
     }
     
     label_to_kwargs = defaultdict(dict)
+
+    if highlight is None:
+        highlight = []
     
     for i, label in enumerate(labels):
         color = 'C{0}'.format(i)
         
-        if highlight is not None:
-            if (i + 1) in highlight:
+        if len(highlight) > 0:
+            if label in highlight:
                 key = 'highlight'
             else:
                 key = 'nonhighlight'
@@ -168,11 +172,9 @@ def plot_gel(image_fn, vertical_range=(0, 1), show_ladders=False, highlight=None
 
     for length, x in peaks:
         alpha = 0.3 if length in major_peaks else 0.05
-
         line_ax.axvline(x, color='black', alpha=alpha)
 
     line_ax.set_yticks([])
-    #line_ax.set_ylim(ymin=0)
     
     line_ax.set_xticks([x for length, x in peaks])
     line_ax.set_xticklabels([str(length) for length, x in peaks], rotation=-90, ha='center', size=8)
@@ -202,12 +204,66 @@ def plot_gel(image_fn, vertical_range=(0, 1), show_ladders=False, highlight=None
     x_min, x_max = map(int, np.asarray(vertical_range) * len(xs))
     line_ax.set_xlim(x_min, x_max)
     
+    im_ax.autoscale(False)
+
     if vertical_range != (0, 1):
-        y_min, y_max = map(int, (1 - np.asarray(vertical_range)) * len(xs))
-        im_ax.axhline(y_min, color='white')
-        im_ax.axhline(y_max, color='white')
+        y_min, y_max = vertical_range
+
+        if y_min == 0:
+            y_min = 0.002
+        if y_max == 1:
+            y_max= 0.999
+
+        line_kwargs = dict(transform=im_ax.transAxes, color='white')
+        im_ax.plot([0.005, 0.005, 0.05], [y_min + 0.05, y_min, y_min], **line_kwargs)
+        im_ax.plot([0.005, 0.005, 0.05], [y_max - 0.05, y_max, y_max], **line_kwargs)
+        im_ax.plot([1 - 0.005, 1 - 0.005, 1 - 0.05], [y_min + 0.05, y_min, y_min], **line_kwargs)
+        im_ax.plot([1 - 0.005, 1 - 0.005, 1 - 0.05], [y_max - 0.05, y_max, y_max], **line_kwargs)
         
     head, tail = os.path.split(image_fn)
     line_ax.set_title(tail)
         
     return fig
+
+def plot_gel_interactive(image_fn, **kwargs):
+    def generate_figure(highlight, vertical_range):
+        fig = plot_gel(image_fn, highlight=highlight, vertical_range=vertical_range)
+        plt.show()
+        return fig
+
+    widgets = {
+        'vertical_range': ipywidgets.FloatRangeSlider(value=[0, 1],
+                                                      continuous_update=False,
+                                                      min=0,
+                                                      max=1,
+                                                      step=0.01,
+                                                      layout=ipywidgets.Layout(height='200px'),
+                                                      style={'description_width': 'initial'},
+                                                      orientation='vertical',
+                                                     ),
+        'highlight': ipywidgets.SelectMultiple(options=load_labels(image_fn),
+                                               value=[],
+                                               layout=ipywidgets.Layout(height='200px'),
+                                              ),
+        'save': ipywidgets.Button(description='Save'),
+        'file_name': ipywidgets.Text(value=os.environ['HOME'] + '/', description='file name'),
+    }
+
+    def save(button):
+        fig = interactive.result
+        fn = widgets['file_name'].value
+        fig.savefig(fn, bbox_inches='tight')
+
+    widgets['save'].on_click(save)
+
+    interactive = ipywidgets.interactive(generate_figure, **widgets)
+    output = interactive.children[-1]
+    output.layout.height = '870px'
+    interactive.update()
+
+    rows = [
+        [widgets['highlight'], widgets['vertical_range'], widgets['file_name'], widgets['save']],
+        [output],
+    ]
+    cols = ipywidgets.VBox([ipywidgets.HBox(row) for row in rows])
+    return cols 
