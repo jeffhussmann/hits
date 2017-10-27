@@ -225,45 +225,55 @@ def plot_gel(image_fn, vertical_range=(0, 1), show_ladders=False, highlight=None
         
     return fig
 
-def plot_gel_interactive(image_fn, **kwargs):
-    def generate_figure(highlight, vertical_range):
-        fig = plot_gel(image_fn, highlight=highlight, vertical_range=vertical_range)
-        plt.show()
-        return fig
+def plot_gels_interactive(image_fns, **kwargs):
 
-    widgets = {
-        'vertical_range': ipywidgets.FloatRangeSlider(value=[0, 1],
-                                                      continuous_update=False,
-                                                      min=0,
-                                                      max=1,
-                                                      step=0.01,
-                                                      layout=ipywidgets.Layout(height='200px'),
-                                                      style={'description_width': 'initial'},
-                                                      orientation='vertical',
-                                                     ),
-        'highlight': ipywidgets.SelectMultiple(options=load_labels(image_fn),
-                                               value=[],
-                                               layout=ipywidgets.Layout(height='200px'),
-                                              ),
-        'save': ipywidgets.Button(description='Save'),
-        'file_name': ipywidgets.Text(value=os.environ['HOME'] + '/', description='file name'),
-    }
+    def make_tab(image_fn):
+        def generate_figure(highlight, vertical_range):
+            fig = plot_gel(image_fn, highlight=highlight, vertical_range=vertical_range)
+            plt.show()
+            return fig
 
-    def save(button):
-        fig = interactive.result
-        fn = widgets['file_name'].value
-        fig.savefig(fn, bbox_inches='tight')
+        widgets = {
+            'vertical_range': ipywidgets.FloatRangeSlider(value=[0, 1],
+                                                          continuous_update=False,
+                                                          min=0,
+                                                          max=1,
+                                                          step=0.01,
+                                                          layout=ipywidgets.Layout(height='200px'),
+                                                          style={'description_width': 'initial'},
+                                                          orientation='vertical',
+                                                         ),
+            'highlight': ipywidgets.SelectMultiple(options=load_labels(image_fn),
+                                                   value=[],
+                                                   layout=ipywidgets.Layout(height='200px'),
+                                                  ),
+            'save': ipywidgets.Button(description='Save'),
+            'file_name': ipywidgets.Text(value=os.environ['HOME'] + '/', description='file name'),
+        }
 
-    widgets['save'].on_click(save)
+        def save(button):
+            fig = interactive.result
+            fn = widgets['file_name'].value
+            fig.savefig(fn, bbox_inches='tight')
 
-    interactive = ipywidgets.interactive(generate_figure, **widgets)
-    output = interactive.children[-1]
-    output.layout.height = '870px'
-    interactive.update()
+        widgets['save'].on_click(save)
 
-    rows = [
-        [widgets['highlight'], widgets['vertical_range'], widgets['file_name'], widgets['save']],
-        [output],
-    ]
-    cols = ipywidgets.VBox([ipywidgets.HBox(row) for row in rows])
-    return cols 
+        interactive = ipywidgets.interactive(generate_figure, **widgets)
+        output = interactive.children[-1]
+        output.layout.height = '870px'
+        interactive.update()
+
+        rows = [
+            [output],
+            [widgets['highlight'], widgets['vertical_range'], widgets['file_name'], widgets['save']],
+        ]
+        cols = ipywidgets.VBox([ipywidgets.HBox(row) for row in rows])
+        return cols 
+
+    tab = ipywidgets.Tab()
+    tab.children = [make_tab(image_fn) for image_fn in image_fns]
+    for i, image_fn in enumerate(image_fns):
+        head, tail = os.path.split(image_fn)
+        tab.set_title(i, tail)
+
+    return tab
