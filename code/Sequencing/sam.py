@@ -929,3 +929,12 @@ def aligned_pairs_exclude_soft_clipping(mapping):
         if last_op == BAM_CSOFT_CLIP:
             aligned_pairs = aligned_pairs[:-last_length]
     return aligned_pairs
+
+def parse_idxstats(bam_fn):
+    lines = pysam.idxstats(bam_fn).splitlines()
+    fields = [line.split('\t') for line in lines]
+    parsed = {rname: int(count) for rname, _, count, _ in fields}
+    return parsed
+
+def get_num_alignments(bam_fn):
+    return sum(parse_idxstats(bam_fn).values())
