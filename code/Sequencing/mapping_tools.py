@@ -434,8 +434,14 @@ def map_tophat(reads_file_names,
     tophat_command = ['tophat2'] + options + [bowtie2_index, joined_reads_names]
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
-    subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
-            
+    try:
+        output = subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print 'tophat command returned code {0}'.format(e.returncode)
+        print 'full command was:\n\t{0}'.format(' '.join(tophat_command))
+        print 'output from tophat was:\n\t{0}'.format(e.output)
+        raise ValueError
+
     # If there were no unmapped reads, tophat won't create a file. I want to be
     # able to assume that one exists.
     accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
