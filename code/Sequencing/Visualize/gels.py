@@ -536,16 +536,17 @@ def plot_gels_interactive(image_fns, **kwargs):
 
         interactive = ipywidgets.interactive(generate_figure, **widgets)
         output = interactive.children[-1]
-        #output.layout.height = '800px'
         interactive.update()
 
+        widgets['invert'].value = annotations.get('invert', False)
+        widgets['contrast'].value = annotations.get('contrast', 1.0)
         widgets['notes'].value = annotations.get('notes', '')
         widgets['labels'].value = '\n'.join(annotations.get('labels', []))
         expected = annotations.get('expected', {})
         lines = ['{0}: {1}'.format(length, name) for length, name in sorted(expected.items())]
         widgets['expected'].value = '\n'.join(lines)
 
-        def update(_):
+        def update_annotations(_):
             def get_lines(key):
                 lines = map(str, widgets[key].value.split('\n'))
                 if lines == ['']:
@@ -555,7 +556,6 @@ def plot_gels_interactive(image_fns, **kwargs):
             annotations['notes'] = str(widgets['notes'].value)
 
             labels = get_lines('labels')
-            annotations['labels'] = labels
             widgets['highlight'].options = labels
 
             expected = {}
@@ -565,11 +565,14 @@ def plot_gels_interactive(image_fns, **kwargs):
                 expected[length] = name
 
             annotations['expected'] = expected
+            annotations['labels'] = labels
+            annotations['invert'] = widgets['invert'].value
+            annotations['contrast'] = widgets['contrast'].value
 
             save_annotations(image_fn, annotations)
             interactive.update()
 
-        widgets['update'].on_click(update)
+        widgets['update'].on_click(update_annotations)
 
         def group_widgets(keys, kind):
             if kind == 'row':
@@ -608,37 +611,49 @@ def plot_gels_interactive(image_fns, **kwargs):
 
         return layout 
 
+    shorten_fn = lambda fn: os.path.split(fn)[1][:-len('_cropped.tif')]
+
     tabs = ipywidgets.Tab()
     tabs.children = [make_tab(image_fn) for image_fn in image_fns]
     for i, image_fn in enumerate(image_fns):
-        head, tail = os.path.split(image_fn)
-        tabs.set_title(i, tail)
+        shortened = shorten_fn(image_fn)
+        tabs.set_title(i, shortened)
             
     fns = sorted(glob.glob('/home/jah/cropped/*.tif'))
-    shorten_fn = lambda fn: os.path.split(fn)[1][:-len('_cropped.tif')]
     file_names = ipywidgets.Select(
         options=[(shorten_fn(fn), fn) for fn in fns],
         value=None,
-        layout=ipywidgets.Layout(width='300px', height='600px'),
+        layout=ipywidgets.Layout(width='300px', height='800px'),
     )
 
     def open_file(change):
         existing_titles = [tabs.get_title(i) for i in range(len(tabs.children))]
         image_fn = change['new']
-        head, tail = os.path.split(image_fn)
-        if tail not in existing_titles:
+        shortened = shorten_fn(image_fn)
+        if shortened not in existing_titles:
             new_tab = make_tab(image_fn)
             tabs.children = tabs.children + (new_tab,)
-            tabs.set_title(len(tabs.children) - 1, tail)
+            tabs.set_title(len(tabs.children) - 1, shortened)
         
-        # Make the selected file the active tab, regardless of whether it was
-        # newly created or not.
+        # Make the selected file the active tab
         titles = [tabs.get_title(i) for i in range(len(tabs.children))]
-        tabs.selected_index = titles.index(tail)
+        tabs.selected_index = titles.index(shortened)
+
+    def sync_menu_selection(change):
+        if change['new'] is None:
+            # All tabs are closed.
+            file_names.value = None
+        else:
+            shorteneds = [s for s, f in file_names.options]
+            fulls = [f for s, f in file_names.options]
+            new_title = tabs.get_title(change['new'])
+            index = shorteneds.index(new_title)
+            file_names.value = fulls[index]
+
+    tabs.observe(sync_menu_selection, names='selected_index')
 
     file_names.observe(open_file, names='value')
 
     file_col = ipywidgets.VBox([file_names])
-    file_col.layout.justify_content = 'center'
 
-    return ipywidgets.HBox([tabs, file_col])
+    return ipywidgets.HBox([file_col, tabs])
