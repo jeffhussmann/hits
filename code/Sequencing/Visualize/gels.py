@@ -231,12 +231,12 @@ def analyze_image(image, annotations):
     else:
         num_lanes = len(labels)
 
+    boundaries = identify_lane_boundaries(image, num_lanes=num_lanes)
+    profiles = extract_profiles(image, boundaries)
+    
     if labels is None:
         labels = range(1, len(boundaries) + 1)
     labels = map(str, labels)
-    
-    boundaries = identify_lane_boundaries(image, num_lanes=num_lanes)
-    profiles = extract_profiles(image, boundaries)
 
     #if invalid(boundaries, labels):
     #    labels = map(str, range(1, len(boundaries) + 1))
