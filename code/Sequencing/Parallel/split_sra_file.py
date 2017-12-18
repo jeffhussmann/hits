@@ -2,16 +2,19 @@ import subprocess32 as subprocess
 import os
 import contextlib
 import Sequencing.Parallel
-import ribosomes.download_GSE as download_GSE
+import yaml
 import sys
 
 def piece(srr_fn, num_pieces, which_piece, paired=False):
     root, _ = os.path.splitext(srr_fn)
-    xml_fn = '{0}.xml'.format(root)
-    if not os.path.exists(xml_fn):
-        raise ValueError('XML doesn\'t exist for {0}'.format(srr_fn))
+    yaml_fn = '{0}.yaml'.format(root)
 
-    info = download_GSE.parse_run_xml(xml_fn)
+    if not os.path.exists(yaml_fn):
+        raise ValueError('yaml doesn\'t exist for {0}'.format(srr_fn))
+
+    with open(yaml_fn) as yaml_fh:
+        info = yaml.load(yaml_fh)
+
     total_spots = info['total_spots']
 
     bounds = Sequencing.Parallel.get_bounds(total_spots, num_pieces)

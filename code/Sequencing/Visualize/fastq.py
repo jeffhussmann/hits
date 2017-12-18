@@ -47,16 +47,19 @@ def plot_data_statistics(R1_base_counts,
                         ):
     ''' Plot fractions of all base calls that are each base at each cycle.
     '''
-    fig, (R1_ax, R2_ax) = plt.subplots(2, 1)
+    fig, (R1_ax, R2_ax) = plt.subplots(2, 1, figsize=(20, 10))
 
     plot_composition(R1_base_counts, ax=R1_ax, expected_seq=R1_expected_seq, bracket_ranges=R1_bracket_ranges)
     plot_composition(R2_base_counts, ax=R2_ax, expected_seq=R2_expected_seq, bracket_ranges=R2_bracket_ranges)
-    R1_ax.set_title('R1', y=-0.05, verticalalignment='top')
-    R2_ax.set_title('R2', y=-0.05, verticalalignment='top')
+    R1_ax.set_title('R1')
+    R2_ax.set_title('R2')
+
+    for ax in (R1_ax, R2_ax):
+        ax.set_ylabel('Base composition')
 
     R1_q_ax = R1_ax.twinx()
     R2_q_ax = R2_ax.twinx()
-
+    
     R1_mean_qs = [utilities.mean_from_histogram(row) for row in R1_qualities]
     R2_mean_qs = [utilities.mean_from_histogram(row) for row in R2_qualities]
 
@@ -65,16 +68,16 @@ def plot_data_statistics(R1_base_counts,
              'linewidth': 2,
              'alpha': 0.3,
             }
-    R1_q_ax.set_autoscale_on(False)
-    R2_q_ax.set_autoscale_on(False)
+
     R1_q_ax.plot(R1_mean_qs, **style)
     R2_q_ax.plot(R2_mean_qs, **style)
+
     for ax in [R1_q_ax, R2_q_ax]:
+        ax.set_ylabel('Average quality score', rotation=90 + 180, va='bottom')
         ax.set_ylim(0, 41)
     
     total = R1_base_counts.sum(axis=1)[0]
     plt.suptitle('Base composition vs. cycle index\n{0:,d} total reads'.format(total))
-    fig.set_size_inches((30, 15))
 
 @optional_ax
 def plot_composition(base_counts,
@@ -127,7 +130,7 @@ def plot_composition(base_counts,
     ax.set_xlim(min(xs) - 0.5, max(xs) + 0.5)
 
     ax.legend(loc='center left',
-              bbox_to_anchor=(1.02, 0.5),
+              bbox_to_anchor=(1.04, 0.5),
               framealpha=0.5,
               numpoints=1,
              )

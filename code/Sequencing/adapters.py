@@ -4,16 +4,16 @@ from Sequencing import utilities
 
 primers = {
     'tru_seq': {
-        'R1':      'TCTTTCCCTACACGACGCTCTTCCGATCT',
-        'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R2':    'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
     },
     'PE': {
         'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
         'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
     },
     'nextera': {
-        'R1':  'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
-        'R2': 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+        'R1':     'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+        'R2':    'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
     },
 }
 
