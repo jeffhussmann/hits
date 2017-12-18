@@ -21,15 +21,15 @@ else
     models['hist_y_all'].glyph.fill_alpha = 0.1
 
 full_data = models['scatter_source'].data
-filtered_data = models['labels_source'].data
+filtered_data = models['filtered_source'].data
 
 for key, values of full_data
     filtered_data[key] = (values[i] for i in indices)
 
-if (models['table']?)
-    models['table'].trigger('change')
+models['filtered_source'].change.emit()#('change')
 
-models['labels_source'].trigger('change')
+if (models['table']?)
+    models['table'].change.emit()#('change')
 
 get_domain_info = (name) ->
     bins_left = models['histogram_source'].data[name + '_bins_left']
@@ -43,7 +43,7 @@ get_domain_info = (name) ->
 binned_to_counts = (binned) -> (b.length for b in binned)
 
 loaded =
-    'd3': if (d3?) then d3 else null
+    'd3': if d3? then d3 else null
 
 update_bins = () ->
     for name in ['x', 'y']
@@ -57,10 +57,11 @@ update_bins = () ->
         binned = binner(data)
         counts = binned_to_counts(binned)
         models['histogram_source'].data[name + '_selected'] = counts
+        console.log(models['histogram_source'])
     
-    models['histogram_source'].trigger('change')
+    models['histogram_source'].change.emit()
 
-if (d3?)
+if d3? and d3.histogram
     update_bins()
     return
 

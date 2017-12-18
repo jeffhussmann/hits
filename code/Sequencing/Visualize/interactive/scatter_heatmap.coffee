@@ -1,7 +1,7 @@
 models = cb_obj.document._all_models_by_name._dict
 
 scatter_data = models['scatter_source'].data
-label_data = models['labels_source'].data
+label_data = models['filtered_source'].data
 hist_data = models['histogram_source'].data
 
 num_selected = cb_obj.selected['1d'].indices.length
@@ -33,8 +33,8 @@ for axis in ['x', 'y']
     models[axis + '_axis'].axis_label = name
 
 # Call to recompute selection histograms.
-models['scatter_source'].callback.func(models['scatter_source'], cb_data, require, exports)
+models['scatter_selection_callback'].func(models['scatter_source'], cb_data, require, exports)
 
-models['scatter_source'].trigger('change')
-models['labels_source'].trigger('change')
-models['histogram_source'].trigger('change')
+models['scatter_source'].change.emit()
+models['filtered_source'].change.emit()
+models['histogram_source'].change.emit()

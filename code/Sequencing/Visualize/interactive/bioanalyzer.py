@@ -2,39 +2,81 @@ import bokeh
 import numpy as np
 import glob
 import os.path
+import io
 import pandas as pd
 from itertools import cycle
-from . import external_coffeescript, colors_list
+from external_coffeescript import build_callback
+from colors_list import colors_list
 from meta import ToggleLegend
 from bokeh.models.annotations import LegendItem
 
-def load_data(exp_dirs):
-    def read_csv(fn):
-        fh = open(fn)
-        line = ''
-        while not line.startswith('Sample Name'):
-            line = fh.readline()
-            
-        name = line.strip().split(',', 1)[1].translate(None, '"')
+def read_sample_csv(fn):
+    fh = open(fn)
+    line = ''
+    while not line.startswith('Sample Name'):
+        line = fh.readline()
         
-        while not line.startswith('Time,Value'):
-            line = fh.readline()
-        
-        times = []
-        values = []
+    name = line.strip().split(',', 1)[1].translate(None, '"')
+    
+    while not line.startswith('Time,Value'):
+        line = fh.readline()
+    
+    times = []
+    values = []
+    
+    line = fh.readline().strip()
+    while line:
+        time, value = map(float, line.strip().split(','))
+        times.append(time)
+        values.append(value)
         
         line = fh.readline().strip()
-        while line:
-            time, value = map(float, line.strip().split(','))
-            times.append(time)
-            values.append(value)
-            
-            line = fh.readline().strip()
-            
-        series = pd.Series(values, index=times, name=name)
         
-        return series
+    series = pd.Series(values, index=times, name=name)
+    
+    return series
 
+def read_results_csv(fn):
+    ''' Parses the *_Results.csv file produced by the Bionalyzer that contains
+    information about peak calls.
+    Returns a dictionary of dataframes keyed by sample name, one of which should
+    be 'Ladder'.
+    '''
+    dfs = {}
+
+    fh = open(fn)
+    def get_clean_line(fh):
+        line = fh.readline()
+        if line == '':
+            clean_line = None
+        else:
+            clean_line = line.replace('\r', '').replace('\n', '').replace('\xb5', 'u').strip()
+        return clean_line
+
+    while(True):
+        line = get_clean_line(fh)
+        if line == None:
+            return dfs
+        while not line.startswith('Sample Name'):
+            line = get_clean_line(fh)
+            if line == None:
+                return dfs
+
+        sample_name = line.split(',')[-1]
+        for i in range(2):
+            fh.readline()
+
+        lines = []
+        line = get_clean_line(fh)
+        while line:
+            lines.append(line)
+            line = get_clean_line(fh)
+
+        file_like = io.StringIO(unicode('\n'.join(lines)))
+        df = pd.read_csv(file_like, thousands=',')
+        dfs[sample_name] = df
+
+def load_data(exp_dirs):
     ordered = ['Sample{0}'.format(i) for i in range(1, 12)] + ['Ladder']
     name_to_order = {n: i + 1 for i, n in enumerate(ordered)}
     def fn_to_order(fn):
@@ -51,9 +93,11 @@ def load_data(exp_dirs):
         'nonmarker area': {},
         'marker area': {},
         'descriptions': {},
+        'peaks': {},
     }
 
     for exp_dir in exp_dirs:
+        exp_dir = exp_dir.rstrip('/')
         try:
             description_fn = '{0}/descriptions.txt'.format(exp_dir)
             descriptions = dict(line.strip().split('\t') for line in open(description_fn))
@@ -66,10 +110,14 @@ def load_data(exp_dirs):
             exps[key][tail] = {}
         fns = glob.glob('{0}/*.csv'.format(exp_dir))
         for fn in fns:
-            data = read_csv(fn)
             order = fn_to_order(fn)
             if order is None:
+                # Results file
+                peaks = read_results_csv(fn)
+                exps['peaks'][tail] = peaks
                 continue
+
+            data = read_sample_csv(fn)
             name = '{0}:{1:02d}_{2}'.format(tail, order, data.name)
 
             marker_area = sum(data[22:23])
@@ -82,16 +130,21 @@ def load_data(exp_dirs):
         
     return exps
 
-def extract_ladder_peak_times(series):
-    ladder_peaks = [
-        ((20, 25), 25),
-        ((25, 30), 200),
-        ((30, 35), 500),
-        ((35, 40), 1000),
-        ((40, 46), 2000),
-        ((46, 52.5), 4000),
-    ]
-    peak_times = {series[start:end].idxmax(): nt for (start, end), nt in ladder_peaks}
+def extract_ladder_peak_times(df):
+    if 'Size [bp]' in df:
+        # This is a DNA ladder.
+        sizes = df['Size [bp]']
+    else:
+        # This is an RNA ladder.
+        sizes = [25, 200, 500, 1000, 2000, 4000]
+        if len(df['Aligned Migration Time [s]']) != len(sizes):
+            raise ValueError('RNA ladder should have exactly 6 peaks. Re-export after excluding extraneous peaks without excluding markers.')
+
+    peak_times = dict(zip(
+        df['Aligned Migration Time [s]'],
+        sizes,
+    ))
+
     return peak_times
 
 def plot(exps,
@@ -106,9 +159,10 @@ def plot(exps,
     colors = {}
     color_iter = cycle(colors_list)
 
-    highest_level_keys = [k for k in sorted(exps) if k != 'descriptions']
+    highest_level_keys = [k for k in sorted(exps) if k not in ['descriptions', 'peaks']]
 
-    for key in ['plotted'] + highest_level_keys:
+    #for key in ['plotted'] + highest_level_keys:
+    for key in ['plotted', 'raw']:
         if key == 'plotted':
             normalization = 'raw'
         else:
@@ -150,22 +204,22 @@ def plot(exps,
         'undo',
     ]
 
-    x_range = bokeh.models.Range1d(17, 70, bounds=(17, 70))
+    #x_range = bokeh.models.Range1d(17, 70, bounds=(17, 70))
     fig = bokeh.plotting.figure(plot_width=1200,
                                 plot_height=600,
                                 tools=tools, active_scroll='wheel_zoom',
-                                x_range=x_range,
+                                lod_threshold=10000,
+                                #x_range=x_range,
                                )
 
     random_group = exps['raw'].keys()[0]
-    series = exps['raw'][random_group]['{0}:12_Ladder'.format(random_group)]
-    peak_times = extract_ladder_peak_times(series)
+    peak_times = extract_ladder_peak_times(exps['peaks'][random_group]['Ladder'])
     
     for time, nt in peak_times.items():
-        line = bokeh.models.annotations.Span(location=time,
+        line = bokeh.models.annotations.Span(location=float(time),
                                              dimension='height',
                                              line_color='black',
-                                             line_alpha=0.8,
+                                             line_alpha=0.2,
                                              line_dash='dashed',
                                             )
         fig.renderers.append(line)
@@ -224,9 +278,9 @@ def plot(exps,
                          )
     fig.add_layout(legend)
     
-    source_callback = external_coffeescript('bioanalyzer_selection',
-                                            args=dict(full_source=full_source),
-                                           )
+    source_callback = build_callback('bioanalyzer_selection',
+                                     args=dict(full_source=full_source),
+                                    )
     for source in sources['plotted'].values():
         source.callback = source_callback
 
@@ -236,13 +290,13 @@ def plot(exps,
     hover.tooltips = [('name', '@name')]
     fig.add_tools(hover)
 
-    sub_group_callback = external_coffeescript('bioanalyzer_sub_group',
-                                               args=dict(full_source=full_source),
-                                              )
+    sub_group_callback = build_callback('bioanalyzer_sub_group',
+                                        args=dict(full_source=full_source),
+                                       )
 
-    top_group_callback = external_coffeescript('bioanalyzer_top_group',
-                                               args=dict(full_source=full_source),
-                                              )
+    top_group_callback = build_callback('bioanalyzer_top_group',
+                                        args=dict(full_source=full_source),
+                                       )
 
     top_groups = []
     sub_groups = []
@@ -267,21 +321,22 @@ def plot(exps,
 
     
     clear_selection = bokeh.models.widgets.Button(label='Clear selection')
-    clear_selection.callback = external_coffeescript('bioanalyzer_clear_selection',
-                                                     args=dict(full_source=full_source),
-                                                    )
+    clear_selection.callback = build_callback('bioanalyzer_clear_selection',
+                                              args=dict(full_source=full_source),
+                                             )
     
     highest_level_chooser = bokeh.models.widgets.Select(options=highest_level_keys,
                                                         value=highest_level_keys[2],
                                                        )
-    callback_name = 'metacodon_highest_level'
+    callback_name = 'lengths_highest_level'
     
     injection_sources = []
-    for key in highest_level_keys:
+    #for key in highest_level_keys:
+    for key in ['raw']:
         injection_sources.extend(sources[key].values())
     injection = {'ensure_no_collision_{0}'.format(i): v for i, v in enumerate(injection_sources)}
 
-    highest_level_chooser.callback = external_coffeescript(callback_name,
+    highest_level_chooser.callback = build_callback(callback_name,
                                                            args=injection,
                                                           )
     table_col_names = [
@@ -309,8 +364,17 @@ def plot(exps,
                                            name='table',
                                            row_headers=False,
                                           )
+    
+    alpha_slider = bokeh.models.Slider(start=0.,
+                                       end=1.,
+                                       value=unselected_alpha,
+                                       step=.05,
+                                       title='unselected alpha',
+                                      )
+    alpha_slider.callback = build_callback('lengths_unselected_alpha')
+
     grid = bokeh.layouts.layout([
-        sub_groups + [bokeh.layouts.widgetbox([highest_level_chooser, clear_selection])],
+        sub_groups + [bokeh.layouts.widgetbox([highest_level_chooser, clear_selection, alpha_slider])],
         [fig],
         [table],
     ])

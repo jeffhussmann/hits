@@ -1,7 +1,6 @@
 models = cb_obj.document._all_models_by_name._dict
 
-chooser = models['highest_level_chooser']
-resolution = chooser.labels[chooser.active][...-(' resolution'.length)]
+resolution = models['highest_level_chooser'].value
 if resolution == 'nucleotide'
     x_max = 300
 else
