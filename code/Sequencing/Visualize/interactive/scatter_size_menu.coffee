@@ -6,4 +6,4 @@ if choice == ''
     choice = '_uniform_size'
 
 models['scatter_source'].data['_size'] = models['scatter_source'].data[choice]
-models['scatter_source'].trigger('change')
+models['scatter_source'].change.emit()

@@ -367,10 +367,11 @@ def codon(enrichments=None,
                                                 )
         sub_groups.append(sub)
 
-    highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
-                                                            active=0 if intial_resolution == 'codon' else 1,
-                                                            name='highest_level_chooser',
-                                                           )
+    highest_level_chooser = bokeh.models.widgets.Select(options=['codon', 'nucleotide'],
+                                                        value=intial_resolution,
+                                                        name='highest_level_chooser',
+                                                        title='Resolution:',
+                                                       )
 
     injection_sources = []
     for resolution in ['codon', 'nucleotide']:

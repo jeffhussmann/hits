@@ -4,4 +4,6 @@ for group in checkbox_groups
     group.active = []
     group.trigger('change')
 
-group.callback.func(full_source, group)
+
+console.log group
+group.callback.func(full_source, group, '', require, exports)
