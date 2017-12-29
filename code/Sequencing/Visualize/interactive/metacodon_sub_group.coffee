@@ -25,7 +25,6 @@ for group in checkbox_groups
 
 if active_names.length == 0
     for line in lines
-        name = line.name['line_'.length..]
         line.glyph.line_width = 1
         line.glyph.line_alpha = 0.6
         if color_unselected
@@ -33,7 +32,7 @@ if active_names.length == 0
         else
             line.glyph.line_color = "black"
         
-    circle.glyph.visible = false for circle in circles
+    circle.glyph.fill_alpha = 0 for circle in circles
         
 else
     for line in lines
@@ -51,7 +50,6 @@ else
             line.glyph.line_width = 1
             line.glyph.line_alpha = line.nonselection_glyph.line_alpha
             
-    console.log(circles)
     for circle in circles
         name = circle.name['circle_'.length..]
 
