@@ -59,6 +59,11 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
         left_mapping, right_mapping = R1_mapping, R2_mapping
     elif R1_strand == '-':
         left_mapping, right_mapping = R2_mapping, R1_mapping
+                
+    if left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP or \
+       right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP:
+        # Don't allow soft clipping on the internal edge.
+        return False
     
     left_md = dict(left_mapping.tags)['MD']
     right_md = dict(right_mapping.tags)['MD']
