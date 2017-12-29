@@ -251,7 +251,7 @@ def realigned_mismatches(seq, start, realigned_cigar, ref_dict):
     realigned_pairs = sam.cigar_to_aligned_pairs(realigned_cigar, start)
     mismatches = []
     for read_position, ref_position in realigned_pairs:
-        if read_position != None and read_position != 'N' and ref_position != None:
+        if read_position != None and read_position != 'N' and ref_position != None and ref_position != 'S':
             read_base = seq[read_position]
             ref_base = ref_dict[ref_position]
             if read_base != ref_base:
@@ -263,7 +263,7 @@ def realigned_mismatches_backwards(seq, end, realigned_cigar, ref_dict):
     realigned_pairs = sam.cigar_to_aligned_pairs_backwards(realigned_cigar, end, len(seq))
     mismatches = []
     for read_position, ref_position in realigned_pairs:
-        if read_position != None and ref_position != None:
+        if read_position != None and read_position != 'N' and ref_position != None and ref_position != 'S':
             read_base = seq[read_position]
             ref_base = ref_dict[ref_position]
             if read_base != ref_base:
