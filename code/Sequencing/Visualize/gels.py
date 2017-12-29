@@ -45,7 +45,7 @@ def identify_lane_boundaries(image, num_lanes=None):
     '''
     cols = image.sum(axis=0)
     window_sums = sum_over_window(cols, 20)
-    peaks, = scipy.signal.argrelmax(window_sums, order=8)
+    peaks, = scipy.signal.argrelmax(window_sums, order=16)
 
     if num_lanes is not None:
         descending = sorted(peaks, key=lambda p: window_sums[p], reverse=True)
@@ -249,7 +249,7 @@ def plot_gel(image_fn,
              vertical_range=(0, 1),
              highlight=None,
              contrast=1.0,
-             show_expected=True,
+             show_expected='both',
              invert=False,
             ):
     image = load_image(image_fn)
@@ -346,15 +346,16 @@ def plot_gel(image_fn,
             expected = annotations.get('expected', {})
             for length, name in expected.items():
                 x = length_to_x(length)
-                line_ax.axvline(x, color='black', linestyle='--')
-                line_ax.annotate(name,
-                                 xy=(x, 1),
-                                 xycoords=('data', 'axes fraction'),
-                                 xytext=(0, 2),
-                                 textcoords='offset points',
-                                 va='bottom',
-                                 ha='center',
-                                )
+                if show_expected in {'both', 'plot'}:
+                    line_ax.axvline(x, color='black', linestyle='--')
+                    line_ax.annotate(name,
+                                     xy=(x, 1),
+                                     xycoords=('data', 'axes fraction'),
+                                     xytext=(0, 2),
+                                     textcoords='offset points',
+                                     va='bottom',
+                                     ha='center',
+                                    )
 
                 if invert:
                     line_color = 'black'
@@ -362,18 +363,19 @@ def plot_gel(image_fn,
                     line_color = 'white'
                 y = rows - x
 
-                im_ax.plot([0.99 * cols, cols], [y, y], color=line_color)
-                im_ax.plot([0, 0.01 * cols], [y, y], color=line_color)
+                if show_expected in {'both', 'image'}:
+                    im_ax.plot([0.99 * cols, cols], [y, y], color=line_color)
+                    im_ax.plot([0, 0.01 * cols], [y, y], color=line_color)
 
-                im_ax.annotate(name,
-                               xy=(1, y),
-                               xycoords=('axes fraction', 'data'),
-                               xytext=(2, 0),
-                               textcoords='offset points',
-                               fontsize=8,
-                               va='center',
-                               ha='left',
-                              )
+                    im_ax.annotate(name,
+                                   xy=(1, y),
+                                   xycoords=('axes fraction', 'data'),
+                                   xytext=(2, 0),
+                                   textcoords='offset points',
+                                   fontsize=8,
+                                   va='center',
+                                   ha='left',
+                                  )
 
     else:
         line_ax.set_xticks([])
@@ -426,7 +428,12 @@ def plot_gel(image_fn,
         if y_max == 1:
             y_max= 0.999
 
-        line_kwargs = dict(transform=im_ax.transAxes, color='white')
+        if invert:
+            line_color = 'black'
+        else:
+            line_color = 'white'
+
+        line_kwargs = dict(transform=im_ax.transAxes, color=line_color)
         im_ax.plot([0.005, 0.005, 0.05], [y_min + 0.05, y_min, y_min], **line_kwargs)
         im_ax.plot([0.005, 0.005, 0.05], [y_max - 0.05, y_max, y_max], **line_kwargs)
         im_ax.plot([1 - 0.005, 1 - 0.005, 1 - 0.05], [y_min + 0.05, y_min, y_min], **line_kwargs)
@@ -488,10 +495,14 @@ def plot_gels_interactive(image_fns, **kwargs):
                 description='Invert',
                 icon='check',
             ),
-            'show_expected': ipywidgets.ToggleButton(
+            'show_expected': ipywidgets.Dropdown(
+                options={'neither': False,
+                         'plot': 'plot',
+                         'image': 'image',
+                         'both': 'both',
+                        },
                 value=False,
                 description='Show expected',
-                icon='check',
             ),
             'save': ipywidgets.Button(
                 description='Save snapshot',
@@ -594,14 +605,16 @@ def plot_gels_interactive(image_fns, **kwargs):
                       'contrast',
                       make_col([
                           'invert',
-                          'show_expected',
                       ]),
                       make_col([
                           'save',
                           'close',
                           'update',
                       ]),
-                      'file_name',
+                      make_col([
+                          'file_name',
+                          'show_expected',
+                      ]),
                      ]),
             make_row(['labels',
                       'expected',
