@@ -412,7 +412,7 @@ def map_tophat(reads_file_names,
                transcriptome_index=None,
                num_threads=1,
                no_sort=False,
-               keep_temporary_files=False,
+               keep_temporary_files=True,
               ):
 
     joined_reads_names = ','.join(reads_file_names)
@@ -423,6 +423,10 @@ def map_tophat(reads_file_names,
         '--output-dir', tophat_dir,
         '--report-secondary-alignments',
         '--read-realign-edit-dist', '0',
+        #'--read-mismatches', '6',
+        #'--read-edit-dist', '6',
+        #'--b2-n-ceil', 'C,10,0',
+        #'--b2-L', '10',
     ]
 
     if gtf_file_name is not None:
