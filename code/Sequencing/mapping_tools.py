@@ -3,9 +3,12 @@ import tempfile
 import logging
 import subprocess32 as subprocess
 import threading
+import shutil
 import fastq
 import sam
 import pysam
+import numpy as np
+import Sequencing.genomes as genomes
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -486,21 +489,66 @@ def map_tophat_paired(R1_fn,
     if not no_sort:
         sam.index_bam(accepted_hits_fn)
 
-def map_star(R1_fn, index_dir, output_prefix, R2_fn=None, num_threads=1):
-    star_command = ['STAR',
-                    '--genomeDir', index_dir,
-                    '--outSAMtype', 'BAM', 'SortedByCoordinate',
-                    '--limitBAMsortRAM', '1345513406',
-                    '--alignIntronMax', '1',
-                    '--runThreadN', str(num_threads),
-                    '--outFileNamePrefix', output_prefix,
-                    '--readFilesIn', R1_fn,
-                   ]
+def map_STAR(R1_fn, index_dir, output_prefix,
+             R2_fn=None,
+             num_threads=1,
+             sort=True,
+             include_unmapped=False,
+             bam_fn=None,
+            ):
+    if sort:
+        bam_suffix = 'Aligned.sortedByCoord.out.bam'
+        sort_option = 'SortedByCoordinate'
+    else:
+        bam_suffix = 'Aligned.out.bam'
+        sort_option = 'Unsorted'
+
+    if include_unmapped:
+        unmapped_option = 'Within'
+    else:
+        unmapped_option = 'None'
+
+    STAR_command = [
+        'STAR',
+        '--genomeDir', index_dir,
+        '--outSAMtype', 'BAM', sort_option,
+        '--outSAMunmapped', unmapped_option,
+        '--limitBAMsortRAM', '1345513406',
+        #'--outFilterScoreMinOverLread', '0.3',
+        #'--outFilterMatchNminOverLread', '0.3',
+        '--alignIntronMax', '1',
+        '--runThreadN', str(num_threads),
+        '--outFileNamePrefix', output_prefix,
+        '--readFilesIn', R1_fn,
+    ]
     if R2_fn is not None:
-        star_command.append(R2_fn)
+        STAR_command.append(R2_fn)
 
-    print ' '.join(star_command)
-    subprocess.check_output(star_command)
+    subprocess.check_output(STAR_command)
 
-    bam_fn = '{0}Aligned.sortedByCoord.out.bam'.format(output_prefix)
-    sam.index_bam(bam_fn)
+    initial_bam_fn = output_prefix + bam_suffix
+    if bam_fn is None:
+        bam_fn = initial_bam_fn
+    else:
+        shutil.move(initial_bam_fn, bam_fn)
+
+    if sort:
+        sam.index_bam(bam_fn)
+
+def build_STAR_index(fasta_files, index_dir, wonky_param=None):
+    total_length = 0
+    for fasta_file in fasta_files:
+        for name, entry in genomes.parse_fai(fasta_file + '.fai').items():
+            total_length += entry.length
+
+    if wonky_param is None:
+        wonky_param = int(min(14, np.log2(total_length) / 2. - 1))
+
+    STAR_command = [
+        'STAR',
+        '--runMode', 'genomeGenerate',
+        '--genomeDir', index_dir,
+        '--genomeFastaFiles', ' '.join(fasta_files),
+        '--genomeSAindexNbases', str(wonky_param),
+    ]
+    subprocess.check_output(STAR_command)
