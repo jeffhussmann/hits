@@ -4,13 +4,18 @@ models = cb_obj.document._all_models_by_name._dict
 # the search button or subset menu callback's. If not, reset the values of those
 # widgets.
 
-if (models['search']?) and cb_data != 'from_search'
-    models['search'].value = ''
-
-if (models['subset_menu']?) and cb_data != 'from_subset'
-    models['subset_menu'].value = ''
-
+# To prevent this from erasing a selection that was just made, store indices
+# and re-assign them afterwards.
 indices = cb_obj.selected['1d'].indices
+
+if cb_data == 'from_heatmap'
+else
+    if (models['search']?) and cb_data != 'from_search'
+        models['search'].value = ''
+    if (models['subset_menu']?) and cb_data != 'from_subset'
+        models['subset_menu'].value = ''
+
+cb_obj.selected['1d'].indices = indices
 
 # Make the histograms of all data slightly darker if nothing is selected. 
 if indices.length == 0
@@ -57,7 +62,6 @@ update_bins = () ->
         binned = binner(data)
         counts = binned_to_counts(binned)
         models['histogram_source'].data[name + '_selected'] = counts
-        console.log(models['histogram_source'])
     
     models['histogram_source'].change.emit()
 
