@@ -13,4 +13,4 @@ else
 data['_color'] = data[main_key]
 data['_selection_color'] = data[selection_key]
 
-models['scatter_source'].trigger('change')
+models['scatter_source'].change.emit()

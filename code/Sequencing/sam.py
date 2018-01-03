@@ -266,6 +266,8 @@ def aligned_pairs_to_cigar(aligned_pairs, guide=None):
             op_sequence.append(BAM_CREF_SKIP)
         elif ref == None or ref == '-':
             op_sequence.append(BAM_CINS)
+        elif ref == 'S':
+            op_sequence.append(BAM_CSOFT_CLIP)
         else:
             op_sequence.append(BAM_CMATCH)
 
@@ -322,6 +324,13 @@ def cigar_to_aligned_pairs(cigar, start):
                 aligned_pairs.append((read_pos, None))
 
                 read_pos += 1
+        
+        elif BAM_CSOFT_CLIP:
+            # Soft-clipping results in gap in ref
+            for i in range(length):
+                aligned_pairs.append((read_pos, 'S'))
+
+                read_pos += 1
 
         else:
             raise ValueError('Unsupported op', cigar)
@@ -352,6 +361,13 @@ def cigar_to_aligned_pairs_backwards(cigar, end, read_length):
             # Insertion results in gap in ref
             for i in range(length):
                 aligned_pairs.append((read_pos, None))
+
+                read_pos -= 1
+        
+        elif op == BAM_CSOFT_CLIP:
+            # Soft-clipping results in gap in ref
+            for i in range(length):
+                aligned_pairs.append((read_pos, 'S'))
 
                 read_pos -= 1
 
@@ -929,3 +945,12 @@ def aligned_pairs_exclude_soft_clipping(mapping):
         if last_op == BAM_CSOFT_CLIP:
             aligned_pairs = aligned_pairs[:-last_length]
     return aligned_pairs
+
+def parse_idxstats(bam_fn):
+    lines = pysam.idxstats(bam_fn).splitlines()
+    fields = [line.split('\t') for line in lines]
+    parsed = {rname: int(count) for rname, _, count, _ in fields}
+    return parsed
+
+def get_num_alignments(bam_fn):
+    return sum(parse_idxstats(bam_fn).values())

@@ -4,13 +4,18 @@ models = cb_obj.document._all_models_by_name._dict
 # the search button or subset menu callback's. If not, reset the values of those
 # widgets.
 
-if (models['search']?) and cb_data != 'from_search'
-    models['search'].value = ''
-
-if (models['subset_menu']?) and cb_data != 'from_subset'
-    models['subset_menu'].value = ''
-
+# To prevent this from erasing a selection that was just made, store indices
+# and re-assign them afterwards.
 indices = cb_obj.selected['1d'].indices
+
+if cb_data == 'from_heatmap'
+else
+    if (models['search']?) and cb_data != 'from_search'
+        models['search'].value = ''
+    if (models['subset_menu']?) and cb_data != 'from_subset'
+        models['subset_menu'].value = ''
+
+cb_obj.selected['1d'].indices = indices
 
 # Make the histograms of all data slightly darker if nothing is selected. 
 if indices.length == 0
@@ -21,15 +26,15 @@ else
     models['hist_y_all'].glyph.fill_alpha = 0.1
 
 full_data = models['scatter_source'].data
-filtered_data = models['labels_source'].data
+filtered_data = models['filtered_source'].data
 
 for key, values of full_data
     filtered_data[key] = (values[i] for i in indices)
 
-if (models['table']?)
-    models['table'].trigger('change')
+models['filtered_source'].change.emit()#('change')
 
-models['labels_source'].trigger('change')
+if (models['table']?)
+    models['table'].change.emit()#('change')
 
 get_domain_info = (name) ->
     bins_left = models['histogram_source'].data[name + '_bins_left']
@@ -43,7 +48,7 @@ get_domain_info = (name) ->
 binned_to_counts = (binned) -> (b.length for b in binned)
 
 loaded =
-    'd3': if (d3?) then d3 else null
+    'd3': if d3? then d3 else null
 
 update_bins = () ->
     for name in ['x', 'y']
@@ -58,9 +63,9 @@ update_bins = () ->
         counts = binned_to_counts(binned)
         models['histogram_source'].data[name + '_selected'] = counts
     
-    models['histogram_source'].trigger('change')
+    models['histogram_source'].change.emit()
 
-if (d3?)
+if d3? and d3.histogram
     update_bins()
     return
 

@@ -6,4 +6,4 @@ if typeof value == 'string'
 
 models['scatter'].glyph.fill_alpha = value
 
-models['scatter_source'].trigger('change')
+models['scatter_source'].change.emit()

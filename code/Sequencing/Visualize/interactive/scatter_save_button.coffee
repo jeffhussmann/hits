@@ -2,7 +2,7 @@ models = cb_obj.document._all_models_by_name._dict
 
 column_names = {column_names}
 
-filtered_data = models['labels_source'].data
+filtered_data = models['filtered_source'].data
 
 # learned from http://stackoverflow.com/questions/14964035/how-to-export-javascript-array-info-to-csv-on-client-side
 csv_content = "data:text/csv;charset=utf-8,"

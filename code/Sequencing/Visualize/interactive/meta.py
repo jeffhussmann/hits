@@ -28,8 +28,8 @@ export class ToggleLegend extends Legend
     }
 '''
 
-bokeh.io.reset_output()
-bokeh.io.output_notebook()
+#bokeh.io.reset_output()
+#bokeh.io.output_notebook()
 
 def codon(enrichments=None,
           group_by='codon',
@@ -37,11 +37,11 @@ def codon(enrichments=None,
           colors=None,
           y_max=5,
           x_lims=(-25, 25),
-          unselected_alpha=0.2,
+          unselected_alpha=0.1,
           initial_menu_selection=None,
           initial_top_group_selections=None,
           initial_sub_group_selections=None,
-          intial_resolution='codon',
+          initial_resolution='codon',
          ):
     ''' An interactive plot of metacodon enrichment profiles using bokeh. Call
     without any arguments for an example using data from Jan et al. Science
@@ -190,7 +190,7 @@ def codon(enrichments=None,
     sources = {}
     for key in ['plotted', 'codon', 'nucleotide']:
         if key == 'plotted':
-            resolution = intial_resolution
+            resolution = initial_resolution
         else:
             resolution = key
         
@@ -234,7 +234,7 @@ def codon(enrichments=None,
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
-    fig.xaxis.axis_label = 'Offset ({0}s)'.format(intial_resolution)
+    fig.xaxis.axis_label = 'Offset ({0}s)'.format(initial_resolution)
     fig.yaxis.axis_label = 'Mean relative enrichment'
 
     fig.xaxis.name = 'x_axis'
@@ -244,6 +244,10 @@ def codon(enrichments=None,
     fig.yaxis.axis_label_text_font_style = 'normal'
     
     fig.xaxis[0].ticker = bokeh.models.tickers.SingleIntervalTicker(interval=3, num_minor_ticks=3)
+
+    for letter, x, color in (('A', 1, 'red'), ('P', 4, 'blue'), ('E', 7, 'green')):
+        fig.add_layout(bokeh.models.BoxAnnotation(left=x - 1.5, right=x + 1.5, fill_color=color, fill_alpha=0.1, line_alpha=0))
+        fig.add_layout(bokeh.models.Label(x=x, y=20, y_units='screen', text=letter, text_color=color, text_align='center'))
 
     legend_items = []
     initial_legend_items = []
@@ -367,10 +371,11 @@ def codon(enrichments=None,
                                                 )
         sub_groups.append(sub)
 
-    highest_level_chooser = bokeh.models.widgets.RadioGroup(labels=['codon resolution', 'nucleotide resolution'],
-                                                            active=0 if intial_resolution == 'codon' else 1,
-                                                            name='highest_level_chooser',
-                                                           )
+    highest_level_chooser = bokeh.models.widgets.Select(options=['codon', 'nucleotide'],
+                                                        value=initial_resolution,
+                                                        name='highest_level_chooser',
+                                                        title='Resolution:',
+                                                       )
 
     injection_sources = []
     for resolution in ['codon', 'nucleotide']:
@@ -411,7 +416,7 @@ def gene(enrichments=None,
          groupings=None,
          y_max=5,
          x_lims=(-20, 150),
-         unselected_alpha=0.2,
+         unselected_alpha=0.1,
          initial_assignment=None,
          initial_top_group_selections=None,
          initial_sub_group_selections=None,
@@ -494,7 +499,11 @@ def gene(enrichments=None,
     for assignment in assignments:
         all_xs[assignment] = {}
         for landmark in landmarks:
-            all_xs[assignment][landmark] = enrichments[assignment][landmark].pop('xs')
+            try:
+                all_xs[assignment][landmark] = enrichments[assignment][landmark].pop('xs')
+            except KeyError:
+                print assignment, landmark
+                raise
     
     exp_names = sorted(enrichments[assignment][landmarks[0]])
 
@@ -548,7 +557,7 @@ def gene(enrichments=None,
     for side in ('left', 'right'):
         x_range = bokeh.models.Range1d(*initial_lims[side])
         x_range.name = 'x_range_{0}'.format(side)
-        x_range.callback = x_range_callback
+        #x_range.callback = x_range_callback
         x_ranges[side] = x_range
 
     y_range = bokeh.models.Range1d(0, y_max)
@@ -776,6 +785,7 @@ def lengths(raw_counts,
             groupings=None,
             initial_top_group_selections=None,
             initial_sub_group_selections=None,
+            initial_normalization='by_type',
             types=None,
             max_length=1000,
             x_max=500,
@@ -795,7 +805,8 @@ def lengths(raw_counts,
 
         for type_name in raw_counts[exp_name]:
             raw = raw_counts[exp_name][type_name]
-            ys['by_type'][exp_name][type_name] = np.true_divide(raw, sum(raw))
+            denominator = max(sum(raw), 1)
+            ys['by_type'][exp_name][type_name] = np.true_divide(raw, denominator)
             ys['by_exp'][exp_name][type_name] = np.true_divide(raw, total_counts)
 
     first_exp_name = ys['raw_counts'].keys()[0]
@@ -850,7 +861,7 @@ def lengths(raw_counts,
     sources = {}
     for key in ['plotted'] + ys.keys():
         if key == 'plotted':
-            normalization = 'raw_counts'
+            normalization = initial_normalization
         else:
             normalization = key
 
@@ -903,7 +914,11 @@ def lengths(raw_counts,
     fig.y_range.callback = range_callback
     fig.x_range.callback = range_callback
 
-    fig.yaxis.axis_label = 'Number of reads'
+    if initial_normalization == 'raw_counts':
+        y_label = 'Number of reads'
+    else:
+        y_label = 'Fraction of reads'
+    fig.yaxis.axis_label = y_label
     fig.yaxis.axis_label_text_font_style = 'normal'
     fig.yaxis.axis_label_text_font_size = '16pt'
 
@@ -942,7 +957,7 @@ def lengths(raw_counts,
                         line_alpha=line_alpha,
                         line_join='round',
                         nonselection_line_color=colors[checkbox_name],
-                        nonselection_line_alpha=0.5,
+                        nonselection_line_alpha=0.2,
                         hover_alpha=1.0,
                         hover_color=colors[checkbox_name],
                        )
@@ -1020,14 +1035,14 @@ def lengths(raw_counts,
     
     alpha_slider = bokeh.models.Slider(start=0.,
                                        end=1.,
-                                       value=0.5,
+                                       value=0.2,
                                        step=.05,
                                        title='alpha',
                                       )
     alpha_slider.callback = build_callback('lengths_unselected_alpha')
     
     highest_level_chooser = bokeh.models.widgets.Select(options=ys.keys(),
-                                                        value='raw_counts',
+                                                        value=initial_normalization,
                                                        )
 
     injection_sources = []

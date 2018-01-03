@@ -30,5 +30,5 @@ index = (i for i in [0..num_pairs] when x_names[i] == x_name and y_names[i] == y
 
 models['heatmap_source'].selected['1d'].indices = [index]
 
-models['heatmap_source'].trigger('change')
-models['heatmap_fig'].trigger('change')
+models['heatmap_source'].change.emit()
+models['heatmap_fig'].change.emit()

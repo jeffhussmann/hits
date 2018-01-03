@@ -4,16 +4,16 @@ from Sequencing import utilities
 
 primers = {
     'tru_seq': {
-        'R1':      'TCTTTCCCTACACGACGCTCTTCCGATCT',
-        'R2': 'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R2':    'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
     },
     'PE': {
         'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
         'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
     },
     'nextera': {
-        'R1':  'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
-        'R2': 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+        'R1':     'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+        'R2':    'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
     },
 }
 
@@ -35,13 +35,13 @@ tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
 P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
 P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
 
-def build_before_adapters(I7_sequence='', primer_type='tru_seq', just_primers=False):
+def build_before_adapters(I7_sequence='', primer_type='tru_seq', just_primers=False, R1_index='', R2_index=''):
     if just_primers:
-        before_R1 = primers[primer_type]['R1']
-        before_R2 = primers[primer_type]['R2']
+        before_R1 = primers[primer_type]['R1'] + R1_index
+        before_R2 = primers[primer_type]['R2'] + R2_index
     else:
-        before_R1 = flow_cell['P5'] + primers[primer_type]['R1']
-        before_R2 = flow_cell['P7'] + utilities.reverse_complement(I7_sequence) + primers[primer_type]['R2']
+        before_R1 = flow_cell['P5'] + primers[primer_type]['R1'] + R1_index
+        before_R2 = flow_cell['P7'] + utilities.reverse_complement(I7_sequence) + primers[primer_type]['R2'] + R2_index
 
     return before_R1, before_R2
 

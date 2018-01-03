@@ -3,9 +3,12 @@ import tempfile
 import logging
 import subprocess32 as subprocess
 import threading
+import shutil
 import fastq
 import sam
 import pysam
+import numpy as np
+import Sequencing.genomes as genomes
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -187,7 +190,7 @@ def launch_bowtie2(index_prefix,
         ('report_up_to',              ['-k', str(options.get('report_up_to'))]),
         ('fasta_input',               ['-f']),
         ('report_timing',             ['-t']),
-        ('omit_unaligned',             ['--no-unal']),
+        ('omit_unaligned',            ['--no-unal']),
         ('min_insert_size',           ['-I', str(options.get('min_insert_size'))]),
         ('max_insert_size',           ['-X', str(options.get('max_insert_size'))]),
         ('forward_forward',           ['--ff']),
@@ -409,7 +412,7 @@ def map_tophat(reads_file_names,
                transcriptome_index=None,
                num_threads=1,
                no_sort=False,
-               keep_temporary_files=False,
+               keep_temporary_files=True,
               ):
 
     joined_reads_names = ','.join(reads_file_names)
@@ -420,6 +423,10 @@ def map_tophat(reads_file_names,
         '--output-dir', tophat_dir,
         '--report-secondary-alignments',
         '--read-realign-edit-dist', '0',
+        #'--read-mismatches', '6',
+        #'--read-edit-dist', '6',
+        #'--b2-n-ceil', 'C,10,0',
+        #'--b2-L', '10',
     ]
 
     if gtf_file_name is not None:
@@ -434,8 +441,14 @@ def map_tophat(reads_file_names,
     tophat_command = ['tophat2'] + options + [bowtie2_index, joined_reads_names]
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
-    subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
-            
+    try:
+        output = subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print 'tophat command returned code {0}'.format(e.returncode)
+        print 'full command was:\n\t{0}'.format(' '.join(tophat_command))
+        print 'output from tophat was:\n\t{0}'.format(e.output)
+        raise ValueError
+
     # If there were no unmapped reads, tophat won't create a file. I want to be
     # able to assume that one exists.
     accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
@@ -480,21 +493,66 @@ def map_tophat_paired(R1_fn,
     if not no_sort:
         sam.index_bam(accepted_hits_fn)
 
-def map_star(R1_fn, index_dir, output_prefix, R2_fn=None, num_threads=1):
-    star_command = ['STAR',
-                    '--genomeDir', index_dir,
-                    '--outSAMtype', 'BAM', 'SortedByCoordinate',
-                    '--limitBAMsortRAM', '1345513406',
-                    '--alignIntronMax', '1',
-                    '--runThreadN', str(num_threads),
-                    '--outFileNamePrefix', output_prefix,
-                    '--readFilesIn', R1_fn,
-                   ]
+def map_STAR(R1_fn, index_dir, output_prefix,
+             R2_fn=None,
+             num_threads=1,
+             sort=True,
+             include_unmapped=False,
+             bam_fn=None,
+            ):
+    if sort:
+        bam_suffix = 'Aligned.sortedByCoord.out.bam'
+        sort_option = 'SortedByCoordinate'
+    else:
+        bam_suffix = 'Aligned.out.bam'
+        sort_option = 'Unsorted'
+
+    if include_unmapped:
+        unmapped_option = 'Within'
+    else:
+        unmapped_option = 'None'
+
+    STAR_command = [
+        'STAR',
+        '--genomeDir', index_dir,
+        '--outSAMtype', 'BAM', sort_option,
+        '--outSAMunmapped', unmapped_option,
+        '--limitBAMsortRAM', '1345513406',
+        #'--outFilterScoreMinOverLread', '0.3',
+        #'--outFilterMatchNminOverLread', '0.3',
+        '--alignIntronMax', '1',
+        '--runThreadN', str(num_threads),
+        '--outFileNamePrefix', output_prefix,
+        '--readFilesIn', R1_fn,
+    ]
     if R2_fn is not None:
-        star_command.append(R2_fn)
+        STAR_command.append(R2_fn)
 
-    print ' '.join(star_command)
-    subprocess.check_output(star_command)
+    subprocess.check_output(STAR_command)
 
-    bam_fn = '{0}Aligned.sortedByCoord.out.bam'.format(output_prefix)
-    sam.index_bam(bam_fn)
+    initial_bam_fn = output_prefix + bam_suffix
+    if bam_fn is None:
+        bam_fn = initial_bam_fn
+    else:
+        shutil.move(initial_bam_fn, bam_fn)
+
+    if sort:
+        sam.index_bam(bam_fn)
+
+def build_STAR_index(fasta_files, index_dir, wonky_param=None):
+    total_length = 0
+    for fasta_file in fasta_files:
+        for name, entry in genomes.parse_fai(fasta_file + '.fai').items():
+            total_length += entry.length
+
+    if wonky_param is None:
+        wonky_param = int(min(14, np.log2(total_length) / 2. - 1))
+
+    STAR_command = [
+        'STAR',
+        '--runMode', 'genomeGenerate',
+        '--genomeDir', index_dir,
+        '--genomeFastaFiles', ' '.join(fasta_files),
+        '--genomeSAindexNbases', str(wonky_param),
+    ]
+    subprocess.check_output(STAR_command)

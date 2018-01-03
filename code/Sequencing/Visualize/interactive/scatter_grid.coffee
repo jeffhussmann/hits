@@ -5,5 +5,11 @@ choice = cb_obj.labels[cb_obj.active]
 for grid in models['grid']
     grid.visible = choice == 'grid'
 
-for diagonal in models['diagonal']
+diagonals = models['diagonal']
+if not Array.isArray(diagonals)
+    diagonals = [diagonals]
+
+for diagonal in diagonals
     diagonal.visible = choice == 'diagonal'
+
+console.log(diagonals)

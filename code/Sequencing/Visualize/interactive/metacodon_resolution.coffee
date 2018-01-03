@@ -4,9 +4,7 @@ lines = (v for k, v of models when k.startsWith('line_'))
 
 resolution = cb_obj.value
 
-x_range = models['x_range_left']
-
-console.log 'in resolution'
+x_range = models['x_range']
 
 # Record the original values because metacodon_range.coffee might change them.
 original_start = x_range.start

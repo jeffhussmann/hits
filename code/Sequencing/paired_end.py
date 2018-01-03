@@ -59,6 +59,11 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
         left_mapping, right_mapping = R1_mapping, R2_mapping
     elif R1_strand == '-':
         left_mapping, right_mapping = R2_mapping, R1_mapping
+                
+    if left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP or \
+       right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP:
+        # Don't allow soft clipping on the internal edge.
+        return False
     
     left_md = dict(left_mapping.tags)['MD']
     right_md = dict(right_mapping.tags)['MD']
@@ -251,7 +256,7 @@ def realigned_mismatches(seq, start, realigned_cigar, ref_dict):
     realigned_pairs = sam.cigar_to_aligned_pairs(realigned_cigar, start)
     mismatches = []
     for read_position, ref_position in realigned_pairs:
-        if read_position != None and read_position != 'N' and ref_position != None:
+        if read_position != None and read_position != 'N' and ref_position != None and ref_position != 'S':
             read_base = seq[read_position]
             ref_base = ref_dict[ref_position]
             if read_base != ref_base:
@@ -263,7 +268,7 @@ def realigned_mismatches_backwards(seq, end, realigned_cigar, ref_dict):
     realigned_pairs = sam.cigar_to_aligned_pairs_backwards(realigned_cigar, end, len(seq))
     mismatches = []
     for read_position, ref_position in realigned_pairs:
-        if read_position != None and ref_position != None:
+        if read_position != None and read_position != 'N' and ref_position != None and ref_position != 'S':
             read_base = seq[read_position]
             ref_base = ref_dict[ref_position]
             if read_base != ref_base:
