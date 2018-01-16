@@ -233,6 +233,27 @@ def contains_soft_clipping_pysam(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CSOFT_CLIP in kinds)
 
+def get_soft_clipped_block(alignment, edge):
+    strand = get_strand(alignment)
+
+    if (edge == 5 and strand == '+') or (edge == 3 and strand == '-'):
+        op, length = alignment.cigar[0]
+        if op == BAM_CSOFT_CLIP:
+            sl = slice(None, length)
+        else:
+            sl = slice(0)
+    elif (edge == 5 and strand == '-') or (edge == 3 and strand == '+'):
+        op, length = alignment.cigar[-1]
+        if op == BAM_CSOFT_CLIP:
+            sl = slice(-length, None)
+        else:
+            sl = slice(0)
+
+    seq = alignment.seq[sl]
+    qual = alignment.qual[sl]
+
+    return seq, qual
+
 def cigar_blocks_to_string(cigar_blocks):
     ''' Builds a CIGAR string out of a corresponding list of operations. '''
     string = ['{0}{1}'.format(length, op_to_char[op])
