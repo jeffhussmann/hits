@@ -153,3 +153,6 @@ def reverse_dictionary(d):
 
 def split_nonempty(string, delim):
     return [f for f in string.split(delim) if f]
+
+def normalize_rows(array):
+    return np.true_divide(array, array.sum(axis=1)[:, np.newaxis])

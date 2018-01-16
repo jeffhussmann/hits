@@ -11,5 +11,3 @@ if not Array.isArray(diagonals)
 
 for diagonal in diagonals
     diagonal.visible = choice == 'diagonal'
-
-console.log(diagonals)
