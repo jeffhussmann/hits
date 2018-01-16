@@ -1,7 +1,5 @@
 models = cb_obj.document._all_models_by_name._dict
 
-console.log(models['x_menu'].value)
-
 scatter_data = models['scatter_source'].data
 label_data = models['filtered_source'].data
 hist_data = models['histogram_source'].data
