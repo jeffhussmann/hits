@@ -976,8 +976,9 @@ def scatter(df=None,
 
     widget_box = bokeh.layouts.widgetbox(children=widgets)
 
-    toolbar = bokeh.models.ToolbarBox(tools=fig.toolbar.tools, merge_tools=False)
-    toolbar.logo = None
+    #toolbar = bokeh.models.ToolbarBox(tools=fig.toolbar.tools, merge_tools=False)
+    toolbar = bokeh.models.ToolbarBox(toolbar=fig.toolbar)
+    #toolbar.logo = None
 
     columns = [
         bokeh.layouts.column(children=[hist_figs['x'], fig]),
