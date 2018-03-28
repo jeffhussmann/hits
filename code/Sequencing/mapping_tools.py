@@ -1,14 +1,19 @@
+from __future__ import print_function
 import os
 import tempfile
 import logging
-import subprocess32 as subprocess
+try:
+    import subprocess32 as subprocess
+except ImportError:
+    import subprocess
 import threading
 import shutil
-import fastq
-import sam
 import pysam
 import numpy as np
+
 import Sequencing.genomes as genomes
+import Sequencing.fasta as fasta
+import Sequencing.fastq as fastq
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -349,7 +354,7 @@ def _map_bowtie2(index_prefix,
                                                 err_output,
                                                )
         if bam_output:
-            sam.index_bam(output_file_name)
+            pysam.index(output_file_name)
 
 def map_bowtie2(index_prefix,
                 R1_fn=None,
@@ -395,13 +400,13 @@ def map_bowtie2(index_prefix,
     if yield_unaligned:
         return generator
     elif yield_mappings:
-        sam_file = generator.next()
+        sam_file = next(generator)
         return sam_file, generator
     else:
         # There isn't a real yield in generator, so calling next() is just
         # executing the function.
         try:
-            generator.next()
+            next(generator)
         except StopIteration:
             pass
 
@@ -444,9 +449,9 @@ def map_tophat(reads_file_names,
     try:
         output = subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print 'tophat command returned code {0}'.format(e.returncode)
-        print 'full command was:\n\t{0}'.format(' '.join(tophat_command))
-        print 'output from tophat was:\n\t{0}'.format(e.output)
+        print('tophat command returned code {0}'.format(e.returncode))
+        print('full command was:\n\t{0}'.format(' '.join(tophat_command)))
+        print('output from tophat was:\n\t{0}'.format(e.output))
         raise ValueError
 
     # If there were no unmapped reads, tophat won't create a file. I want to be
@@ -460,7 +465,7 @@ def map_tophat(reads_file_names,
         empty_unmapped.close()
 
     if not no_sort:
-        sam.index_bam(accepted_hits_fn)
+        pysam.index(accepted_hits_fn)
 
 def map_tophat_paired(R1_fn,
                       R2_fn,
@@ -491,7 +496,7 @@ def map_tophat_paired(R1_fn,
     
     accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
     if not no_sort:
-        sam.index_bam(accepted_hits_fn)
+        pysam.index(accepted_hits_fn)
 
 def map_STAR(R1_fn, index_dir, output_prefix,
              R2_fn=None,
@@ -517,9 +522,10 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--genomeDir', index_dir,
         '--outSAMtype', 'BAM', sort_option,
         '--outSAMunmapped', unmapped_option,
+        '--outSAMattributes', 'MD',
         '--limitBAMsortRAM', '1345513406',
-        #'--outFilterScoreMinOverLread', '0.3',
-        #'--outFilterMatchNminOverLread', '0.3',
+        '--outFilterScoreMinOverLread', '0.2',
+        '--outFilterMatchNminOverLread', '0.2',
         '--alignIntronMax', '1',
         '--runThreadN', str(num_threads),
         '--outFileNamePrefix', output_prefix,
@@ -537,7 +543,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         shutil.move(initial_bam_fn, bam_fn)
 
     if sort:
-        sam.index_bam(bam_fn)
+        pysam.index(bam_fn)
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0
@@ -556,3 +562,25 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
         '--genomeSAindexNbases', str(wonky_param),
     ]
     subprocess.check_output(STAR_command)
+
+def _map_STAR(reads,
+              index_prefix,
+              output_prefix,
+             ):
+    input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
+
+    with input_fifo_source:
+        R1_fn = input_fifo_source.file_name
+        writer = ThreadFastqWriter(reads, R1_fn)
+
+        STAR_process, STAR_command = map_STAR(R1_fn,
+                                              index_prefix,
+                                              output_prefix,
+                                             )
+
+        _, err_output = STAR_process.communicate()
+        if STAR_process.returncode != 0:
+            raise subprocess.CalledProcessError(STAR_process.returncode,
+                                                STAR_command,
+                                                err_output,
+                                               )

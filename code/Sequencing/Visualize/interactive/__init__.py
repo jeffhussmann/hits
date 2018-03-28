@@ -6,13 +6,14 @@ import bokeh.plotting
 import pandas as pd
 import matplotlib.colors
 import matplotlib.cm
+import os
 import os.path
 import re
 import base64
 import glob
 import IPython.display
 from collections import defaultdict
-from external_coffeescript import build_callback
+from .external_coffeescript import build_callback
 
 bokeh.io.output_notebook()
 

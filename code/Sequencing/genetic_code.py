@@ -1,6 +1,5 @@
 import Bio.Data.CodonTable
 import copy
-import string
 
 nucleotide_order = 'TCAG'
 nucleotide_to_index = {b: i for i, b in enumerate(nucleotide_order)}
@@ -84,11 +83,11 @@ anticodon_to_codons = {
     'CAC': {'GUG'},
 }
 
-u_to_t = string.maketrans('U', 'T')
+u_to_t = str.maketrans('U', 'T')
 def rna_to_dna(rna):
     return rna.translate(u_to_t)
 
-t_to_u = string.maketrans('T', 'U')
+t_to_u = str.maketrans('T', 'U')
 def dna_to_rna(dna):
     return dna.translate(t_to_u)
 

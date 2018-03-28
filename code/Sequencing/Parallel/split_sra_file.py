@@ -1,4 +1,7 @@
-import subprocess32 as subprocess
+try:
+    import subprocess32 as subprocess
+except ImportError:
+    import subprocess
 import os
 import contextlib
 import Sequencing.Parallel
@@ -23,7 +26,7 @@ def piece(srr_fn, num_pieces, which_piece, paired=False):
 
     with dump_spots(srr_fn, first, last, paired) as lines:
         for line in lines:
-            yield line
+            yield line.decode()
 
 @contextlib.contextmanager
 def dump_spots(srr_fn, first, last, paired):
@@ -32,14 +35,15 @@ def dump_spots(srr_fn, first, last, paired):
     else:
         name_format = '@$ac.$si'
 
-    command = ['fastq-dump',
-               '--dumpbase',
-               '--minSpotId', str(first),
-               '--maxSpotId', str(last),
-               '--defline-seq', name_format,
-               '--stdout',
-               srr_fn,
-              ]
+    command = [
+        'fastq-dump',
+        '--dumpbase',
+        '--minSpotId', str(first),
+        '--maxSpotId', str(last),
+        '--defline-seq', name_format,
+        '--stdout',
+        srr_fn,
+    ]
 
     if paired:
         command.insert(1, '--split-spot')

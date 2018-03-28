@@ -1,23 +1,27 @@
+from __future__ import absolute_import
 from __future__ import division
-from itertools import izip, islice, groupby, cycle, product
-import subprocess
-import re
+from __future__ import print_function
+from itertools import islice, groupby, cycle, product
+from six.moves import zip
+import functools
 import numpy as np
-from Bio.Seq import Seq
-try:
-    import progressbar
-except ImportError:
-    progressbar = None
+import Bio.Data.IUPACData
 
 identity = lambda x: x
 
-def reverse_complement(sequence_string):
-    rc_string = str(Seq(sequence_string).reverse_complement())
-    return rc_string
+mapping = Bio.Data.IUPACData.ambiguous_dna_complement
+for uppercase in list(mapping):
+    mapping[uppercase.lower()] = mapping[uppercase].lower()
+order = ''.join(mapping)
+from_bytes = order.encode()
+to_bytes = ''.join(mapping[f] for f in order).encode()
+complement_table = bytes.maketrans(from_bytes, to_bytes)
 
-def complement(sequence_string):
-    c_string = str(Seq(sequence_string).complement())
-    return c_string
+def complement(seq):
+    return seq.translate(complement_table)
+
+def reverse_complement(seq):
+    return complement(seq)[::-1]
 
 base_order = 'ACGTN-'
 base_to_index = {b: i for i, b in enumerate(base_order)}
@@ -25,22 +29,23 @@ base_to_complement_index = {b: i for i, b in enumerate(complement(base_order))}
 
 complement_index = {i: base_to_complement_index[b] for i, b in enumerate(base_order)}
 
-IUPAC = {'A': {'A'},
-         'C': {'C'},
-         'G': {'G'},
-         'T': {'T'},
-         'M': {'A', 'C'},
-         'R': {'A', 'G'},
-         'W': {'A', 'T'},
-         'S': {'C', 'G'},
-         'Y': {'C', 'T'},
-         'K': {'G', 'T'},
-         'V': {'A', 'C', 'G'},
-         'H': {'A', 'C', 'T'},
-         'D': {'A', 'G', 'T'},
-         'B': {'C', 'G', 'T'},
-         'N': {'G', 'A', 'T', 'C'},
-        }
+IUPAC = {
+    'A': {'A'},
+    'C': {'C'},
+    'G': {'G'},
+    'T': {'T'},
+    'M': {'A', 'C'},
+    'R': {'A', 'G'},
+    'W': {'A', 'T'},
+    'S': {'C', 'G'},
+    'Y': {'C', 'T'},
+    'K': {'G', 'T'},
+    'V': {'A', 'C', 'G'},
+    'H': {'A', 'C', 'T'},
+    'D': {'A', 'G', 'T'},
+    'B': {'C', 'G', 'T'},
+    'N': {'G', 'A', 'T', 'C'},
+}
 
 def counts_to_array(counts, dim=1):
     ''' Converts a dictionary with integer keys into an array. '''
@@ -65,7 +70,9 @@ def mean_from_histogram(histogram):
     if histogram.sum() == 0:
         return 0
     else:
-        mean = np.true_divide(np.dot(histogram, np.arange(len(histogram))), histogram.sum())
+        weighted_sum = np.dot(histogram, np.arange(len(histogram)))
+        num_items = float(histogram.sum())
+        mean = weighted_sum / num_items
     return mean
 
 def group_by(iterable, key=None):
@@ -98,25 +105,6 @@ def line_count(file_name):
     count = int(count)
     return count
 
-def progress_bar(iterable, max_val=None):
-    if progressbar == None:
-        # If the module wasn't imported
-        return iterable
-    else:
-        if max_val is None:
-            max_val = len(iterable)
-
-        max_str = str(len(str(max_val)))
-        format_string = '%(value)' + max_str + 'd / %(max)d'
-        widgets = [progressbar.Bar('='),
-                   ' ',
-                   progressbar.FormatLabel(format_string),
-                   ' ',
-                   progressbar.ETA(),
-                  ]
-        bar = progressbar.ProgressBar(widgets=widgets, maxval=max_val)
-        return bar(iterable)
-
 def pairwise(s):
     """ Returns the elements of s in overlapping pairs. """
     return [(s[i - 1], s[i]) for i in range(1, len(s))]
@@ -145,6 +133,13 @@ def smooth(ys, window):
     smoothed = ys.astype(float)
     for i in range(window, len(ys) - window):
         smoothed[i] = sum(ys[i - window:i + window + 1]) / float(2 * window + 1)
+
+    for i in range(window):
+        smoothed[i] = sum(ys[:i + window + 1]) / float(i + window + 1)
+    
+    for i in range(len(ys) - window, len(ys)):
+        smoothed[i] = sum(ys[i - window:]) / float(len(ys) - (i - window ) + 1)
+
     return smoothed
 
 def reverse_dictionary(d):
@@ -156,3 +151,32 @@ def split_nonempty(string, delim):
 
 def normalize_rows(array):
     return np.true_divide(array, array.sum(axis=1)[:, np.newaxis])
+
+def reverse_enumerate(list_like):
+    reversed_range = range(len(list_like) - 1, -1, -1)
+    return zip(reversed_range, list_like[::-1])
+
+def memoized_property(f):
+    @property
+    @functools.wraps(f)
+    def memoized_f(self):
+        attr_name = '_' + (f.__name__)
+        
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, f(self))
+        
+        return getattr(self, attr_name)
+    
+    return memoized_f
+
+def reservoir_sample(iterable, n):
+    sample = []
+    for i, item in enumerate(iterable):
+        if i < n:
+            sample.append(item)
+        else:
+            j = np.random.randint(i + 1)
+            if j < n:
+                sample[j] = item
+    
+    return sample

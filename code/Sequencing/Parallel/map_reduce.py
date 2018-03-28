@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 import subprocess
 import time
@@ -6,9 +7,12 @@ import shutil
 import re
 import logging
 import pickle
+import glob
+from collections import defaultdict
 from . import split_file
 from . import launcher
-from Sequencing import Serialize
+import Sequencing.Serialize as Serialize
+import Sequencing.fastq as fastq
 
 def extend_stages(whole_stages, specific_stages):
     for whole_stage, specific_stage in zip(whole_stages, specific_stages):
@@ -201,11 +205,93 @@ class MapReduceExperiment(object):
         Serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
         logging.info('Done with cleanup for stage {0}'.format(stage))
 
+    def get_fn_groups(self):
+        fn_groups = defaultdict(lambda: {'R1': None,
+                                         'R2': None,
+                                         'I1': None,
+                                         'I2': None,
+                                        })
+        pattern = r'[RI][12]'
+        data_fns = glob.glob(self.data_dir + '/*.fastq') + glob.glob(self.data_dir + '/*.fq')
+        for data_fn in data_fns:
+            head, tail = os.path.split(data_fn)
+            which_member = re.search(pattern, data_fn).group()
+            group_name = re.sub(pattern, '*', tail)
+            fn_groups[group_name][which_member] = data_fn
+        
+        for group_name in sorted(fn_groups):
+            R1_fn = fn_groups[group_name]['R1']
+            R2_fn = fn_groups[group_name]['R2']
+
+            if R1_fn == None or R2_fn == None:
+                raise ValueError('unpaired file names in data_dir')
+
+        return fn_groups
+
+    def get_read_pairs(self, max_pairs_per_group=None, quiet=False):
+        fn_groups = self.get_fn_groups()
+
+        read_pairs_list = []
+
+        for group in sorted(fn_groups):
+            R1_fn = fn_groups[group]['R1']
+            R2_fn = fn_groups[group]['R2']
+
+            if R1_fn == None or R2_fn == None:
+                raise ValueError('unpaired file names in data_dir')
+
+            R1_lines = split_file.interleaved_piece(R1_fn, self.num_pieces, self.which_piece)
+            R2_lines = split_file.interleaved_piece(R2_fn, self.num_pieces, self.which_piece)
+            read_pairs = fastq.read_pairs(R1_lines, R2_lines,
+                                          standardize_names=True,
+                                          ensure_sanger_encoding=True,
+                                         )
+            read_pairs_list.append(read_pairs)
+        
+        if len(fn_groups) == 0:
+            sra_fns = glob.glob(self.data_dir + '/*.sra')
+            for sra_fn in sra_fns:
+                lines = split_sra_file.piece(sra_fn,
+                                             self.num_pieces,
+                                             self.which_piece,
+                                             paired=True,
+                                            )
+                read_pairs = fastq.read_pairs_interleaved(lines,
+                                                          standardize_names=True,
+                                                          ensure_sanger_encoding=True,
+                                                         )
+                read_pairs_list.append(read_pairs)
+        
+        total_reads = 0
+
+        for read_pairs in read_pairs_list:
+            total_pairs_from_group = 0
+            for R1, R2 in read_pairs:
+                if R1.name != R2.name:
+                    raise ValueError('R1 and R2 out of sync', R1, R2)
+
+                yield R1, R2
+                
+                total_reads += 1
+                total_pairs_from_group += 1
+
+                if not quiet and total_reads % 100000 == 0:
+                    logging.info('{0:,} reads processed'.format(total_reads))
+
+                if max_pairs_per_group and total_pairs_from_group >= max_pairs_per_group:
+                    break
+        
+        if not quiet:
+            logging.info('{0:,} total reads processed'.format(total_reads))
+            self.summary.append(('Total reads', total_reads))
+
+    
+
 def controller(ExperimentClass, script_path, **override):
     args = parse_arguments()
     if args.subparser_name == 'launch':
         if override:
-            print 'Launching with {0}'.format(override)
+            print('Launching with {0}'.format(override))
         launch(args, script_path, ExperimentClass.num_stages, **override)
     elif args.subparser_name == 'process':
         process(args, ExperimentClass, **override)
@@ -263,7 +349,7 @@ def launch(args, script_path, num_stages, **override):
     description = parse_description(description_file_name)
 
     def make_process_command(args, which_piece, stage):
-        command = ['python', script_path,
+        command = [script_path,
                    '--job_dir', args.job_dir,
                    'process',
                    '--num_pieces', str(args.num_pieces),
@@ -274,7 +360,7 @@ def launch(args, script_path, num_stages, **override):
         return command_string
     
     def make_finish_command(args, stage):
-        command = ['python', script_path,
+        command = [script_path,
                    '--job_dir', args.job_dir,
                    'finish',
                    '--num_pieces', str(args.num_pieces),
@@ -337,7 +423,7 @@ def launch(args, script_path, num_stages, **override):
         )
         output = subprocess.check_output([submitter, launcher_file_name])
         this_job_id = get_job_id(output)
-        print '\tLaunched stage {0} with jid {1}'.format(stage, this_job_id)
+        print('\tLaunched stage {0} with jid {1}'.format(stage, this_job_id))
 
         for stage in range(1, num_stages):
             previous_job_id = this_job_id
@@ -350,15 +436,16 @@ def launch(args, script_path, num_stages, **override):
             )
             output = subprocess.check_output([submitter, launcher_file_name])
             this_job_id = get_job_id(output)
-            print '\tLaunched stage {0} with jid {1}, holding on {2}'.format(stage,
+            print('\tLaunched stage {0} with jid {1}, holding on {2}'.format(stage,
                                                                            this_job_id,
                                                                            previous_job_id,
                                                                           )
+                 )
         os.chdir(starting_path)
     else:
         for stage in range(num_stages):
-        #for stage in [2]:
-            print '\tLaunched stage {0} with parallel'.format(stage)
+        #for stage in [1]:
+            print('\tLaunched stage {0} with parallel'.format(stage))
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)
 

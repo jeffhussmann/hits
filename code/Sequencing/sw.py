@@ -1,20 +1,22 @@
 import numpy as np
+import array
 import itertools
 import sys
 import pysam
 import argparse
 from collections import Counter
 from Sequencing import utilities, fastq, fasta, adapters, annotation, sam
-from sw_cython import *
+from Sequencing.sw_cython import *
 
-empty_alignment = {'score': -1e6,
-                   'path': [],
-                   'query_mappings': [],
-                   'target_mappings': [],
-                   'insertions': set(),
-                   'deletions': set(),
-                   'mismatches': set(),
-                  }
+empty_alignment = {
+    'score': -1e6,
+    'path': [],
+    'query_mappings': [],
+    'target_mappings': [],
+    'insertions': set(),
+    'deletions': set(),
+    'mismatches': set(),
+}
 
 def first_query_index(alignment_path):
     for q, t in alignment_path:
@@ -131,7 +133,7 @@ def generate_alignments(query,
                         mismatch_penalty=-1,
                         indel_penalty=-5,
                         max_alignments=1,
-                        min_score=None,
+                        min_score=-np.inf,
                        ):
     if alignment_type == 'local':
         force_query_start = False
@@ -153,6 +155,11 @@ def generate_alignments(query,
         force_target_start = False
         force_either_start = False
         force_edge_end = True
+    elif alignment_type == 'IVT':
+        force_query_start = True
+        force_target_start = False
+        force_either_start = False
+        force_edge_end = False
 
     matrices = generate_matrices(query,
                                  target,
@@ -230,8 +237,12 @@ def propose_all_ends(score_matrix, cells_seen, min_score):
     for index in sorted_indices:
         cell = np.unravel_index(index, score_matrix.shape)
 
-        if score_matrix[cell] < min_score:
-            break
+        try:
+            if score_matrix[cell] < min_score:
+                break
+        except TypeError:
+            print(score_matrix[cell], min_score)
+            raise
 
         if cell in cells_seen:
             continue
@@ -295,9 +306,9 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         try:
             first_R1_index, first_R2_index = alignment['path'][0]
         except IndexError:
-            print R1
-            print R2
-            print alignment
+            print(R1)
+            print(R2)
+            print(alignment)
             raise
         length_from_R1 = (first_R1_index - R1_start + 1) + (len(R2.seq) - 1)
 
@@ -324,9 +335,9 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
             pass
         else:
             # This shouldn't be possible without an illegal indel.
-            #print 'length from R1', length_from_R1
-            #print 'length from R2', length_from_R2
-            #print_diagnostic(R1, R2, before_R1, before_R2, alignment)
+            #print('length from R1', length_from_R1)
+            #print('length from R2', length_from_R2)
+            #print(diagnostic(R1, R2, before_R1, before_R2, alignment)
             return 'illegal', 500, -1
     
     #print_diagnostic(R1, R2, before_R1, before_R2, alignment)
@@ -334,21 +345,21 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
     return status, insert_length, alignment
 
 def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
-    extended_R1 = before_R1.lower() + R1.seq
-    extended_R2 = utilities.reverse_complement(before_R2.lower() + R2.seq)
-    fh.write(R1.name + '\n')
-    fh.write(R1.qual + '\n')
-    fh.write(R2.qual + '\n')
-    fh.write('{0}\t{1}\t{2}\n'.format(alignment['score'], len(alignment['path']) * .2, alignment['score'] - len(alignment['path']) * 2))
-    fh.write(str(alignment['path']) + '\n')
+    extended_R1 = (before_R1.lower() + R1.seq).decode()
+    extended_R2 = (utilities.reverse_complement(before_R2.lower() + R2.seq)).decode()
+    #fh.write(R1.name + '\n')
+    #fh.write(R1.qual + '\n')
+    #fh.write(R2.qual + '\n')
+    #fh.write('{0}\t{1}\t{2}\n'.format(alignment['score'], len(alignment['path']) * .2, alignment['score'] - len(alignment['path']) * 2))
+    #fh.write(str(alignment['path']) + '\n')
     print_local_alignment(extended_R1, extended_R2, alignment['path'], fh=fh)
-    fh.write(str(alignment['insertions']) + '\n')
-    fh.write(str(alignment['deletions']) + '\n')
-    fh.write(str(sorted(alignment['mismatches'])) + '\n')
-    for q, t in sorted(alignment['mismatches']):
-        fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
+    #fh.write(str(alignment['insertions']) + '\n')
+    #fh.write(str(alignment['deletions']) + '\n')
+    #fh.write(str(sorted(alignment['mismatches'])) + '\n')
+    #for q, t in sorted(alignment['mismatches']):
+    #    fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
 
-def align_read(read, targets, alignment_type, min_path_length):
+def align_read(read, targets, alignment_type, min_path_length, max_alignments=1):
     alignments = []
 
     for seq, qual, is_reverse in ((read.seq, read.qual, False),
@@ -358,37 +369,37 @@ def align_read(read, targets, alignment_type, min_path_length):
         qual = array.array('B', fastq.decode_sanger(qual))
 
         for i, (target_name, target_seq) in enumerate(targets):
-            alignment = generate_alignments(seq, target_seq, alignment_type)[0]
-            path = alignment['path']
+            for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments):
+                path = alignment['path']
 
-            if len(path) >= min_path_length and alignment['score'] / (2. * len(path)) > 0.8:
-                aligned_segment = pysam.AlignedSegment()
-                aligned_segment.seq = seq
-                aligned_segment.query_qualities = qual
-                aligned_segment.is_reverse = is_reverse
+                if len(path) >= min_path_length and alignment['score'] / (2. * len(path)) > 0.8:
+                    aligned_segment = pysam.AlignedSegment()
+                    aligned_segment.seq = seq
+                    aligned_segment.query_qualities = qual
+                    aligned_segment.is_reverse = is_reverse
 
-                char_pairs = make_char_pairs(path, seq, target_seq)
+                    char_pairs = make_char_pairs(path, seq, target_seq)
 
-                cigar = sam.aligned_pairs_to_cigar(char_pairs)
-                clip_from_start = first_query_index(path)
-                if clip_from_start > 0:
-                    cigar = [(sam.BAM_CSOFT_CLIP, clip_from_start)] + cigar
-                clip_from_end = len(seq) - 1 - last_query_index(path)
-                if clip_from_end > 0:
-                    cigar = cigar + [(sam.BAM_CSOFT_CLIP, clip_from_end)]
-                aligned_segment.cigar = cigar
+                    cigar = sam.aligned_pairs_to_cigar(char_pairs)
+                    clip_from_start = first_query_index(path)
+                    if clip_from_start > 0:
+                        cigar = [(sam.BAM_CSOFT_CLIP, clip_from_start)] + cigar
+                    clip_from_end = len(seq) - 1 - last_query_index(path)
+                    if clip_from_end > 0:
+                        cigar = cigar + [(sam.BAM_CSOFT_CLIP, clip_from_end)]
+                    aligned_segment.cigar = cigar
 
-                read_aligned, ref_aligned = zip(*char_pairs)
-                md = sam.alignment_to_MD_string(ref_aligned, read_aligned)
-                aligned_segment.set_tag('MD', md)
+                    read_aligned, ref_aligned = zip(*char_pairs)
+                    md = sam.alignment_to_MD_string(ref_aligned, read_aligned)
+                    aligned_segment.set_tag('MD', md)
 
-                aligned_segment.set_tag('AS', alignment['score'])
-                aligned_segment.tid = i
-                aligned_segment.query_name = read.name
-                aligned_segment.next_reference_id = -1
-                aligned_segment.reference_start = first_target_index(path)
-    
-                alignments.append(aligned_segment)
+                    aligned_segment.set_tag('AS', alignment['score'])
+                    aligned_segment.tid = i
+                    aligned_segment.query_name = read.name
+                    aligned_segment.next_reference_id = -1
+                    aligned_segment.reference_start = first_target_index(path)
+        
+                    alignments.append(aligned_segment)
 
     return alignments
 
@@ -421,7 +432,7 @@ def align_reads(target_fasta_fn,
 
                 sorted_alignments = sorted(alignments, key=lambda m: m.get_tag('AS'), reverse=True)
                 grouped = utilities.group_by(sorted_alignments, key=lambda m: m.get_tag('AS'))
-                _, highest_group = grouped.next()
+                _, highest_group = next(grouped)
                 primary_already_assigned = False
                 for alignment in highest_group:
                     if len(highest_group) == 1:
@@ -444,79 +455,34 @@ def align_reads(target_fasta_fn,
             for key in ['input', 'aligned', 'unaligned']:
                 error_fh.write('{0}: {1:,}\n'.format(key, statistics[key]))
 
-def align_reads_michelle(fastq_fn, target_fasta_fn, bam_fn):
-    reads = fastq.reads(fastq_fn)
-    
-    for _ in align_reads(target_fasta_fn, reads, bam_fn, alignment_type='local'):
-        pass
+def stitch_read_pair(R1, R2, before_R1='', before_R2=''):    
+    status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
+    R2_rc = R2.reverse_complement()
 
-if __name__ == '__main__':
-    import argparse
+    overlap_start = max(0, insert_length - len(R1))
+    just_R1 = R1[:overlap_start]
+    overlap_R1 = R1[overlap_start:insert_length]
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('R1_fn', help='input R1 file name (can be gzip\'ed)')
-    parser.add_argument('R2_fn', help='input R2 file name (can be gzip\'ed)')
-    parser.add_argument('output_fn', help='where good merged reads will be written')
-    parser.add_argument('bad_R1_fn', help='where bad R1 reads will be written')
-    parser.add_argument('bad_R2_fn', help='where bad R2 reads will be written')
+    overlap_start = max(0, len(R2) - insert_length)
+    overlap_R2 = R2_rc[overlap_start:overlap_start + len(overlap_R1)]
+    just_R2 = R2_rc[overlap_start + len(overlap_R1):]
 
-    args = parser.parse_args()
-    read_pairs = fastq.read_pairs(args.R1_fn, args.R2_fn)
+    overlap_seq = []
+    overlap_qual = []
+    for R1_s, R1_q, R2_s, R2_q in zip(overlap_R1.seq,
+                                      overlap_R1.qual,
+                                      overlap_R2.seq,
+                                      overlap_R2.qual,
+                                     ):
+        if R1_q > R2_q:
+            s, q = R1_s, R1_q
+        else:
+            s, q = R2_s, R2_q
 
-    with open(args.output_fn, 'w') as output_fh, \
-         open(args.bad_R1_fn, 'w') as bad_R1_fn, \
-         open(args.bad_R2_fn, 'w') as bad_R2_fn:
+        overlap_seq.append(s)
+        overlap_qual.append(q)
 
-        for R1, R2 in itertools.islice(read_pairs, 10000):
-            if len(R1.seq) != len(R2.seq):
-                bad_R1_fn.write(str(R1))
-                bad_R2_fn.write(str(R2))
-                continue
+    overlap = fastq.Read('', ''.join(overlap_seq), ''.join(overlap_qual))
 
-            status, insert_length, alignment = infer_insert_length(R1, R2, '', '')
-            if status == 'bad':
-                bad_R1_fn.write(str(R1))
-                bad_R2_fn.write(str(R2))
-                continue
-            else:
-                R2_rc_seq = utilities.reverse_complement(R2.seq)
-                R2_rc_qual = R2.qual[::-1]
-
-                just_R1_slice = slice(None, insert_length - len(R1.seq))
-                just_R1_seq = R1.seq[just_R1_slice] 
-                just_R1_qual = R1.qual[just_R1_slice] 
-
-                overlap_R1_slice = slice(insert_length - len(R1.seq), None)
-                overlap_R1_seq = R1.seq[overlap_R1_slice]
-                overlap_R1_qual = R1.seq[overlap_R1_slice]
-
-                overlap_R2_slice = slice(None, len(overlap_R1_seq))
-                overlap_R2_seq = R2_rc_seq[overlap_R2_slice]
-                overlap_R2_qual = R2_rc_qual[overlap_R2_slice]
-
-                just_R2_slice = slice(len(overlap_R1_seq), None)
-                just_R2_seq = R2_rc_seq[just_R2_slice]
-                just_R2_qual = R2_rc_qual[just_R2_slice]
-
-                overlap_seq = []
-                overlap_qual = []
-                for R1_s, R1_q, R2_s, R2_q in zip(overlap_R1_seq,
-                                                  overlap_R1_qual,
-                                                  overlap_R2_seq,
-                                                  overlap_R2_qual,
-                                                 ):
-                    if R1_q > R2_q:
-                        s, q = R1_s, R1_q
-                    else:
-                        s, q = R2_s, R2_q
-
-                    overlap_seq.append(s)
-                    overlap_qual.append(q)
-
-                overlap_seq = ''.join(overlap_seq)
-                overlap_qual = ''.join(overlap_qual)
-
-                seq = just_R1_seq + overlap_seq + just_R2_seq
-                qual = just_R1_qual + overlap_qual + just_R2_qual
-
-                output_fh.write(str(fastq.Read(R1.name, seq, qual)))
+    stitched = just_R1 + overlap + just_R2
+    return stitched

@@ -19,6 +19,6 @@ for group in checkbox_groups
             else
                 group.active = (a for a in group.active when a != i)
 
-    group.trigger('change')
+    group.change.emit()
 
 group.callback.func(group, '', require, exports)

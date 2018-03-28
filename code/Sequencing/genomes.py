@@ -17,12 +17,13 @@ def make_fais(genome_dir):
     fasta_file_names = get_all_fasta_file_names(genome_dir)
     map(pysam.faidx, fasta_file_names)
 
-fai_entry_fields = ['file_name',
-                    'length',
-                    'offset',
-                    'bases_per_line',
-                    'bytes_per_line',
-                   ]
+fai_entry_fields = [
+    'file_name',
+    'length',
+    'offset',
+    'bases_per_line',
+    'bytes_per_line',
+]
 fai_entry = namedtuple('fai_entry', fai_entry_fields)
 
 def parse_fai(fai_file_name):
@@ -48,14 +49,13 @@ def build_base_lookup(genome_dir, sam_file):
     genome_index = get_genome_index(genome_dir)
     references = {}
 
-    def base_lookup(tid, position):
-        if tid not in references:
-            seq_name = sam_file.getrname(tid)
-            fasta_file_name = genome_index[seq_name].file_name
+    def base_lookup(rname, position):
+        if rname not in references:
+            fasta_file_name = genome_index[rname].file_name
             with pysam.Fastafile(fasta_file_name) as fasta_file:
-                references[tid] = fasta_file.fetch(reference=seq_name)
+                references[rname] = fasta_file.fetch(reference=rname)
 
-        base = references[tid][position]
+        base = references[rname][position:position + 1]
         return base
 
     return base_lookup

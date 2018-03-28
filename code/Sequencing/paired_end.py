@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 import pysam
 import logging
@@ -48,6 +49,50 @@ def is_discordant(R1_m, R2_m, max_insert_length):
 
     return discordant
 
+def remove_soft_clipping(mapping):
+    if mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP:
+        clipped_from_start = mapping.cigar[0][1]
+        cigar_start_index = 1
+        cigar_start = mapping.cigar[:1]
+    else:
+        clipped_from_start = 0
+        cigar_start_index = 0
+        cigar_start = []
+    
+    if mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP:
+        clipped_from_end = mapping.cigar[-1][1]
+        cigar_end_index = -1
+        cigar_end = mapping.cigar[-1:]
+    else:
+        clipped_from_end = 0
+        cigar_end_index = None
+        cigar_end = []
+
+    seq = mapping.seq
+    qual = mapping.qual
+    from_start_slice = slice(None, clipped_from_start)
+    from_end_slice = slice(len(seq) - clipped_from_end, None)
+    remaining_slice = slice(clipped_from_start, len(seq) - clipped_from_end)
+
+    clipped = {
+        'from_start': {
+            'seq': seq[from_start_slice],
+            'qual': qual[from_start_slice],
+            'cigar': cigar_start,
+        },
+        'from_end': {
+            'seq': seq[from_end_slice],
+            'qual': qual[from_end_slice],
+            'cigar': cigar_end,
+        },
+    }
+
+    mapping.cigar = mapping.cigar[cigar_start_index:cigar_end_index]
+    mapping.seq = seq[remaining_slice]
+    mapping.qual = qual[remaining_slice]
+
+    return clipped
+
 def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     ''' Takes two pysam mappings representing opposite ends of a fragment and
     combines them into one mapping, (ab)using BAM_CREF_SKIP to bridge the gap
@@ -60,11 +105,23 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     elif R1_strand == '-':
         left_mapping, right_mapping = R2_mapping, R1_mapping
                 
-    if left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP or \
-       right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP:
-        # Don't allow soft clipping on the internal edge.
+    # Soft-clipping at the 3' end of a read should only happen if this is
+    # read-through into soft-clipping at the 5' end of the other read.
+    # If there is non-physical soft-clipping in this pair, give up now.
+
+    if left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP and \
+       left_mapping.reference_end != right_mapping.reference_end:
         return False
+    if right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP and \
+       right_mapping.reference_start != left_mapping.reference_start:
+        return False
+
+    # Otherwise, remove all soft-clipping from the mappings, storing the 5'
+    # soft-clipped seq and quals from both reads to add back at the end.
     
+    left_clipped = remove_soft_clipping(left_mapping)
+    right_clipped = remove_soft_clipping(right_mapping)
+
     left_md = dict(left_mapping.tags)['MD']
     right_md = dict(right_mapping.tags)['MD']
 
@@ -89,7 +146,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     right_after_overlap_read_start = len(right_mapping.seq) - len(right_reads_after)
 
     right_overlap_seq = right_mapping.seq[:right_after_overlap_read_start] 
-    right_overlap_qual = right_mapping.qual[:right_after_overlap_read_start] 
+    right_overlap_qual = right_mapping.query_qualities[:right_after_overlap_read_start] 
 
     right_after_overlap_seq = right_mapping.seq[right_after_overlap_read_start:]
     right_after_overlap_qual = right_mapping.qual[right_after_overlap_read_start:]
@@ -115,7 +172,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     
     left_overlap_read_start = len(left_reads_before)
     left_overlap_seq = left_mapping.seq[left_overlap_read_start:] 
-    left_overlap_qual = left_mapping.qual[left_overlap_read_start:] 
+    left_overlap_qual = left_mapping.query_qualities[left_overlap_read_start:] 
 
     left_before_overlap_seq = left_mapping.seq[:left_overlap_read_start]
     left_before_overlap_qual = left_mapping.qual[:left_overlap_read_start]
@@ -130,8 +187,8 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
             # If the two mappings agree about the location of indels in their overlap,
             # use the seq from the mapping with the higher average quality in the
             # overlap.
-            left_mean_qual = np.mean(fastq.decode_sanger(left_overlap_qual))
-            right_mean_qual = np.mean(fastq.decode_sanger(right_overlap_qual))
+            left_mean_qual = np.mean(left_overlap_qual)
+            right_mean_qual = np.mean(right_overlap_qual)
 
             if left_mean_qual > right_mean_qual:
                 use_overlap_from = 'left'
@@ -179,9 +236,9 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
             try:
                 left_using_right_mismatches = realigned_mismatches(left_overlap_seq, overlap_ref_start, realigned_left_cigar, ref_dict)
                 right_using_left_mismatches = realigned_mismatches_backwards(right_overlap_seq, overlap_ref_end, realigned_right_cigar, ref_dict)
-            except ValueError:
-                print left_mapping
-                print right_mapping
+            except (ValueError, TypeError):
+                print(left_mapping)
+                print(right_mapping)
                 raise
             
             if verbose:
@@ -231,7 +288,7 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
         combined_mapping.setTag('MD', combined_md)
 
         overlap_seq_tag = right_overlap_seq
-        overlap_qual_tag = right_overlap_qual
+        overlap_qual_tag = fastq.encode_sanger(right_overlap_qual)
 
     elif use_overlap_from == 'right':
         combined_mapping.seq = left_before_overlap_seq + right_mapping.seq
@@ -242,13 +299,22 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
         combined_mapping.setTag('MD', combined_md)
         
         overlap_seq_tag = left_overlap_seq
-        overlap_qual_tag = left_overlap_qual
+        overlap_qual_tag = fastq.encode_sanger(left_overlap_qual)
 
     if len(overlap_seq_tag) > 0:
         # Having empty tags causes problems, so don't create them.
         combined_mapping.setTag('Xs', overlap_seq_tag)
         combined_mapping.setTag('Xq', overlap_qual_tag)
         combined_mapping.setTag('Xw', use_overlap_from)
+
+    qual = combined_mapping.qual
+    seq = combined_mapping.seq
+    cigar = combined_mapping.cigar
+    before = left_clipped['from_start']
+    after = right_clipped['from_end']
+    combined_mapping.cigar = before['cigar'] + cigar + after['cigar']
+    combined_mapping.seq = before['seq'] + seq + after['seq']
+    combined_mapping.qual = before['qual'] + qual + after['qual']
 
     return combined_mapping
 

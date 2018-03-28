@@ -43,11 +43,13 @@ def piece(file_name, num_pieces, which_piece, file_format, key=None):
                              find_next_chunk,
                             )
     
-    fh = open(file_name)
+    fh = open(file_name, 'rb')
     fh.seek(this_start)
     
     while fh.tell() < next_start:
-        yield fh.readline()
+        yield fh.readline().decode()
+
+    fh.close()
 
 def interleaved_piece(file_name, num_pieces, which_piece):
     ''' An iterator over the lines of fastq chunks which are equivalent to 
@@ -81,10 +83,10 @@ def _find_start(file_name, num_pieces, which_piece, find_next_chunk):
     if which_piece >= num_pieces:
         return file_size
 
-    nominal_piece_size = np.ceil(float(file_size) / num_pieces)
+    nominal_piece_size = int(np.ceil(float(file_size) / num_pieces))
     nominal_start = nominal_piece_size * which_piece
     
-    with open(file_name) as fh:
+    with open(file_name, 'rb') as fh:
         fh.seek(nominal_start)
         next_start = find_next_chunk(fh)
     
@@ -116,7 +118,7 @@ def _find_next_fastq_read(fh):
     # Now we are guaranteed to not be at the beginning of the file.
     # Move to the next beginning of a line, which may be the current position.
     fh.seek(-1, os.SEEK_CUR)
-    fh.readline()
+    fh.readline().decode()
     
     # Find the next beginning of a set of four lines for which the first
     # starts with '@' and the third starts with '+'.
@@ -125,14 +127,14 @@ def _find_next_fastq_read(fh):
     for i in range(4):
         position = fh.tell()
         positions.append(position)
-        line = fh.readline()
+        line = fh.readline().decode()
         if not line:
             return fh.tell()
         lines.append(line)
 
     while not(lines[0].startswith('@') and lines[2].startswith('+')):
         position = fh.tell()
-        line = fh.readline()
+        line = fh.readline().decode()
         if not line:
             return fh.tell()
         positions.popleft()
@@ -162,7 +164,7 @@ def _find_next_sam_chunk(fh, key):
     previous_value = key(previous_line)
     while True:
         start_of_line = fh.tell()
-        current_line = fh.readline()
+        current_line = fh.readline().decode()
         if not current_line:
             # Reached the end of the file.
             break
@@ -180,7 +182,7 @@ def _find_start_of_reads(fh):
     fh.seek(0)
     while True:
         start_of_line = fh.tell()
-        line = fh.readline()
+        line = fh.readline().decode()
         if not line:
             start_of_reads = start_of_line
             break
@@ -201,7 +203,7 @@ def _advance_to_next_line(fh):
         fh.seek(start_of_reads)
         return
     fh.seek(-1, os.SEEK_CUR)
-    fh.readline()
+    fh.readline().decode()
 
 @preserve_position
 def _get_previous_line(fh):
@@ -228,7 +230,7 @@ def _get_previous_line(fh):
             break
         fh.seek(-1, os.SEEK_CUR)
     if new_lines == 2:
-        return fh.readline()
+        return fh.readline().decode()
     else:
         # Reached the beginning of the reads without hitting 2 newlines, so
         # there is no previous line.

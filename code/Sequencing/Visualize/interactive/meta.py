@@ -1,35 +1,21 @@
 import bokeh
 from bokeh.models.tickers import SingleIntervalTicker
 from bokeh.models.annotations import Legend, LegendItem
-from bokeh.core.properties import List, Instance
 import copy
 import json
 import os.path
 import numpy as np
 import Sequencing.genetic_code as genetic_code
+import Sequencing.Visualize.interactive.toggle_legend as toggle_legend
 from itertools import cycle
 from collections import defaultdict
-from external_coffeescript import build_callback
-from colors_list import colors_list
+from .external_coffeescript import build_callback
+from .colors_list import colors_list
 
 # In 0.12.5 and 0.12.6, custom models have to be defined BEFORE output_notebook
 # is called. See https://github.com/codypiersall/bokeh-custom-model.
-class ToggleLegend(bokeh.models.annotations.Legend):
-    all_items = List(Instance(LegendItem))
-
-    __implementation__ = '''
-import {Legend} from "models/annotations/legend"
-import * as p from "core/properties"
-
-export class ToggleLegend extends Legend
-    type: "ToggleLegend"
-    @define {
-        all_items: [p.Array, []]
-    }
-'''
-
-#bokeh.io.reset_output()
-#bokeh.io.output_notebook()
+bokeh.io.reset_output()
+bokeh.io.output_notebook()
 
 def codon(enrichments=None,
           group_by='codon',
@@ -300,7 +286,7 @@ def codon(enrichments=None,
         if checkbox_name in initial_sub_group_selections:
             initial_legend_items.append(legend_item)
         
-    legend = ToggleLegend(name='legend',
+    legend = toggle_legend.ToggleLegend(name='legend',
                           items=initial_legend_items,
                           all_items=legend_items,
                          )
@@ -502,7 +488,7 @@ def gene(enrichments=None,
             try:
                 all_xs[assignment][landmark] = enrichments[assignment][landmark].pop('xs')
             except KeyError:
-                print assignment, landmark
+                print(assignment, landmark)
                 raise
     
     exp_names = sorted(enrichments[assignment][landmarks[0]])
@@ -646,7 +632,7 @@ def gene(enrichments=None,
                 if exp_name in initial_sub_group_selections:
                     initial_legend_items.append(legend_item)
 
-    legend = ToggleLegend(name='legend',
+    legend = toggle_legend.ToggleLegend(name='legend',
                           items=initial_legend_items,
                           all_items=legend_items,
                          )
@@ -809,7 +795,7 @@ def lengths(raw_counts,
             ys['by_type'][exp_name][type_name] = np.true_divide(raw, denominator)
             ys['by_exp'][exp_name][type_name] = np.true_divide(raw, total_counts)
 
-    first_exp_name = ys['raw_counts'].keys()[0]
+    first_exp_name = list(ys['raw_counts'])[0]
     
     if types is None:
         types = sorted(ys['raw_counts'][first_exp_name])
@@ -859,7 +845,7 @@ def lengths(raw_counts,
         raise ValueError('{0} not in {1}'.format(initial_menu_selection, menu_options))
 
     sources = {}
-    for key in ['plotted'] + ys.keys():
+    for key in ['plotted'] + list(ys):
         if key == 'plotted':
             normalization = initial_normalization
         else:
@@ -872,7 +858,7 @@ def lengths(raw_counts,
                 full_list = list(ys[normalization][checkbox_name][menu_name])
                 if len(full_list) > max_length:
                     full_list[max_length] = sum(full_list[max_length:])
-                elif len(full_list < max_length):
+                elif len(full_list) < max_length:
                     full_list.extend([0]*(max_length + 1 - len(full_list)))
 
                 data[menu_name] = np.array(full_list[:max_length + 1])
@@ -982,7 +968,7 @@ def lengths(raw_counts,
         if checkbox_name in initial_sub_group_selections:
             initial_legend_items.append(legend_item)
         
-    legend = ToggleLegend(name='legend',
+    legend = toggle_legend.ToggleLegend(name='legend',
                           items=initial_legend_items,
                           all_items=legend_items,
                          )
@@ -1041,7 +1027,7 @@ def lengths(raw_counts,
                                       )
     alpha_slider.callback = build_callback('lengths_unselected_alpha')
     
-    highest_level_chooser = bokeh.models.widgets.Select(options=ys.keys(),
+    highest_level_chooser = bokeh.models.widgets.Select(options=list(ys),
                                                         value=initial_normalization,
                                                        )
 

@@ -106,7 +106,7 @@ def get_ladder100_peaks(ys):
     # Filter out peaks that aren't sufficiently high.
     median = np.percentile(ys, 50)
     overall_max = np.max(ys)
-    threshold = median + (overall_max - median) * 0.1
+    threshold = median + (overall_max - median) * 0.3
     high_enough = relative_maxes[ys[relative_maxes] > threshold] 
 
     # Filter out peaks that are too close to the top or bottom.
@@ -258,13 +258,13 @@ def plot_gel(image_fn,
     labels, boundaries, profiles, lanes = analyze_image(image, annotations)
 
     fig_height = 8.
-    plot_width = 14.
+    plot_width = 12.
     rows, cols = image.shape
     im_width = fig_height * cols / rows
 
-    gridspec_kw = dict(width_ratios=[plot_width, im_width], wspace=0)
+    gridspec_kw = dict(width_ratios=[im_width, plot_width], wspace=0)
     
-    fig, (line_ax, im_ax) = plt.subplots(1, 2,
+    fig, (im_ax, line_ax) = plt.subplots(1, 2,
                                          figsize=(plot_width + im_width, fig_height),
                                          gridspec_kw=gridspec_kw,
                                         )
@@ -382,7 +382,6 @@ def plot_gel(image_fn,
 
     line_ax.set_yticks([])
     
-    legend = line_ax.legend(loc='upper left', framealpha=0.5)
     
     if invert:
         im_cmap = matplotlib.cm.binary
@@ -411,9 +410,10 @@ def plot_gel(image_fn,
                        va='bottom',
                        **label_to_kwargs['text'][label])
         
-    for text in legend.get_texts():
-        label = text.get_text()
-        text.set(**label_to_kwargs['text'][label])
+    #legend = line_ax.legend(loc='upper left', framealpha=0.5)
+    #for text in legend.get_texts():
+    #    label = text.get_text()
+    #    text.set(**label_to_kwargs['text'][label])
    
     x_min, x_max = map(int, np.asarray(vertical_range) * len(xs))
     line_ax.set_xlim(x_min, x_max)

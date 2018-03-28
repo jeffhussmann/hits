@@ -1,19 +1,19 @@
-from adapters_cython import *
+from Sequencing.adapters_cython import *
 import numpy as np
 from Sequencing import utilities
 
 primers = {
     'tru_seq': {
-        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT',
-        'R2':    'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+        'R1':         b'TCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R2':    b'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
     },
     'PE': {
-        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
-        'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
+        'R1':         b'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
+        'R2': b'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
     },
     'nextera': {
-        'R1':     'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
-        'R2':    'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+        'R1':     b'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+        'R2':    b'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
     },
 }
 
@@ -23,19 +23,19 @@ primers['mix_and_match'] = {
 }
 
 flow_cell = {
-    'P5': 'AATGATACGGCGACCACCGAGATCTACAC',
-    'P7': 'CAAGCAGAAGACGGCATACGAGAT',
+    'P5': b'AATGATACGGCGACCACCGAGATCTACAC',
+    'P7': b'CAAGCAGAAGACGGCATACGAGAT',
 }
 
-A_tail = 'A' * 10
+A_tail = b'A' * 10
 
 # For backwards compatibility
-tru_seq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGA'
-tru_seq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
-P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
-P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
+tru_seq_R1_rc = b'AGATCGGAAGAGCGTCGTGTAGGGAAAGA'
+tru_seq_R2_rc = b'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
+P5_rc = b'TCTCGGTGGTCGCCGTATCATT'
+P7_rc = b'ATCTCGTATGCCGTCTTCTGCTTG'
 
-def build_before_adapters(I7_sequence='', primer_type='tru_seq', just_primers=False, R1_index='', R2_index=''):
+def build_before_adapters(I7_sequence=b'', primer_type='tru_seq', just_primers=False, R1_index=b'', R2_index=b''):
     if just_primers:
         before_R1 = primers[primer_type]['R1'] + R1_index
         before_R2 = primers[primer_type]['R2'] + R2_index

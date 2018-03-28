@@ -1,14 +1,22 @@
-from Sequencing import utilities, fastq, genomes, mapping_tools, sw, sam
-from Sequencing import fasta
-import pysam
-import string
-from itertools import izip, izip_longest, chain, islice
-from Circles import periodicity
-import numpy as np
+from __future__ import print_function
+
 import sys
 import contextlib
+import numpy as np
+import pysam
+import string
+from itertools import chain, islice
+from six.moves import zip, zip_longest
 
-def mapping_to_alignment(mapping, sam_file, base_lookup):
+import Sequencing.utilities as utilities
+import Sequencing.fastq as fastq
+import Sequencing.fasta as fasta
+import Sequencing.genomes as genomes
+import Sequencing.mapping_tools as mapping_tools
+import Sequencing.sw as sw
+import Sequencing.sam as sam
+
+def mapping_to_alignment(mapping, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
     path = []
     mismatches = set()
@@ -19,24 +27,32 @@ def mapping_to_alignment(mapping, sam_file, base_lookup):
             if ref_i == None:
                 ref_i = sw.GAP
             else:
-                read_base = mapping.seq[read_i]
-                ref_base = base_lookup(mapping.tid, ref_i).upper()
+                read_base = mapping.seq[read_i].encode()
+                ref_base = base_lookup(mapping.reference_name, ref_i).upper()
                 if read_base != ref_base:
+                    print(read_base, ref_base)
                     mismatches.add((read_i, ref_i))
 
             path.append((read_i, ref_i))
         else:
             deletions.add(ref_i)
 
-    alignment = {'path': path,
-                 'XO': mapping.opt('XO'),
-                 'XM': mapping.opt('XM'),
-                 'is_reverse': mapping.is_reverse,
-                 'mismatches': mismatches,
-                 'deletions': deletions,
-                 'rname': sam_file.get_reference_name(mapping.tid),
-                 'query': mapping.seq,
-                }
+    
+    alignment = {
+        'path': path,
+        'is_reverse': mapping.is_reverse,
+        'mismatches': mismatches,
+        'deletions': deletions,
+        'rname': mapping.reference_name,
+        'query': mapping.seq,
+    }
+
+    for tag in ['XO', 'XM']:
+        if mapping.has_tag(tag):
+            alignment[tag] = mapping.get_tag(tag)
+        else:
+            alignment[tag] = -1
+
     return alignment
 
 def produce_bowtie2_alignments(reads,
@@ -60,13 +76,13 @@ def produce_bowtie2_alignments(reads,
                                                    **bowtie2_options)
 
     base_lookup = genomes.build_base_lookup(genome_dir, sam_file)
-
     mapping_groups = utilities.group_by(mappings, lambda m: m.qname)
     
     for qname, group in mapping_groups:
-        group = sorted(group, key=lambda m: (m.tid, m.pos))
-        alignments = [mapping_to_alignment(mapping, sam_file, base_lookup)
-                      for mapping in group if not mapping.is_unmapped]
+        mapped = [m for m in group if not m.is_unmapped]
+        group = sorted(mapped, key=lambda m: (m.reference_name, m.pos))
+        alignments = [mapping_to_alignment(mapping, base_lookup)
+                      for mapping in mapped]
         yield qname, alignments
 
 def get_local_alignments(read, targets):
@@ -83,7 +99,7 @@ def get_local_alignments(read, targets):
                                                 max_alignments=3,
                                                )
             for alignment in alignments:
-                if alignment['score'] >= 0.7 * 2 * len(alignment['path']):
+                if alignment['score'] >= 0.75 * 2 * len(alignment['path']):
                     alignment['query'] = query
                     alignment['rname'] = target.name
                     alignment['is_reverse'] = is_reverse
@@ -100,8 +116,10 @@ def get_edge_alignments(read, targets):
         for query, is_reverse in [(seq, False), (seq_rc, True)]:
             alignments = sw.generate_alignments(query,
                                                 target.seq,
-                                                'unpaired_adapter',
+                                                'IVT',
                                                 min_score=min_score,
+                                                max_alignments=1,
+                                                mismatch_penalty=-2,
                                                )
             for alignment in alignments:
                 if alignment['score'] >= 2 * len(alignment['path']):
@@ -133,63 +151,56 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets, max_to_report=5):
         alignments = sorted(alignments, key=lambda a: a['score'], reverse=True)
         alignments = alignments[:max_to_report]
 
-        sanitized_name = up_to_first_space(read.name)
+        name = read.name
+        try:
+            name = name.decode()
+        except AttributeError:
+            pass
+
+        sanitized_name = up_to_first_space(name)
         yield sanitized_name, alignments
 
+def produce_sam_alignments(bam_fn, ref_fn, max_reads=None):
+    refs = {r.name: r.seq for r in fasta.reads(ref_fn)}
+    def base_lookup(name, i):
+        return refs[name][i:i + 1]
+    
+    mapping_groups = utilities.group_by(pysam.AlignmentFile(bam_fn), lambda m: m.query_name)
+    for name, mappings in islice(mapping_groups, max_reads):
+        alignments = [mapping_to_alignment(mapping, base_lookup)
+                      for mapping in sorted(mappings, key=lambda m: (m.tid, m.pos))
+                      if not mapping.is_unmapped
+                     ]
+        yield name, alignments
+
 def produce_representations(alignment_groups_list):
-    for alignment_group_list in izip_longest(*alignment_groups_list):
+    for alignment_group_list in zip_longest(*alignment_groups_list):
         representations = []
         qnames = set()
-        for (qname, alignment_group) in alignment_group_list:
+        for qname, alignment_group in alignment_group_list:
+            try:
+                qname = qname.decode()
+            except AttributeError:
+                pass
             qnames.add(qname)
             representations.extend(map(represent_alignment, alignment_group))
 
         if len(qnames) > 1:
-            print alignment_group_list
+            print([(qname, len(group)) for qname, group in alignment_group_list])
             raise ValueError('Attempted to flatten alignment groups with different qnames:', qnames)
 
         qname = qnames.pop()
 
         yield qname, representations
 
-def find_best_offset(R1_seq, R2_rc_seq, periodic=False):
-    first_between_fractions = periodicity.compute_between_fractions(R1_seq, R2_rc_seq) 
-    first_offset = np.argmax(first_between_fractions)
-    first_offset_fraction = first_between_fractions[first_offset]
-
-    second_between_fractions = periodicity.compute_between_fractions(R2_rc_seq, R1_seq) 
-    second_offset = np.argmax(second_between_fractions)
-    second_offset_fraction = second_between_fractions[second_offset]
-
-    if periodic:
-        within_fractions = (periodicity.compute_within_fractions(R1_seq) + periodicity.compute_within_fractions(R2_rc_seq)) / 2
-        period, period_fraction = periodicity.best_period(within_fractions)
+def find_best_offset(R1, R2_rc):
+    R2 = R2_rc.reverse_complement()
+    status, insert_length, alignment = sw.infer_insert_length(R1, R2, b'', b'')
+    if status == 'good':
+        offset = insert_length - len(R1)
     else:
-        period_fraction = 0
-
-    # Heuristic - if both offset fractions are very high, use the one with the
-    # most overlap, which is the one with the smaller offset.
-    if first_offset_fraction > 0.9 and second_offset_fraction > 0.9:
-        if first_offset < second_offset:
-            which = 'first'
-        else:
-            which = 'second'
-    elif first_offset_fraction >= second_offset_fraction:
-        which = 'first'
-    else:
-        which = 'second'
-
-    if which == 'first':
-        offset = first_offset
-        if period_fraction > 0.7:
-            offset = offset % period
-    else:
-        offset = -second_offset
-        if period_fraction > 0.7:
-            offset = -((-offset) % period)
-
-    best_offset_fraction = max(first_offset_fraction, second_offset_fraction)
-    return offset, best_offset_fraction
+        offset = len(R1) + 1
+    return offset
 
 def represent_alignment(alignment):
     ''' Returns text representation of the portion of the read mapped by a local
@@ -231,7 +242,22 @@ def represent_alignment(alignment):
 
     width = rightmost_read - leftmost_read + 1
 
-    ref_name_string = string.center(alignment['rname'], width)
+    ref_name = alignment['rname']
+    try:
+        ref_name = ref_name.decode()
+    except AttributeError:
+        pass
+
+    ref_name_string = ref_name.center(width)
+    if width > 100:
+        parts = [' ',
+                 ref_name,
+                 ref_name_string[1 + len(ref_name):-(len(ref_name) + 1) ],
+                 ref_name,
+                 ' ',
+                ]
+        ref_name_string = ''.join(parts)
+
     ref_name_line = before_left + ref_name_string + after_right
     
     # Create a line marking the reference positions of the boundaries of the
@@ -244,7 +270,7 @@ def represent_alignment(alignment):
     else:
         mismatch_string = ''
 
-    mismatch_chars = list(string.center(mismatch_string, width, '-'))
+    mismatch_chars = list(mismatch_string.center(width, '-'))
 
     right_ref_edge_string = '{0:,}'.format(read_to_ref[rightmost_read])
     left_ref_edge_string = '{0:,}'.format(read_to_ref[leftmost_read])
@@ -260,7 +286,7 @@ def represent_alignment(alignment):
         mismatch_string = ' {0} {1} '.format(alignment['XM'],
                                              alignment['XO'],
                                             )
-        mismatch_chars = list(string.center(mismatch_string, width, '-'))
+        mismatch_chars = list(mismatch_string.center(width, '-'))
 
         overlaps_left = any(c != '-' for c in mismatch_chars[left_edge_slice])
         overlaps_right = any(c != '-' for c in mismatch_chars[right_edge_slice])
@@ -268,7 +294,7 @@ def represent_alignment(alignment):
         if overlaps_left or overlaps_right:
             mismatch_string = ''
     
-    mismatch_chars = list(string.center(mismatch_string, width))
+    mismatch_chars = list(mismatch_string.center(width))
     extent_chars = mismatch_chars
 
     left_start, left_stop, _ = left_edge_slice.indices(len(extent_chars))
@@ -342,23 +368,32 @@ def lowercase_below_qual_threshold(seq, qual, threshold):
     qual is below threshold.
     '''
     seq = list(seq)
-    qual = fastq.decode_sanger(qual)
+
     for p, (s, q) in enumerate(zip(seq, qual)):
         if q <= threshold:
-            seq[p] = s.lower()
-    return ''.join(seq)
+            seq[p] = bytes([s]).lower()[0]
+
+    return bytes(seq)
 
 def visualize_unpaired_alignments(get_reads,
                                   sw_genome_dirs,
                                   extra_targets,
                                   bowtie2_targets,
-                                  output_fn,
+                                  output_fn=None,
+                                  skip_initial=0,
+                                  num_pairs=100,
                                  ):
+    def relevant_reads(source):
+        return islice(source, skip_initial, skip_initial + num_pairs)
 
     if isinstance(get_reads, str):
         R1_fn = get_reads
         def get_reads():
-            return islice(fastq.reads(R1_fn), 1000)
+            return relevant_reads(fastq.reads(R1_fn))
+    else:
+        full_get_reads = get_reads
+        def get_reads():
+            return relevant_reads(full_get_reads())
 
     R1_alignment_groups_list = []
 
@@ -382,8 +417,8 @@ def visualize_unpaired_alignments(get_reads,
                   R1_representation_groups,
                  ]
 
-    with open(output_fn, 'w') as output_fh:
-        for R1, (R1_qname, R1_representations) in izip_longest(*everything):
+    with possibly_fn(output_fn) as output_fh:
+        for R1, (R1_qname, R1_representations) in zip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)
 
@@ -398,6 +433,39 @@ def visualize_unpaired_alignments(get_reads,
                     output_fh.write(line + '\n')
 
             output_fh.write(R1_seq + '\n')
+            output_fh.write('\n\n')
+
+def visualize_bam_alignments(bam_fn, ref_fn, output_fn, max_reads=None):
+    def get_reads():
+        all_reads = sam.sam_to_fastq(bam_fn)
+        grouped = utilities.group_by(all_reads, lambda r: r.name)
+        for name, group in islice(grouped, max_reads):
+            yield group[0]
+
+    alignment_groups_list = [produce_sam_alignments(bam_fn, ref_fn, max_reads)]
+    representation_groups = produce_representations(alignment_groups_list)
+
+    everything = [
+        get_reads(),
+        representation_groups,
+    ]
+
+    with possibly_fn(output_fn) as output_fh:
+        for read, (qname, representations) in zip_longest(*everything):
+            if up_to_first_space(read.name) != qname:
+                raise ValueError('Iters out of sync', read.name, qname)
+
+            seq = lowercase_below_qual_threshold(read.seq, read.qual, 20)
+            
+            representations = collapse_representations(representations)
+
+            output_fh.write(read.name + '\n\n')
+
+            for _, lines in representations:
+                for line in lines:
+                    output_fh.write(line + '\n')
+
+            output_fh.write(seq.decode() + '\n')
             output_fh.write('\n\n')
 
 @contextlib.contextmanager
@@ -441,7 +509,7 @@ def visualize_paired_end_mappings(get_read_pairs,
         
         def get_R2_rc_reads():
             read_pairs = relevant_reads(get_read_pairs())
-            return (fastq.Read(R2.name, utilities.reverse_complement(R2.seq), R2.qual[::-1]) for R1, R2 in read_pairs)
+            return (R2.reverse_complement() for R1, R2 in read_pairs)
 
     for genome_dir, index_prefix, score_min in bowtie2_targets:
         R1_alignment_groups = produce_bowtie2_alignments(get_R1_reads(),
@@ -488,34 +556,31 @@ def visualize_paired_end_mappings(get_read_pairs,
                  ]
     
     with possibly_fn(output_fn) as output_fh:
-        for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in izip_longest(*everything):
+        for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in zip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)
             if up_to_first_space(R2_rc.name) != R2_qname:
                 raise ValueError('Iters out of sync', R2_rc.name, R2_qname)
 
-            offset, best_offset_fraction = find_best_offset(R1.seq, R2_rc.seq)
-            if best_offset_fraction > 0.7:
-                gap_line = ''
-                if offset >= 0:
-                    R1_shift = ''
-                    R2_shift = ' '*offset
-                else:
-                    R1_shift = ' '*(-offset)
-                    R2_shift = ''
-            else:
-                gap_line = '\n'
+            offset = find_best_offset(R1, R2_rc)
+
+            gap_line = ''
+            if offset >= 0:
                 R1_shift = ''
+                R2_shift = ' '*offset
+            else:
+                R1_shift = ' '*(-offset)
                 R2_shift = ''
             
-            R1_seq = lowercase_below_qual_threshold(R1.seq, R1.qual, 20)
-            R2_rc_seq = lowercase_below_qual_threshold(R2_rc.seq, R2_rc.qual, 20)
+            R1_seq = lowercase_below_qual_threshold(R1.seq, R1.qual, 20).decode()
+            R2_rc_seq = lowercase_below_qual_threshold(R2_rc.seq, R2_rc.qual, 20).decode()
             
             R1_representations = collapse_representations(R1_representations)
             R2_representations = collapse_representations(R2_representations)
 
             output_fh.write(R1.name + '\n')
-            output_fh.write(R2_rc.name + '\n')
+            if R2_rc.name != R1.name:
+                output_fh.write(R2_rc.name + '\n')
 
             for _, lines in R1_representations:
                 for line in lines:
