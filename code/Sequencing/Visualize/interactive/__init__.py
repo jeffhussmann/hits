@@ -8,6 +8,8 @@ import matplotlib.colors
 import matplotlib.cm
 import os
 import os.path
+import numbers
+import six
 import re
 import base64
 import glob
@@ -284,7 +286,7 @@ def scatter(df=None,
     else:
         show_color_by_menu = True
 
-        if isinstance(color_by, basestring):
+        if isinstance(color_by, six.string_types):
             color_options = ['', color_by]
         else:
             color_options = [''] + list(color_by)
@@ -295,7 +297,7 @@ def scatter(df=None,
     if label_by is None:
         label_by = df.index.name
 
-    if isinstance(label_by, basestring):
+    if isinstance(label_by, six.string_types):
         show_label_by_menu = False
         label_options = [label_by]
     else:
@@ -304,11 +306,11 @@ def scatter(df=None,
     
     scatter_data['_label'] = scatter_data[label_options[0]]
 
-    if isinstance(marker_size, (int, long, float)):
+    if isinstance(marker_size, numbers.Number):
         show_marker_size_menu = False
         size_widget_type = 'slider'
     else:
-        if isinstance(marker_size, basestring):
+        if isinstance(marker_size, six.string_types):
             size_options = ['', marker_size]
         else:
             size_options = [''] + list(marker_size)
@@ -752,7 +754,7 @@ def scatter(df=None,
             return '''dict = {dict};\nreturn dict[tick].slice(0, 15);'''.format(dict=dict(enumerate(order)))
         
         for ax in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
-            ax.ticker = bokeh.models.FixedTicker(ticks=range(num_exps))
+            ax.ticker = bokeh.models.FixedTicker(ticks=np.arange(num_exps))
             ax.formatter = bokeh.models.FuncTickFormatter(code=make_tick_formatter(orders[order_key]))
             ax.major_label_text_font_size = '8pt'
 
@@ -762,7 +764,7 @@ def scatter(df=None,
         for axis in (heatmap_fig.xaxis, heatmap_fig.yaxis):
             axis.axis_line_color = None
 
-        name_pairs = zip(heatmap_source.data['x_name'], heatmap_source.data['y_name'])
+        name_pairs = list(zip(heatmap_source.data['x_name'], heatmap_source.data['y_name']))
         initial_index = name_pairs.index((x_name, y_name))
         heatmap_source.selected = build_selected([initial_index])
 
