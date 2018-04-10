@@ -1,12 +1,15 @@
 ''' Utilities for dealing with fastq files. '''
 
-from itertools import izip, chain
+from itertools import chain
+from six.moves import zip
 from collections import namedtuple
-from .fastq_cython import *
-from .utilities import identity, base_order, reverse_complement, group_by
+from Sequencing.fastq_cython import *
+import Sequencing.utilities as utilities
+from Sequencing.utilities import identity, base_order, group_by
 import numpy as np
-import string
 import gzip
+
+from pathlib import Path
 
 # SANGER_OFFSET is imported from fastq_cython
 SOLEXA_OFFSET = 64
@@ -15,11 +18,11 @@ MAX_EXPECTED_QUAL = 42
 
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
-    return [ord(q) - SANGER_OFFSET for q in qual]
+    return [q - SANGER_OFFSET for q in qual]
 
 def decode_solexa(qual):
     ''' Converts a string of solexa-encoded quals to a list of integers. '''
-    return [ord(q) - SOLEXA_OFFSET for q in qual]
+    return [q - SOLEXA_OFFSET for q in qual]
 
 def encode_sanger(ints):
     ''' Converts a list of integer quals to a sanger-encoded string. '''
@@ -47,9 +50,10 @@ def solexa_to_sanger(qual):
 # chr(ord('/') - 1). 
 # '_' is used as a field separator in annotations, so similarly needs to be
 # downgraded to chr(ord('_') - 1).
-_chars_to_sanitize = '/_'
-_sanitized_chars = ''.join(chr(ord(c) - 1) for c in _chars_to_sanitize)
-_sanitize_table = string.maketrans(_chars_to_sanitize, _sanitized_chars)
+_chars_to_sanitize = b'/_'
+_sanitized_chars = bytes(c - 1 for c in _chars_to_sanitize)
+_sanitize_table = bytes.maketrans(_chars_to_sanitize, _sanitized_chars)
+
 
 def sanitize_qual(qual):
     sanitized = qual.translate(_sanitize_table)
@@ -104,35 +108,73 @@ def quality_and_complexity_paired(read_pairs, max_read_length, results):
     })
 
 def get_line_groups(line_source):
-    if isinstance(line_source, str) or isinstance(line_source, unicode):
-        # line_source is a file name.
+    if isinstance(line_source, Path):
+        line_source = str(line_source)
+
+    if isinstance(line_source, str):
         if line_source.endswith('.gz'):
-            lines = gzip.open(line_source)
+            opener = gzip.open
         else:
-            lines = open(line_source)
+            opener = open
     else:
-        # line_source is an open file.
-        lines = iter(line_source)
-    return izip(*[lines]*4)
+        opener = iter
 
-Read = namedtuple('Read', ['name', 'seq', 'qual'])
+    lines = opener(line_source)
+    groups = zip(*[lines]*4)
+    return groups
 
-def Read_to_record(self):
-    return make_record(*self)
-Read.__str__ = Read_to_record
+class Read(object):
+    def __init__(self, name, seq, qual):
+        self.name = name
+        self.seq = seq
+        self.qual = qual
+        
+    def __str__(self):
+        return make_record(self.name, self.seq.decode(), self.qual.decode())
+    
+    def reverse_complement(self):
+        return Read(self.name,
+                    utilities.reverse_complement(self.seq),
+                    self.qual[::-1],
+                   )
+    
+    def __getitem__(self, sl):
+        return Read(self.name, self.seq[sl], self.qual[sl])
+    
+    def __repr__(self):
+        return str(self)
 
-period_to_N = string.maketrans('.', 'N')
+    def __len__(self):
+        return len(self.seq)
+
+    def __add__(self, other):
+        return Read(self.name, self.seq + other.seq, self.qual + other.qual)
+
+period_to_N = bytes.maketrans(b'.', b'N')
+
+def convert_to_bytes(possibly_s):
+    try:
+        b = possibly_s.encode()
+    except AttributeError:
+        b = possibly_s
+    return b
 
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
+    seq_line = convert_to_bytes(seq_line)
+    qual_line = convert_to_bytes(qual_line)
+
     name = name_standardizer(name_line.rstrip().lstrip('@'))
+
     seq = seq_line.strip()
     seq = seq.translate(period_to_N)
+
     qual = qual_convertor(qual_line.strip())
+
     read = Read(name, seq, qual)
     return read
 
-def reads(file_name, standardize_names=False, ensure_sanger_encoding=False):
+def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_to_space=False):
     ''' Yields Read's from a file name or line iterator.
         If standardize_names == True, infers read name structure and
         standardizes read names.
@@ -143,6 +185,8 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False):
 
     if standardize_names:
         name_standardizer, line_groups = detect_structure(line_groups)
+    elif up_to_space:
+        name_standardizer = lambda n: n.split(' ')[0]
     else:
         name_standardizer = identity
 
@@ -158,13 +202,12 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False):
 
 def reverse_complement_reads(file_name, **kwargs):
     for read in reads(file_name, **kwargs):
-        rc_read = Read(read.name, reverse_complement(read.seq), read.qual[::-1])
-        yield rc_read
+        yield read.reverse_complement()
 
 def detect_structure(line_groups):
     ''' Look at the first read to figure out the read name structure. '''
     try:
-        first_group = line_groups.next()
+        first_group = next(line_groups)
         first_read = line_group_to_read(first_group)
         name_standardizer = get_read_name_standardizer(first_read.name)
         line_groups = chain([first_group], line_groups)
@@ -180,11 +223,10 @@ def detect_encoding(line_groups):
         for line_group in line_groups:
             groups_examined.append(line_group)
             read = line_group_to_read(line_group)
-            ords = [ord(q) for q in read.qual]
-            if min(ords) < SOLEXA_OFFSET - 5:
+            if min(read.qual) < SOLEXA_OFFSET - 5:
                 encoding = 'SANGER'
                 break
-            if max(ords) > SANGER_OFFSET + 41:
+            if max(read.qual) > SANGER_OFFSET + 41:
                 encoding = 'SOLEXA'
                 break
     except StopIteration:
@@ -203,7 +245,7 @@ def detect_encoding(line_groups):
 def read_pairs(R1_file_name, R2_file_name, **kwargs):
     R1_reads = reads(R1_file_name, **kwargs)
     R2_reads = reads(R2_file_name, **kwargs)
-    return izip(R1_reads, R2_reads)
+    return zip(R1_reads, R2_reads)
 
 def read_pairs_interleaved(lines, **kwargs):
     interleaved_reads = reads(lines, **kwargs)
@@ -253,27 +295,31 @@ def get_read_name_standardizer(read_name):
     if parser == parse_SRA_read_name or parser == parse_ERR_read_name:
         def standardizer(read_name):
             accession, number = parser(read_name)
-            standardized = _standardize_SRA(accession, number)
+            standardized = standardize('SRA', accession, number)
             return standardized
     elif parser == parse_paired_SRA_read_name:
         def standardizer(read_name):
             accession, number, member = parser(read_name)
-            standardized = _standardize_paired_SRA(accession, number, member)
+            standardized = standardize('paired_SRA', accession, number, member)
             return standardized
     elif parser:
         def standardizer(read_name):
             lane, tile, x, y, member, index = parser(read_name)
-            standardized = _standardize(lane, tile, x, y, member)
+            standardized = standardize('default', lane, tile, x, y, member)
             return standardized
     else:
         standardizer = identity
 
     return standardizer
 
-_standardize = '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}'.format
-_standardize_SRA = '{0:0>9.9s}:{1:0>10.10s}'.format
-_standardize_ERR = _standardize_SRA
-_standardize_paired_SRA = '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}'.format
+def standardize(template, *args):
+    return templates[template].format(*args)
+
+templates = {
+    'default': '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}',
+    'SRA': '{0:0>9.9s}:{1:0>10.10s}',
+    'paired_SRA': '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}',
+}
 
 def parse_new_illumina_read_name(read_name):
     location_info, member_info = read_name.split()

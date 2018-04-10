@@ -1,5 +1,5 @@
 import shutil
-from functools import partial
+from functools import partial, reduce
 from Sequencing import external_sort, sam
 from . import log
 
@@ -54,5 +54,5 @@ def merge_files(input_file_names, output_file_name, file_format, fast=False):
             merged_data = reduce(file_format.combine_data, processed_inputs)
             file_format.write_file(merged_data, output_file_name)
     except IOError:
-        print output_file_name
+        print(output_file_name)
         raise

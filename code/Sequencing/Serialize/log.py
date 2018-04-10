@@ -1,5 +1,6 @@
 import itertools
 import collections
+from six.moves import zip_longest
 
 extension = 'txt'
 
@@ -37,20 +38,20 @@ def read_file(log_file_name):
             dtype = int
         except ValueError:
             dtype = float
-        value = map(dtype, strings)
+        value = [dtype(s) for s in strings]
         return description, value
     
     with open(log_file_name) as log_file:
-        pairs = map(process_line, log_file)
+        pairs = [process_line(l) for l in log_file]
 
     return pairs
 
 def combine_data(first_pairs, second_pairs):
     combined_pairs = []
-    zipped = itertools.izip_longest(first_pairs, second_pairs, fillvalue=(None, None))
+    zipped = zip_longest(first_pairs, second_pairs, fillvalue=(None, None))
     for (first_d, first_v), (second_d, second_v) in zipped:
         if first_d != second_d:
-            raise RuntimeError, 'descriptions do not match'
+            raise RuntimeError('descriptions do not match')
         
         # Note: the use of '+' means these can't be np.arrays.
         combined_v = first_v + second_v 

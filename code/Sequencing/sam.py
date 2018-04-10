@@ -1,18 +1,31 @@
 ''' Utilities for dealing with sam files. '''
 
-import utilities
+from __future__ import print_function
+
 import re
-import subprocess32 as subprocess
+try:
+    import subprocess32 as subprocess
+except ImportError:
+    import subprocess
+
 from collections import Counter
-from itertools import izip, chain
+from itertools import chain
+from six.moves import zip
+from pathlib import Path
+
 import os
 import shutil
-import external_sort
-import pysam
-import fastq
-import mapping_tools
 import logging
 import heapq
+import contextlib
+import copy
+
+import pysam
+
+import Sequencing.utilities as utilities
+import Sequencing.external_sort as external_sort
+import Sequencing.fastq as fastq
+import Sequencing.mapping_tools as mapping_tools
 
 BAM_CMATCH = 0     # M
 BAM_CINS = 1       # I
@@ -37,7 +50,7 @@ op_to_char = {
 }
 # Want to be able to lookup with int or char keys, so make every relevant char
 # return itself.
-for v in op_to_char.values():
+for v in list(op_to_char.values()):
     op_to_char[v] = v
 
 read_consuming_ops = {
@@ -434,6 +447,12 @@ def truncate_cigar_blocks_from_beginning(cigar_blocks, truncated_length):
     truncated_blocks = flipped_truncated_blocks[::-1]
     return truncated_blocks
 
+def collapse_cigar_blocks(cigar_blocks):
+    collapsed = []
+    for kind, blocks in utilities.group_by(cigar_blocks, lambda t: t[0]):
+        collapsed.append((kind, sum(t[1] for t in blocks)))
+    return collapsed
+
 def alignment_to_cigar_string(ref_aligned, read_aligned):
     """ Builds a CIGAR string from an alignment. """
     cigar_blocks = alignment_to_cigar_blocks(ref_aligned, read_aligned)
@@ -448,27 +467,10 @@ def md_string_to_ops_string(md_string):
         to that char.
     '''
     # In the presence of a CIGAR string, the '^' character seems extraneous.
-    md_string = md_string.translate(None, '^')
+    # 94 is unicode ^.
+    md_string = md_string.translate({94: None})
     
-    match_lengths = map(int, re.findall(md_number, md_string))
-    text_blocks = re.findall(md_text, md_string)
-    
-    ops_string = '='*match_lengths[0]
-    for text_block, match_length in zip(text_blocks, match_lengths[1:]):
-        ops_string += text_block
-        ops_string += '='*match_length
-    
-    return ops_string
-
-def md_string_to_ops_string(md_string):
-    ''' Converts an MD string into a list of operations for supplying reference
-        characters, either '=' if equal to the read, or any other char if equal
-        to that char.
-    '''
-    # In the presence of a CIGAR string, the '^' character seems extraneous.
-    md_string = md_string.translate(None, '^')
-    
-    match_lengths = map(int, re.findall(md_number, md_string))
+    match_lengths = [int(s) for s in re.findall(md_number, md_string)]
     text_blocks = re.findall(md_text, md_string)
     
     # The standard calls for a number to start and end, zero if necessary,
@@ -618,14 +620,12 @@ def produce_alignment(mapping):
     if read_seq == None:
         read_seq = ''
     
-    read_quals = mapping.qual
+    read_quals = mapping.query_qualities
     if read_quals == None:
-        read_quals = ''
+        read_quals = []
     
     MD_string = dict(mapping.tags)['MD']
     
-    read_quals = fastq.decode_sanger(read_quals)
-
     ref_ops = iter(md_string_to_ops_string(MD_string))
     
     columns = []
@@ -637,7 +637,7 @@ def produce_alignment(mapping):
             for i in range(length):
                 read_char = read_seq[read_pos]
                 
-                ref_op = ref_ops.next()
+                ref_op = next(ref_ops)
                 if ref_op == '=':
                     ref_char = read_char
                 else:
@@ -655,7 +655,7 @@ def produce_alignment(mapping):
             # Deletion results in gap in read
             for i in range(length):
                 read_char = '-'
-                ref_char = ref_ops.next()
+                ref_char = next(ref_ops)
                 qual = 0 
                 
                 column = (ref_char, read_char, qual, ref_pos, read_pos)
@@ -719,7 +719,7 @@ def alignment_to_MD_string(ref_aligned, read_aligned):
     # Mark all blocks of matching with numbers, all deletion bases with '^*0', and all mismatch bases.
     MD_list = []
     current_match_length = 0
-    for ref_char, read_char in izip(ref_aligned, read_aligned):
+    for ref_char, read_char in zip(ref_aligned, read_aligned):
         if ref_char == read_char:
             current_match_length += 1
         elif ref_char != '-':
@@ -784,17 +784,18 @@ def sort(input_file_name, output_file_name):
         external_sort.external_sort(read_lines, output_file)
     
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
-    root, ext = os.path.splitext(output_file_name)
     samtools_command = ['samtools', 'sort']
     if by_name:
         samtools_command.append('-n')
     samtools_command.extend(['-@', str(num_threads),
-                             '-T', root,
                              '-o', output_file_name,
                              input_file_name,
                             ])
-    samtools_process = subprocess.Popen(samtools_command)
-    samtools_process.communicate()
+
+    subprocess.check_call(samtools_command)
+
+    if not by_name:
+        pysam.index(output_file_name)
 
 def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
     if len(input_file_names) == 1:
@@ -807,38 +808,11 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
         subprocess.check_call(merge_command)
     
     if not by_name:
-        index_bam(merged_file_name)
-
-def sam_to_sorted_bam(sam_file_name, bam_file_name):
-    view_command = ['samtools', 'view', '-ubh', sam_file_name]
-    sort_command = ['samtools', 'sort', '-T', bam_file_name, '-o', bam_file_name, '-']
-    bam_process = subprocess.Popen(view_command,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                  )
-    sort_process = subprocess.Popen(sort_command,
-                                    stdin=bam_process.stdout,
-                                    stderr=subprocess.PIPE,
-                                   )
-    sort_process.communicate()
-    _, err_output = bam_process.communicate()
-    if bam_process.returncode:
-        raise RuntimeError(err_output)
-    
-    index_bam(bam_file_name)
-
-def bam_to_sorted_bam(input_file_name, sorted_file_name):
-    sort_command = ['samtools', 'sort', '-T', sorted_file_name, '-o', sorted_file_name, input_file_name]
-    subprocess.check_call(sort_command)
-    index_bam(sorted_file_name)
+        pysam.index(merged_file_name)
 
 def bam_to_sam(bam_file_name, sam_file_name):
     view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
     subprocess.check_call(view_command)
-
-def index_bam(bam_file_name):
-    samtools_command = ['samtools', 'index', bam_file_name]
-    subprocess.check_call(samtools_command)
 
 def get_length_counts(bam_file_name, only_primary=True, only_unique=False):
     bam_file = pysam.Samfile(bam_file_name)
@@ -868,14 +842,10 @@ def get_mapq_counts(bam_file_name):
     return mapq_counts
 
 def mapping_to_Read(mapping):
-    if mapping.is_unmapped or not mapping.is_reverse:
-        seq = mapping.seq
-        qual = mapping.qual
-    else:
-        seq = utilities.reverse_complement(mapping.seq)
-        qual = mapping.qual[::-1]
+    seq = mapping.get_forward_sequence().encode()
+    qual = mapping.get_forward_qualities()
 
-    read = fastq.Read(mapping.qname, seq, qual)
+    read = fastq.Read(mapping.query_name, seq, qual)
     return read
 
 def sam_to_fastq(sam_file_name):
@@ -897,7 +867,7 @@ class AlignmentSorter(object):
                 ):
         self.reference_names = reference_names
         self.reference_lengths = reference_lengths
-        self.output_file_name = output_file_name
+        self.output_file_name = str(output_file_name)
         self.by_name = by_name
         self.fifo = mapping_tools.TemporaryFifo(name='unsorted_fifo.bam')
 
@@ -936,24 +906,53 @@ class AlignmentSorter(object):
             raise RuntimeError(err_output)
 
         if not self.by_name:
-            index_bam(self.output_file_name)
+            pysam.index(self.output_file_name)
 
     def write(self, alignment):
         self.sam_file.write(alignment)
 
+@contextlib.contextmanager
+def multiple_AlignmentSorters(handlers):
+    ''' from http://hoardedhomelyhints.dietbuddha.com/2014/02/python-aggregating-multiple-context.html '''
+    for handler in handlers:
+        handler.__enter__()
+  
+    err = None
+    exc_info = (None, None, None)
+    try:
+        yield
+    except Exception as err:
+        exc_info = sys.exc_info()
+ 
+    # exc_info get's passed to each subsequent handler.__exit__
+    # unless one of them suppresses the exception by returning True
+    for handler in reversed(handlers):
+        if handler.__exit__(*exc_info):
+            err = False
+            exc_info = (None, None, None)
+    if err:
+        raise err
+
+class AlignedSegmentByName(object):
+    def __init__(self, aligned_segment):
+        self.aligned_segment = aligned_segment
+        
+    def __lt__(self, other):
+        return self.aligned_segment.query_name < other.aligned_segment.query_name
+
 def merge_by_name(*mapping_iterators):
-    ''' Merges iterators over mappings that are sorted by name. Use case is to
-    combine accepted_hits.bam and unmapped.bam from tophat output.
+    ''' Merges iterators over mappings that are sorted by name.
     '''
-    wrapped_iterators = [((m.qname, m) for m in mappings) for mappings in mapping_iterators]
+    wrapped_iterators = [(AlignedSegmentByName(m) for m in mappings) for mappings in mapping_iterators]
     merged_wrapped = heapq.merge(*wrapped_iterators)
     last_qname = None
-    for (qname, mapping) in merged_wrapped:
-        if last_qname and qname < last_qname:
+    for al_by_name in merged_wrapped:
+        qname = al_by_name.aligned_segment.query_name
+        if last_qname is not None and qname < last_qname:
             raise ValueError('Attempted to merge unsorted mapping iterators')
 
         last_qname = qname
-        yield mapping
+        yield al_by_name.aligned_segment
 
 def aligned_pairs_exclude_soft_clipping(mapping):
     cigar = mapping.cigartuples
@@ -975,3 +974,261 @@ def parse_idxstats(bam_fn):
 
 def get_num_alignments(bam_fn):
     return sum(parse_idxstats(bam_fn).values())
+
+def crop_al_to_query_int(alignment, start, end):
+    ''' Replace any parts of alignment that involve query bases not in the
+    interval [start, end] with soft clipping.
+    query coords are given relative to the original read (and are therefore
+    transformed if alignment is reversed.)
+    '''
+    alignment = copy.deepcopy(alignment)
+
+    if alignment.is_unmapped:
+        return alignment
+
+    if alignment.is_reverse:
+        start, end = alignment.query_length - 1 - end, alignment.query_length - 1 - start
+
+    aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start)
+
+    start_i = 0
+    while aligned_pairs[start_i][0] == None or aligned_pairs[start_i][0] < start:
+        start_i += 1
+        
+    end_i = len(aligned_pairs) - 1
+    while aligned_pairs[end_i][0] is None or aligned_pairs[end_i][0] > end:
+        end_i -= 1
+
+    restricted_pairs = aligned_pairs[start_i:end_i + 1]
+    cigar = aligned_pairs_to_cigar(restricted_pairs) 
+
+    before_soft = start
+    if before_soft > 0:
+        cigar = [(BAM_CSOFT_CLIP, before_soft)] + cigar
+
+    after_soft = alignment.query_length - end - 1
+    if after_soft > 0:
+        cigar = cigar + [(BAM_CSOFT_CLIP, after_soft)]
+
+    restricted_rs = [r for q, r in restricted_pairs if r != None and r != 'S']
+    if not restricted_rs:
+        alignment.is_unmapped = True
+        alignment.cigar = []
+    else:
+        alignment.reference_start = min(restricted_rs)
+        alignment.cigar = cigar
+
+    return alignment
+
+def crop_al_to_ref_int(alignment, start, end):
+    ''' Returns a copy of alignment in which any query bases that align
+    outside the interval [start, end] are soft-clipped. If no bases are left,
+    sets alignment.is_unmapped to true.
+    '''
+    alignment = copy.deepcopy(alignment)
+
+    if alignment.reference_start > end or alignment.reference_end - 1 < start:
+        # alignment doesn't overlap the ref interval at all
+        alignment.is_unmapped = True
+        return alignment
+
+    if alignment.reference_start >= start and alignment.reference_end - 1 <= end:
+        # alignment is entirely contained in the ref_interval
+        return alignment
+
+    query_length = alignment.query_length
+    aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start)
+
+    start_i = 0
+    while (
+        aligned_pairs[start_i][1] == 'S' or
+        aligned_pairs[start_i][0] is None or
+        aligned_pairs[start_i][1] is None or
+        aligned_pairs[start_i][1] < start
+    ):
+        start_i += 1
+        
+    end_i = len(aligned_pairs) - 1
+    while (
+        aligned_pairs[end_i][1] == 'S' or
+        aligned_pairs[end_i][0] is None or
+        aligned_pairs[end_i][1] is None or
+        aligned_pairs[end_i][1] > end
+    ):
+        end_i -= 1
+
+    remaining = aligned_pairs[start_i:end_i + 1]
+    if remaining:
+        cigar = aligned_pairs_to_cigar(remaining)
+        before_soft = remaining[0][0]
+        if before_soft > 0:
+            cigar = [(BAM_CSOFT_CLIP, before_soft)] + cigar
+
+        after_soft = query_length - remaining[-1][0] - 1
+        if after_soft > 0:
+            cigar = cigar + [(BAM_CSOFT_CLIP, after_soft)]
+
+        alignment.cigar = cigar
+
+        alignment.reference_start = aligned_pairs[start_i][1]
+    else:
+        alignment.is_unmapped = True
+        alignment.cigar = []
+    
+
+    return alignment
+
+def disallow_query_positions_from_other(alignment, other):
+    start, end = query_interval(alignment)
+    other_start, other_end = query_interval(other)
+    if other_start <= end or other_end >= start:
+        if other_start > start and other_end < end:
+            raise ValueError
+        elif other_start <= start:
+            crop_al_to_query_int(alignment, other_end + 1, alignment.query_length - 1)
+        elif other_end >= end:
+            crop_al_to_query_int(alignment, 0, other_start - 1)
+
+    return alignment
+
+def query_interval(alignment):
+    start = alignment.query_alignment_start
+    end = alignment.query_alignment_end - 1
+    if alignment.is_reverse:
+        start, end = true_query_position(end, alignment), true_query_position(start, alignment)
+    return start, end
+
+def merge_adjacent_alignments(first, second):
+    ''' Takes two alignments to the same reference name and strand that
+    are adjacent or partially overlap on the query and merges them by
+    assigning the overlapping query bases to the rightmost alignment
+    and adding an appropriately sized deletion.
+    '''
+    if first.reference_name != second.reference_name:
+        raise ValueError
+    if get_strand(first) != get_strand(second):
+        raise ValueError
+    
+    (q_left_start, q_left_end), (q_right_start, q_right_end) = sorted(map(query_interval, (first, second)))
+    if q_left_start == q_right_start and q_left_end == q_right_end:
+        # query intervals are identical
+        raise ValueError
+
+    if not (q_right_start - 1 <= q_left_end <= q_right_end - 1):
+        # query intervals are not partially overlapping or adjacent
+        raise ValueError
+
+    left, right = sorted((first, second), key=lambda al: al.reference_start)
+
+    disallow_query_positions_from_other(left, right)
+
+    # Since they were adjacent or overlapping before disallowing in left,
+    # they are now adjacent and right's cigar starts with a soft clip
+    # block of size left.query_alignment_length
+
+    deletion_length = right.reference_start - left.reference_end
+    if deletion_length < 0:
+        # These shouldn't actually be merged.
+        raise ValueError(deletion_length)
+    else:
+        cigar = left.cigar[:-1] + [(BAM_CDEL, deletion_length)] + right.cigar[1:]
+        left.cigar = cigar
+
+    return left
+
+def true_query_position(p, alignment):
+    if alignment.is_reverse:
+        p = alignment.query_length - 1 - p
+    return p
+
+def closest_query_position(r, alignment, which_side='either'):
+    ''' Return query position paired with r (or with the closest to r) '''
+    r_to_q = {r: true_query_position(q, alignment)
+              for q, r in alignment.aligned_pairs
+              if r is not None and q is not None
+             }
+    if r in r_to_q:
+        q = r_to_q[r]
+    else:
+        if which_side == 'either':
+            rs = r_to_q
+        elif which_side == 'before':
+            rs = (other_r for other_r in r_to_q if other_r < r)
+        elif which_side == 'after':
+            rs = (other_r for other_r in r_to_q if other_r > r)
+
+        closest_r = min(rs, key=lambda other_r: abs(other_r - r))
+        q = r_to_q[closest_r]
+
+    return q
+
+def max_block_length(alignment, block_types):
+    if alignment.is_unmapped:
+        return 0
+    else:
+        block_lengths = [l for k, l in alignment.cigar if k in block_types]
+        if len(block_lengths) == 0:
+            return 0
+        else:
+            return max(block_lengths)
+
+def total_indel_lengths(alignment):
+    if alignment.is_unmapped:
+        return 0
+    else:
+        return sum(l for k, l in alignment.cigar if k == BAM_CDEL or k == BAM_CINS)
+
+def get_ref_pos_to_block(alignment):
+    ref_pos_to_block = {}
+    reference_start = alignment.reference_start
+    for kind, length in alignment.cigar:
+        if kind in ref_consuming_ops:
+            for r in range(reference_start, reference_start + length):
+                ref_pos_to_block[r] = (kind, length)
+            reference_start += length
+
+    return ref_pos_to_block
+
+def split_at_first_large_insertion(alignment, min_length=20):
+    q = 0
+
+    # Using cigar blocks, march from beginning of the read to the (possible)
+    # insertion point to determine the query interval to crop to.
+    # If the alignment is reversed, alignment.cigar is reversed relative to
+    # true query positions.
+    cigar = alignment.cigar
+    if alignment.is_reverse:
+        cigar = cigar[::-1]
+
+    for kind, length in cigar:
+        if kind == BAM_CINS and length >= min_length:
+            before = crop_al_to_query_int(alignment, 0, q - 1)
+            after = crop_al_to_query_int(alignment, q + length, alignment.query_length)
+            return [before, after]
+        else:
+            if kind in read_consuming_ops:
+                q += length
+
+    return [alignment]
+
+def split_at_large_insertions(alignment):
+    all_split = []
+    
+    to_split = [alignment]
+
+    while len(to_split) > 0:
+        candidate = to_split.pop()
+        split = split_at_first_large_insertion(candidate)
+        if len(split) > 1:
+            to_split.extend(split)
+        else:
+            all_split.extend(split)
+
+    return all_split
+
+def grouped_by_name(als):
+    if isinstance(als, (str, Path)):
+        als = pysam.AlignmentFile(als)
+
+    grouped = utilities.group_by(als, lambda al: al.query_name)
+    return grouped

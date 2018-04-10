@@ -1,4 +1,4 @@
-import define_igv_colors
+from . import define_igv_colors
 import itertools
 import scipy.stats
 import numpy as np
@@ -254,13 +254,17 @@ def enhanced_scatter(xs, ys,
                         }
 
         if hist_range is None:
-            hist_range = (min(xs), max(xs))
+            hist_range = {
+                'x': (min(xs), max(xs)),
+                'y': (min(ys), max(ys)),
+            }
+
         ax_x = fig.add_axes((ax_position.x0, bottom, ax_position.width, ax_position.height * 0.1), sharex=ax)
-        ax_x.hist(xs, range=hist_range, **common_kwargs)
+        ax_x.hist(xs, range=hist_range['x'], **common_kwargs)
         ax_x.axis('off')
 
         ax_y = fig.add_axes((left, ax_position.y0, ax_position.width * 0.1, ax_position.height), sharey=ax)
-        ax_y.hist(ys, range=hist_range, orientation='horizontal', **common_kwargs)
+        ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', **common_kwargs)
         ax_y.axis('off')
 
         if remove_x_hist:
@@ -382,3 +386,6 @@ def color_labels(labels, name_to_color):
 
 def apply_alpha(color, alpha):
     return matplotlib.colors.colorConverter.to_rgba(color, alpha=alpha)
+
+def force_integer_ticks(axis):
+    axis.set_major_locator(matplotlib.ticker.MaxNLocator(interger=True))
