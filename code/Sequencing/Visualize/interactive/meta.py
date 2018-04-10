@@ -1,14 +1,17 @@
-import bokeh
-from bokeh.models.tickers import SingleIntervalTicker
-from bokeh.models.annotations import Legend, LegendItem
 import copy
 import json
 import os.path
-import numpy as np
-import Sequencing.genetic_code as genetic_code
-import Sequencing.Visualize.interactive.toggle_legend as toggle_legend
 from itertools import cycle
 from collections import defaultdict
+
+import numpy as np
+import bokeh
+from bokeh.models.tickers import SingleIntervalTicker
+from bokeh.models.annotations import Legend, LegendItem
+
+import sequencing.genetic_code as genetic_code
+import sequencing.Visualize.interactive.toggle_legend as toggle_legend
+
 from .external_coffeescript import build_callback
 from .colors_list import colors_list
 
@@ -231,9 +234,14 @@ def codon(enrichments=None,
     
     fig.xaxis[0].ticker = bokeh.models.tickers.SingleIntervalTicker(interval=3, num_minor_ticks=3)
 
-    for letter, x, color in (('A', 1, 'red'), ('P', 4, 'blue'), ('E', 7, 'green')):
-        fig.add_layout(bokeh.models.BoxAnnotation(left=x - 1.5, right=x + 1.5, fill_color=color, fill_alpha=0.1, line_alpha=0))
-        fig.add_layout(bokeh.models.Label(x=x, y=20, y_units='screen', text=letter, text_color=color, text_align='center'))
+    if initial_resolution == 'nucleotide':
+        for letter, x, color in (('A', 1, 'red'), ('P', 4, 'blue'), ('E', 7, 'green')):
+            fig.add_layout(bokeh.models.BoxAnnotation(left=x - 1.5, right=x + 1.5, fill_color=color, fill_alpha=0.1, line_alpha=0))
+            fig.add_layout(bokeh.models.Label(x=x, y=20, y_units='screen', text=letter, text_color=color, text_align='center'))
+    elif initial_resolution == 'codon':
+        for letter, x, color in (('A', 0, 'red'), ('P', 1, 'blue'), ('E', 2, 'green')):
+            fig.add_layout(bokeh.models.BoxAnnotation(left=x - 0.5, right=x + 0.5, fill_color=color, fill_alpha=0.1, line_alpha=0))
+            fig.add_layout(bokeh.models.Label(x=x, y=20, y_units='screen', text=letter, text_color=color, text_align='center'))
 
     legend_items = []
     initial_legend_items = []
@@ -751,7 +759,7 @@ def gene(enrichments=None,
     alpha_slider.callback = build_callback('lengths_unselected_alpha')
 
     plots = bokeh.layouts.gridplot([[figs['left'], figs['right']]])
-    plots.children[0].logo = None
+    #plots.children[0].logo = None
 
     grid = [
         top_groups,
