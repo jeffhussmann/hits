@@ -20,7 +20,7 @@ cpdef int adapter_hamming_distance(char *seq,
 cpdef simple_hamming_distance(char *first_seq, char *second_seq):
     return adapter_hamming_distance(first_seq, second_seq, len(first_seq), len(second_seq), 0)
 
-def find_adapter(char *adapter, int max_distance, char *seq):
+def find_adapter(char* adapter, int max_distance, char *seq):
     ''' Returns the leftmost position in seq for which either:
             - seq[position:position + len(adapter)] is within hamming distance
               max_distance of adapter

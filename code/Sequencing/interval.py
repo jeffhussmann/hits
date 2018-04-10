@@ -1,5 +1,5 @@
-import Sequencing.sam as sam
 from collections import defaultdict
+from . import sam
 
 def are_disjoint(first, second):
     return first.start > second.end or second.start > first.end

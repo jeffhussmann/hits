@@ -1,6 +1,6 @@
 import shutil
 from functools import partial, reduce
-from Sequencing import external_sort, sam
+from .. import external_sort, sam
 from . import log
 
 def _concatenate(input_file_names, output_file_name):

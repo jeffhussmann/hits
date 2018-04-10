@@ -235,26 +235,26 @@ def make_intensity_files(fastq_files, lane_dir):
         return int_file
 
     fastq_line_counts = {}
-    print 'Counting reads in fastq files...'
+    print('Counting reads in fastq files...')
     progress_bar = custom_progress_bar(len(fastq_files))
     for i, fastq_file in enumerate(fastq_files):
         fastq_line_counts[fastq_file] = line_count(fastq_file) / 4
         progress_bar.update(i + 1)
     progress_bar.finish()
     
-    print 'Loading cluster locations in tiles...'
+    print('Loading cluster locations in tiles...')
     locations = load_locations(lane_dir)
     cluster_counts = {tile:len(locations) for tile, locations in locations.items()}
     
     for t, tile in enumerate(locations):
-        print 'Processing tile {0} ({1}/{2})'.format(tile, t + 1, len(locations))
-        print 'Loading intensities from .cifs...'
+        print('Processing tile {0} ({1}/{2})'.format(tile, t + 1, len(locations)))
+        print('Loading intensities from .cifs...')
         intensities = load_intensities(lane_dir, tile, cluster_counts[tile])
-        print 'Converting to strings...'
+        print('Converting to strings...')
         intensity_strings = intensities_array_to_strings(intensities)
         
         for fastq_file in fastq_files:
-            print 'Assigning intensities to {0}'.format(fastq_file)
+            print('Assigning intensities to {0}'.format(fastq_file))
             
             intensities_file_name = split_int_file_name(fastq_file, tile)
 
@@ -291,7 +291,7 @@ def make_intensity_files(fastq_files, lane_dir):
                 progress_bar.finish()
                  
     for fastq_file in fastq_files:
-        print 'Merging tiles for {0}'.format(fastq_file)
+        print('Merging tiles for {0}'.format(fastq_file))
         tile_handles = {tile: open(split_int_file_name(fastq_file, tile))
                         for tile in locations}
         
@@ -319,7 +319,7 @@ def make_intensity_files(fastq_files, lane_dir):
                 progress_bar.update(l + 1)
             progress_bar.finish()
         
-        print 'Removing tile-specific files...'
+        print('Removing tile-specific files...')
         for tile in locations:
             os.remove(split_int_file_name(fastq_file, tile))
 

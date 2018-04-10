@@ -1,11 +1,10 @@
-from __future__ import print_function
 import numpy as np
 import pysam
 import logging
 from collections import Counter
-import Sequencing.sam as sam
-import Sequencing.utilities as utilities
-import Sequencing.fastq as fastq
+from . import sam
+from . import utilities
+from . import fastq
 
 def keep_same_names(R1_aligned, R2_aligned):
     return R1_aligned.qname, R2_aligned.qname

@@ -1,20 +1,17 @@
-from __future__ import print_function
-
 import sys
 import contextlib
 import numpy as np
 import pysam
 import string
-from itertools import chain, islice
-from six.moves import zip, zip_longest
+from itertools import chain, islice, zip_longest
 
-import Sequencing.utilities as utilities
-import Sequencing.fastq as fastq
-import Sequencing.fasta as fasta
-import Sequencing.genomes as genomes
-import Sequencing.mapping_tools as mapping_tools
-import Sequencing.sw as sw
-import Sequencing.sam as sam
+from . import utilities
+from . import fastq
+from . import fasta
+from . import genomes
+from . import mapping_tools
+from . import sw
+from . import sam
 
 def mapping_to_alignment(mapping, base_lookup):
     ''' Convert a mapping represented by a pysam.AlignedRead into an alignment. '''
@@ -27,10 +24,9 @@ def mapping_to_alignment(mapping, base_lookup):
             if ref_i == None:
                 ref_i = sw.GAP
             else:
-                read_base = mapping.seq[read_i].encode()
+                read_base = mapping.seq[read_i]
                 ref_base = base_lookup(mapping.reference_name, ref_i).upper()
                 if read_base != ref_base:
-                    print(read_base, ref_base)
                     mismatches.add((read_i, ref_i))
 
             path.append((read_i, ref_i))
@@ -75,7 +71,7 @@ def produce_bowtie2_alignments(reads,
                                                    yield_mappings=True,
                                                    **bowtie2_options)
 
-    base_lookup = genomes.build_base_lookup(genome_dir, sam_file)
+    base_lookup = genomes.build_base_lookup(genome_dir)
     mapping_groups = utilities.group_by(mappings, lambda m: m.qname)
     
     for qname, group in mapping_groups:
@@ -152,10 +148,6 @@ def produce_sw_alignments(reads, genome_dirs, extra_targets, max_to_report=5):
         alignments = alignments[:max_to_report]
 
         name = read.name
-        try:
-            name = name.decode()
-        except AttributeError:
-            pass
 
         sanitized_name = up_to_first_space(name)
         yield sanitized_name, alignments
@@ -165,7 +157,7 @@ def produce_sam_alignments(bam_fn, ref_fn, max_reads=None):
     def base_lookup(name, i):
         return refs[name][i:i + 1]
     
-    mapping_groups = utilities.group_by(pysam.AlignmentFile(bam_fn), lambda m: m.query_name)
+    mapping_groups = utilities.group_by(pysam.AlignmentFile(str(bam_fn)), lambda m: m.query_name)
     for name, mappings in islice(mapping_groups, max_reads):
         alignments = [mapping_to_alignment(mapping, base_lookup)
                       for mapping in sorted(mappings, key=lambda m: (m.tid, m.pos))
@@ -178,10 +170,6 @@ def produce_representations(alignment_groups_list):
         representations = []
         qnames = set()
         for qname, alignment_group in alignment_group_list:
-            try:
-                qname = qname.decode()
-            except AttributeError:
-                pass
             qnames.add(qname)
             representations.extend(map(represent_alignment, alignment_group))
 
@@ -195,7 +183,7 @@ def produce_representations(alignment_groups_list):
 
 def find_best_offset(R1, R2_rc):
     R2 = R2_rc.reverse_complement()
-    status, insert_length, alignment = sw.infer_insert_length(R1, R2, b'', b'')
+    status, insert_length, alignment = sw.infer_insert_length(R1, R2, '', '')
     if status == 'good':
         offset = insert_length - len(R1)
     else:
@@ -243,10 +231,6 @@ def represent_alignment(alignment):
     width = rightmost_read - leftmost_read + 1
 
     ref_name = alignment['rname']
-    try:
-        ref_name = ref_name.decode()
-    except AttributeError:
-        pass
 
     ref_name_string = ref_name.center(width)
     if width > 100:
@@ -368,12 +352,13 @@ def lowercase_below_qual_threshold(seq, qual, threshold):
     qual is below threshold.
     '''
     seq = list(seq)
+    decoded_qual = fastq.decode_sanger(qual)
 
-    for p, (s, q) in enumerate(zip(seq, qual)):
+    for p, (s, q) in enumerate(zip(seq, decoded_qual)):
         if q <= threshold:
-            seq[p] = bytes([s]).lower()[0]
+            seq[p] = s.lower()
 
-    return bytes(seq)
+    return ''.join(seq)
 
 def visualize_unpaired_alignments(get_reads,
                                   sw_genome_dirs,
@@ -465,14 +450,14 @@ def visualize_bam_alignments(bam_fn, ref_fn, output_fn, max_reads=None):
                 for line in lines:
                     output_fh.write(line + '\n')
 
-            output_fh.write(seq.decode() + '\n')
+            output_fh.write(seq + '\n')
             output_fh.write('\n\n')
 
 @contextlib.contextmanager
 def possibly_fn(fn=None):
     # from https://stackoverflow.com/a/22264583
     if fn is not None:
-        writer = open(fn, 'w')
+        writer = open(str(fn), 'w')
     else:
         writer = sys.stdout
 
@@ -572,8 +557,8 @@ def visualize_paired_end_mappings(get_read_pairs,
                 R1_shift = ' '*(-offset)
                 R2_shift = ''
             
-            R1_seq = lowercase_below_qual_threshold(R1.seq, R1.qual, 20).decode()
-            R2_rc_seq = lowercase_below_qual_threshold(R2_rc.seq, R2_rc.qual, 20).decode()
+            R1_seq = lowercase_below_qual_threshold(R1.seq, R1.qual, 20)
+            R2_rc_seq = lowercase_below_qual_threshold(R2_rc.seq, R2_rc.qual, 20)
             
             R1_representations = collapse_representations(R1_representations)
             R2_representations = collapse_representations(R2_representations)

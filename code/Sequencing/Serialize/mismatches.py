@@ -3,7 +3,7 @@ import numpy as np
 extension = 'npy'
 
 def write_file(type_counts, mismatch_file_name):
-    if not mismatch_file_name.endswith('.npy'):
+    if not str(mismatch_file_name).endswith('.npy'):
         raise ValueError('{0} does not end in .npy'.format(mismatch_file_name))
     np.save(mismatch_file_name, type_counts)
 

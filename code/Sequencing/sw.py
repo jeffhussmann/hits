@@ -5,8 +5,14 @@ import sys
 import pysam
 import argparse
 from collections import Counter
-from Sequencing import utilities, fastq, fasta, adapters, annotation, sam
-from Sequencing.sw_cython import *
+
+from . import utilities
+from . import fastq
+from . import fasta
+from . import adapters
+from . import annotation
+from . import sam
+from .sw_cython import *
 
 empty_alignment = {
     'score': -1e6,
@@ -161,8 +167,11 @@ def generate_alignments(query,
         force_either_start = False
         force_edge_end = False
 
-    matrices = generate_matrices(query,
-                                 target,
+    query_bytes = query.encode()
+    target_bytes = target.encode()
+
+    matrices = generate_matrices(query_bytes,
+                                 target_bytes,
                                  match_bonus,
                                  mismatch_penalty,
                                  indel_penalty,
@@ -178,8 +187,8 @@ def generate_alignments(query,
 
     alignments = []
     for end_row, end_col in possible_ends:
-        alignment = backtrack_cython(query,
-                                     target,
+        alignment = backtrack_cython(query_bytes,
+                                     target_bytes,
                                      matrices,
                                      cells_seen,
                                      end_row,
@@ -265,6 +274,7 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
                                       1,
                                       0,
                                      )
+    #print_local_alignment(extended_R1, extended_R2, alignment['path'])
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1

@@ -1,4 +1,3 @@
-from __future__ import print_function
 import argparse
 import subprocess
 import time
@@ -9,10 +8,15 @@ import logging
 import pickle
 import glob
 from collections import defaultdict
+from pathlib import Path
+
+import yaml
+
 from . import split_file
+from . import split_sra_file
 from . import launcher
-import Sequencing.Serialize as Serialize
-import Sequencing.fastq as fastq
+from .. import Serialize
+from .. import fastq
 
 def extend_stages(whole_stages, specific_stages):
     for whole_stage, specific_stage in zip(whole_stages, specific_stages):
@@ -31,21 +35,25 @@ class MapReduceExperiment(object):
     def __init__(self, **kwargs):
         self.group = kwargs.get('group', '')
         self.name = kwargs['name']
-        self.work_prefix = kwargs['work_prefix'].rstrip('/')
-        self.scratch_prefix = kwargs['scratch_prefix'].rstrip('/')
-        self.relative_results_dir = kwargs['relative_results_dir'].strip('/')
+
+        home = Path.home()
+
+        self.work_prefix = Path(kwargs.get('work_prefix', home))
+        self.scratch_prefix = Path(kwargs.get('scratch_prefix', home / 'scratch'))
+        if 'results_dir' in kwargs:
+            self.relative_results_dir = Path(kwargs['results_dir']).relative_to(self.work_prefix)
+        elif 'relative_results_dir' in kwargs:
+            self.relative_results_dir = Path(kwargs['relative_results_dir'])
+        else:
+            raise ValueError('must provide either results_dir or relative_results_dir')
+
         self.num_pieces = kwargs['num_pieces']
         self.which_piece = kwargs['which_piece']
         
         suffix = split_file.generate_suffix(self.num_pieces, self.which_piece)
 
-        self.scratch_results_dir = '{0}/{1}{2}'.format(self.scratch_prefix,
-                                                       self.relative_results_dir,
-                                                       suffix,
-                                                      )
-        self.work_results_dir = '{0}/{1}'.format(self.work_prefix,
-                                                 self.relative_results_dir,
-                                                )
+        self.scratch_results_dir = (self.scratch_prefix / self.relative_results_dir).with_suffix(suffix)
+        self.work_results_dir = self.work_prefix / self.relative_results_dir
         
         if self.which_piece == -1:
             # Sentinel value that indicates this is the merged experiment.
@@ -131,17 +139,20 @@ class MapReduceExperiment(object):
                 extension = serialize_type.extension
 
             file_tail = tail_template.format(name=self.name, key=key, extension=extension)
-            self.file_names[key] = '/'.join([self.scratch_results_dir, file_tail])
-            self.merged_file_names[key] = '/'.join([self.work_results_dir, file_tail])
+            self.file_names[key] = self.scratch_results_dir / file_tail
+            self.merged_file_names[key] = self.work_results_dir / file_tail
             self.file_types[key] = (serialize_type, fast_merge)
 
         self.figure_file_names = {}
         for key, tail_template in self.figure_files:
             file_tail = tail_template.format(name=self.name, key=key)
-            self.figure_file_names[key] = '{0}/{1}'.format(self.work_results_dir, file_tail)
+            self.figure_file_names[key] = self.work_results_dir / file_tail
 
         if self.which_piece == -1:
             self.file_names = self.merged_file_names
+
+    def format_file_name(self, key, **kwargs):
+        return Path(str(self.file_names[key]).format(**kwargs))
 
     def consolidate_summaries(self):
         stage_file_names = [self.file_names['summary_stage_{0}'.format(stage)]
@@ -212,11 +223,11 @@ class MapReduceExperiment(object):
                                          'I2': None,
                                         })
         pattern = r'[RI][12]'
-        data_fns = glob.glob(self.data_dir + '/*.fastq') + glob.glob(self.data_dir + '/*.fq')
+
+        data_fns = list(self.data_dir.glob('*.fastq')) + list(self.data_dir.glob('*.fq'))
         for data_fn in data_fns:
-            head, tail = os.path.split(data_fn)
-            which_member = re.search(pattern, data_fn).group()
-            group_name = re.sub(pattern, '*', tail)
+            which_member = re.search(pattern, data_fn.name).group()
+            group_name = re.sub(pattern, '*', data_fn.name)
             fn_groups[group_name][which_member] = data_fn
         
         for group_name in sorted(fn_groups):
@@ -285,7 +296,6 @@ class MapReduceExperiment(object):
             logging.info('{0:,} total reads processed'.format(total_reads))
             self.summary.append(('Total reads', total_reads))
 
-    
 
 def controller(ExperimentClass, script_path, **override):
     args = parse_arguments()
@@ -338,15 +348,37 @@ def parse_arguments():
     args = parser.parse_args()
     return args
 
+def get_description_fn(job_dir):
+    description_fn = Path(job_dir) / 'description.yaml'
+    if not description_fn.exists():
+        description_fn = Path(job_dir) / 'description.txt'
+
+    if not description_fn.exists():
+        raise ValueError(job_dir)
+
+    return description_fn
+
 def parse_description(description_fn, **override):
-    description = dict(line.strip().split() for line in open(description_fn)
-                       if not line.startswith('#'))
+    description_fn = Path(description_fn)
+    if description_fn.suffix == '.txt':
+        description = dict(line.strip().split() for line in open(description_fn)
+                           if not line.startswith('#'))
+    elif description_fn.suffix == '.yaml':
+        description = yaml.load(description_fn.read_text())
+
     description.update(override)
+
     return description
 
 def launch(args, script_path, num_stages, **override):
-    description_file_name = '{0}/description.txt'.format(args.job_dir)
-    description = parse_description(description_file_name)
+    description_fn = Path(args.job_dir) / 'description.yaml'
+    if not description_fn.exists():
+        description_fn = Path(args.job_dir) / 'description.txt'
+
+    if not description_fn.exists():
+        raise ValueError
+
+    description = parse_description(description_fn)
 
     def make_process_command(args, which_piece, stage):
         command = [script_path,
@@ -443,15 +475,15 @@ def launch(args, script_path, num_stages, **override):
                  )
         os.chdir(starting_path)
     else:
-        for stage in range(num_stages):
-        #for stage in [1]:
+        #for stage in range(num_stages):
+        for stage in [1]:
             print('\tLaunched stage {0} with parallel'.format(stage))
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)
 
 def process(args, ExperimentClass, **override):
-    description_file_name = '{0}/description.txt'.format(args.job_dir)
-    description = parse_description(description_file_name, **override)
+    description_fn = get_description_fn(args.job_dir)
+    description = parse_description(description_fn, **override)
 
     experiment = ExperimentClass(num_pieces=args.num_pieces,
                                  which_piece=args.which_piece,
@@ -459,8 +491,8 @@ def process(args, ExperimentClass, **override):
     experiment.do_work(args.stage)
 
 def finish(args, ExperimentClass, **override):
-    description_file_name = '{0}/description.txt'.format(args.job_dir)
-    description = parse_description(description_file_name, **override)
+    description_fn = get_description_fn(args.job_dir)
+    description = parse_description(description_fn, **override)
     
     merged = ExperimentClass(num_pieces=args.num_pieces,
                              which_piece=-1,

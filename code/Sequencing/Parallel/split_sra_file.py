@@ -4,7 +4,7 @@ except ImportError:
     import subprocess
 import os
 import contextlib
-import Sequencing.Parallel
+import sequencing.Parallel
 import yaml
 import sys
 
@@ -20,12 +20,13 @@ def piece(srr_fn, num_pieces, which_piece, paired=False):
 
     total_spots = info['total_spots']
 
-    bounds = Sequencing.Parallel.get_bounds(total_spots, num_pieces)
+    bounds = sequencing.Parallel.get_bounds(total_spots, num_pieces)
     first = bounds[which_piece] + 1
     last = bounds[which_piece + 1]
 
     with dump_spots(srr_fn, first, last, paired) as lines:
         for line in lines:
+            # Note: empirically, these lines are bytes objects.
             yield line.decode()
 
 @contextlib.contextmanager
@@ -59,5 +60,5 @@ def dump_spots(srr_fn, first, last, paired):
         process.terminate()
         process.stdout.close()
         for line in process.stderr:
-            if not (line.startswith('Read') or line.startswith('Written')):
+            if not (line.startswith(b'Read') or line.startswith(b'Written')):
                 sys.stderr.write(line)

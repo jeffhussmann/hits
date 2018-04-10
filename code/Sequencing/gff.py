@@ -165,7 +165,7 @@ def get_all_features(gff_fn, populate_connections=True):
     def relevant_lines(gff_fn):
         # Ignore any line starting with '#' and all lines after any line
         # starting with '##FASTA'
-        for line in open(gff_fn):
+        for line in open(str(gff_fn)):
             if line.startswith('##FASTA'):
                 break
             elif line.startswith('#'):

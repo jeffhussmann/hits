@@ -43,7 +43,7 @@ def get_genome_index(genome_dir):
         entries.update(parse_fai(fai_file_name))
     return entries
 
-def build_base_lookup(genome_dir, sam_file):
+def build_base_lookup(genome_dir):
     ''' Returns a memoized function for looking up single bases from reference.
     '''
     genome_index = get_genome_index(genome_dir)
