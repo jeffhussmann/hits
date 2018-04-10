@@ -1,3 +1,10 @@
+import os
+import os.path
+import numbers
+import base64
+import re
+from collections import defaultdict
+
 import numpy as np
 import scipy.cluster.hierarchy
 import bokeh
@@ -6,27 +13,13 @@ import bokeh.plotting
 import pandas as pd
 import matplotlib.colors
 import matplotlib.cm
-import os
-import os.path
-import numbers
 import six
-import re
-import base64
-import glob
 import IPython.display
-from collections import defaultdict
+
 from .external_coffeescript import build_callback
 
 bokeh.io.output_notebook()
 
-def build_selected(indices):
-    selected = {
-        '0d': {'indices': []},
-        '1d': {'indices': indices},
-        '2d': {},
-    }
-    return selected
-    
 def bool_to_js(b):
     return 'true' if b else 'false'
 
@@ -177,20 +170,21 @@ def scatter(df=None,
 
     # Infer column types.
     scatter_data = df.to_dict(orient='list')
-    scatter_data[df.index.name] = list(df.index)
 
     if 'index' in scatter_data:
         scatter_data['_index'] = scatter_data['index']
 
     if df.index.name is None:
         df.index.name = 'index'
+    
+    scatter_data[df.index.name] = list(df.index)
 
     if initial_selection is None:
         initial_selection = []
 
     initial_indices = [i for i, n in enumerate(df.index) if n in initial_selection]
 
-    auto_numerical_cols = [n for n in df.columns if df[n].dtype in [float, int]]
+    auto_numerical_cols = [n for n in df.columns if df[n].dtype in [np.float32, float, int]]
     if numerical_cols is not None:
         for col in numerical_cols:
             if col not in auto_numerical_cols:
@@ -326,7 +320,7 @@ def scatter(df=None,
                                                    name='scatter_source',
                                                   )
     if len(initial_indices) > 0:
-        scatter_source.selected = build_selected(initial_indices)
+        scatter_source.selected = bokeh.models.Selection(indices=initial_indices)
 
     scatter = fig.scatter('x',
                           'y',
@@ -629,7 +623,7 @@ def scatter(df=None,
                     }
     
     filtered_source = bokeh.models.ColumnDataSource(data=filtered_data, name='filtered_source')
-    filtered_source.selected = build_selected([])
+    filtered_source.selected = bokeh.models.Selection()
     
     table = bokeh.models.widgets.DataTable(source=filtered_source,
                                            columns=columns,
@@ -638,7 +632,7 @@ def scatter(df=None,
                                            sortable=False,
                                            reorderable=False,
                                            name='table',
-                                           row_headers=False,
+                                           index_position=None,
                                           )
     
     # Callback to filter the table when selection changes.
@@ -766,7 +760,7 @@ def scatter(df=None,
 
         name_pairs = list(zip(heatmap_source.data['x_name'], heatmap_source.data['y_name']))
         initial_index = name_pairs.index((x_name, y_name))
-        heatmap_source.selected = build_selected([initial_index])
+        heatmap_source.selected = bokeh.models.Selection(indices=[initial_index])
 
         heatmap_fig.min_border = 1
         
