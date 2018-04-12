@@ -4,7 +4,7 @@ scatter_data = models['scatter_source'].data
 label_data = models['filtered_source'].data
 hist_data = models['histogram_source'].data
 
-num_selected = cb_obj.selected['1d'].indices.length
+num_selected = cb_obj.selected.indices.length
 
 if num_selected == 0
     # Selection was cleared with ESC. Recover the old selection from the axis
@@ -17,9 +17,9 @@ if num_selected == 0
     index = (i for i in [0..num_pairs] when x_names[i] == x_name and y_names[i] == y_name)[0]
 else
     # In case of multiple selection with shift key, only keep the most recent.
-    index = cb_obj.selected['1d'].indices[num_selected - 1]
+    index = cb_obj.selected.indices[num_selected - 1]
 
-cb_obj.selected['1d'].indices = [index]
+cb_obj.selected.indices = [index]
 
 for axis in ['x', 'y']
     name = cb_obj.data[axis + '_name'][index]
