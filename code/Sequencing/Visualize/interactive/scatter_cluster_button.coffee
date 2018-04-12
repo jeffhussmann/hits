@@ -28,7 +28,7 @@ x_names = data['x_name']
 y_names = data['y_name']
 index = (i for i in [0..num_pairs] when x_names[i] == x_name and y_names[i] == y_name)[0]
 
-models['heatmap_source'].selected['1d'].indices = [index]
+models['heatmap_source'].selected.indices = [index]
 
 models['heatmap_source'].change.emit()
 models['heatmap_fig'].change.emit()

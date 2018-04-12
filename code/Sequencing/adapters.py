@@ -1,41 +1,41 @@
-from Sequencing.adapters_cython import *
 import numpy as np
-from Sequencing import utilities
+from . import utilities
+from .adapters_cython import *
 
 primers = {
-    'tru_seq': {
-        'R1':         b'TCTTTCCCTACACGACGCTCTTCCGATCT',
-        'R2':    b'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
+    'truseq': {
+        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT',
+        'R2':    'GTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT',
     },
     'PE': {
-        'R1':         b'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as tru_seq R1
-        'R2': b'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
+        'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as truseq R1
+        'R2': 'CGGTCTCGGCATTCCTGCTGAACCGCTCTTCCGATCT',
     },
     'nextera': {
-        'R1':     b'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
-        'R2':    b'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
+        'R1':     'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG',
+        'R2':    'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG',
     },
 }
 
 primers['mix_and_match'] = {
     'R1': primers['nextera']['R1'],
-    'R2': primers['tru_seq']['R2'],
+    'R2': primers['truseq']['R2'],
 }
 
 flow_cell = {
-    'P5': b'AATGATACGGCGACCACCGAGATCTACAC',
-    'P7': b'CAAGCAGAAGACGGCATACGAGAT',
+    'P5': 'AATGATACGGCGACCACCGAGATCTACAC',
+    'P7': 'CAAGCAGAAGACGGCATACGAGAT',
 }
 
-A_tail = b'A' * 10
+A_tail = 'A' * 10
 
 # For backwards compatibility
-tru_seq_R1_rc = b'AGATCGGAAGAGCGTCGTGTAGGGAAAGA'
-tru_seq_R2_rc = b'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
-P5_rc = b'TCTCGGTGGTCGCCGTATCATT'
-P7_rc = b'ATCTCGTATGCCGTCTTCTGCTTG'
+truseq_R1_rc = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGA'
+truseq_R2_rc = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
+P5_rc = 'TCTCGGTGGTCGCCGTATCATT'
+P7_rc = 'ATCTCGTATGCCGTCTTCTGCTTG'
 
-def build_before_adapters(I7_sequence=b'', primer_type='tru_seq', just_primers=False, R1_index=b'', R2_index=b''):
+def build_before_adapters(I7_sequence='', primer_type='truseq', just_primers=False, R1_index='', R2_index=''):
     if just_primers:
         before_R1 = primers[primer_type]['R1'] + R1_index
         before_R2 = primers[primer_type]['R2'] + R2_index
@@ -45,14 +45,15 @@ def build_before_adapters(I7_sequence=b'', primer_type='tru_seq', just_primers=F
 
     return before_R1, before_R2
 
-def build_adapters(index_sequence='', max_length=None, primer_type='tru_seq'):
-    before_R1, before_R2 = build_before_adapters(index_sequence, primer_type)
+def build_adapters(**kwargs):
+    before_R1, before_R2 = build_before_adapters(**kwargs)
+
     adapter_in_R1 = utilities.reverse_complement(before_R2) + A_tail
     adapter_in_R2 = utilities.reverse_complement(before_R1) + A_tail
-    truncated_slice = slice(None, max_length)
-    return adapter_in_R1[truncated_slice], adapter_in_R2[truncated_slice]
 
-def build_adapter_ranges(index_sequence, primer_type='tru_seq'):
+    return adapter_in_R1, adapter_in_R2
+
+def build_adapter_ranges(index_sequence, primer_type='truseq'):
     def make_ranges(construct, names):
         cumulative_lengths = list(np.cumsum(map(len, construct)))
         bounds = zip([0] + cumulative_lengths, cumulative_lengths)

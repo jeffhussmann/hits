@@ -1,18 +1,7 @@
 ''' Utilities for dealing with sam files. '''
 
-from __future__ import print_function
-
 import re
-try:
-    import subprocess32 as subprocess
-except ImportError:
-    import subprocess
-
-from collections import Counter
-from itertools import chain
-from six.moves import zip
-from pathlib import Path
-
+import subprocess
 import os
 import shutil
 import logging
@@ -20,12 +9,16 @@ import heapq
 import contextlib
 import copy
 
+from collections import Counter
+from itertools import chain
+from pathlib import Path
+
 import pysam
 
-import Sequencing.utilities as utilities
-import Sequencing.external_sort as external_sort
-import Sequencing.fastq as fastq
-import Sequencing.mapping_tools as mapping_tools
+from . import utilities
+from . import external_sort
+from . import fastq
+from . import mapping_tools
 
 BAM_CMATCH = 0     # M
 BAM_CINS = 1       # I
@@ -263,7 +256,7 @@ def get_soft_clipped_block(alignment, edge):
             sl = slice(0)
 
     seq = alignment.seq[sl]
-    qual = alignment.qual[sl]
+    qual = alignment.query_qualities[sl]
 
     return seq, qual
 
@@ -808,14 +801,14 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
         subprocess.check_call(merge_command)
     
     if not by_name:
-        pysam.index(merged_file_name)
+        pysam.index(str(merged_file_name))
 
 def bam_to_sam(bam_file_name, sam_file_name):
     view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
     subprocess.check_call(view_command)
 
 def get_length_counts(bam_file_name, only_primary=True, only_unique=False):
-    bam_file = pysam.Samfile(bam_file_name)
+    bam_file = pysam.AlignmentFile(bam_file_name)
     if only_unique:
         qlen_counts = Counter(ar.qlen for ar in bam_file if ar.mapping_quality == 50)
     elif only_primary:
@@ -826,7 +819,7 @@ def get_length_counts(bam_file_name, only_primary=True, only_unique=False):
     return qlen_counts
 
 def get_tlen_counts(bam_file_name, only_primary=True, only_unique=False):
-    bam_file = pysam.Samfile(bam_file_name)
+    bam_file = pysam.AlignmentFile(bam_file_name)
     if only_unique:
         tlen_counts = Counter(ar.tlen for ar in bam_file if ar.mapping_quality == 50)
     elif only_primary:
@@ -837,19 +830,19 @@ def get_tlen_counts(bam_file_name, only_primary=True, only_unique=False):
     return tlen_counts
 
 def get_mapq_counts(bam_file_name):
-    bam_file = pysam.Samfile(bam_file_name)
+    bam_file = pysam.AlignmentFile(bam_file_name)
     mapq_counts = Counter(ar.mapq for ar in bam_file)
     return mapq_counts
 
 def mapping_to_Read(mapping):
-    seq = mapping.get_forward_sequence().encode()
-    qual = mapping.get_forward_qualities()
+    seq = mapping.get_forward_sequence()
+    qual = fastq.encode_sanger(mapping.get_forward_qualities())
 
     read = fastq.Read(mapping.query_name, seq, qual)
     return read
 
 def sam_to_fastq(sam_file_name):
-    sam_file = pysam.Samfile(sam_file_name)
+    sam_file = pysam.AlignmentFile(str(sam_file_name))
     for mapping in sam_file:
         yield mapping_to_Read(mapping)
 
@@ -859,14 +852,8 @@ class AlignmentSorter(object):
     ''' Context manager that handles writing AlignedSegments into a samtools
     sort process.
     '''
-    def __init__(self,
-                 reference_names,
-                 reference_lengths,
-                 output_file_name,
-                 by_name=False,
-                ):
-        self.reference_names = reference_names
-        self.reference_lengths = reference_lengths
+    def __init__(self, output_file_name, header, by_name=False):
+        self.header = header
         self.output_file_name = str(output_file_name)
         self.by_name = by_name
         self.fifo = mapping_tools.TemporaryFifo(name='unsorted_fifo.bam')
@@ -886,13 +873,7 @@ class AlignmentSorter(object):
                                              stderr=subprocess.PIPE,
                                             )
 
-        self.sam_file = pysam.Samfile(self.fifo.file_name,
-                                      'wbu',
-                                      reference_names=self.reference_names,
-                                      reference_lengths=self.reference_lengths
-                                     )
-
-        self.get_tid = self.sam_file.get_tid
+        self.sam_file = pysam.AlignmentFile(self.fifo.file_name, 'wbu', header=self.header)
 
         return self
 
@@ -1228,7 +1209,13 @@ def split_at_large_insertions(alignment):
 
 def grouped_by_name(als):
     if isinstance(als, (str, Path)):
-        als = pysam.AlignmentFile(als)
+        als = pysam.AlignmentFile(str(als))
 
     grouped = utilities.group_by(als, lambda al: al.query_name)
     return grouped
+
+def header_from_STAR_index(index):
+    names = [l.strip() for l in (index / 'chrName.txt').open()]
+    lengths = [int(l.strip()) for l in (index / 'chrLength.txt').open()]
+    header = pysam.AlignmentHeader.from_references(names, lengths)
+    return header

@@ -1,19 +1,14 @@
-from __future__ import print_function
 import os
 import tempfile
 import logging
-try:
-    import subprocess32 as subprocess
-except ImportError:
-    import subprocess
+import subprocess
 import threading
 import shutil
+
 import pysam
 import numpy as np
 
-import Sequencing.genomes as genomes
-import Sequencing.fasta as fasta
-import Sequencing.fastq as fastq
+from . import genomes, fasta, fastq
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -342,7 +337,7 @@ def _map_bowtie2(index_prefix,
                 for read in fastq.reads(unal_R1_fn):
                     yield read
         elif yield_mappings:
-            sam_file = pysam.Samfile(output_file_name, 'r')
+            sam_file = pysam.AlignmentFile(str(output_file_name), 'r')
             yield sam_file
             for read in sam_file:
                 yield read
@@ -354,7 +349,7 @@ def _map_bowtie2(index_prefix,
                                                 err_output,
                                                )
         if bam_output:
-            pysam.index(output_file_name)
+            pysam.index(str(output_file_name))
 
 def map_bowtie2(index_prefix,
                 R1_fn=None,
@@ -420,7 +415,7 @@ def map_tophat(reads_file_names,
                keep_temporary_files=True,
               ):
 
-    joined_reads_names = ','.join(reads_file_names)
+    joined_reads_names = ','.join(str(fn) for fn in reads_file_names)
 
     options = [
         '--no-novel-juncs',
@@ -459,8 +454,8 @@ def map_tophat(reads_file_names,
     accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
     unmapped_fn = '{0}/unmapped.bam'.format(tophat_dir)
     if not os.path.exists(unmapped_fn):
-        template = pysam.Samfile(accepted_hits_fn)
-        empty_unmapped = pysam.Samfile(unmapped_fn, 'wb', template=template)
+        template = pysam.AlignmentFile(accepted_hits_fn)
+        empty_unmapped = pysam.AlignmentFile(unmapped_fn, 'wb', template=template)
         template.close()
         empty_unmapped.close()
 
@@ -536,14 +531,15 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     subprocess.check_output(STAR_command)
 
-    initial_bam_fn = output_prefix + bam_suffix
+    initial_bam_fn = str(output_prefix) + bam_suffix
+
     if bam_fn is None:
         bam_fn = initial_bam_fn
     else:
         shutil.move(initial_bam_fn, bam_fn)
 
     if sort:
-        pysam.index(bam_fn)
+        pysam.index(str(bam_fn))
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0

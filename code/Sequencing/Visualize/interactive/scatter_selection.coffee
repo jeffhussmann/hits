@@ -6,7 +6,7 @@ models = cb_obj.document._all_models_by_name._dict
 
 # To prevent this from erasing a selection that was just made, store indices
 # and re-assign them afterwards.
-indices = cb_obj.selected['1d'].indices
+indices = cb_obj.selected.indices
 
 if cb_data == 'from_heatmap'
 else
@@ -15,7 +15,7 @@ else
     if (models['subset_menu']?) and cb_data != 'from_subset'
         models['subset_menu'].value = ''
 
-cb_obj.selected['1d'].indices = indices
+cb_obj.selected.indices = indices
 
 # Make the histograms of all data slightly darker if nothing is selected. 
 if indices.length == 0

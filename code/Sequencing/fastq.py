@@ -1,28 +1,29 @@
 ''' Utilities for dealing with fastq files. '''
 
-from itertools import chain
-from six.moves import zip
-from collections import namedtuple
-from Sequencing.fastq_cython import *
-import Sequencing.utilities as utilities
-from Sequencing.utilities import identity, base_order, group_by
 import numpy as np
 import gzip
 
 from pathlib import Path
+from itertools import chain
+from six.moves import zip
+from collections import namedtuple
 
-# SANGER_OFFSET is imported from fastq_cython
+from . import utilities
+from .fastq_cython import *
+from .utilities import identity, base_order, group_by
+
+# SANGER_OFFSET = 33 is imported from fastq_cython
 SOLEXA_OFFSET = 64
 MAX_QUAL = 93
 MAX_EXPECTED_QUAL = 42
 
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
-    return [q - SANGER_OFFSET for q in qual]
+    return [ord(q) - SANGER_OFFSET for q in qual]
 
 def decode_solexa(qual):
     ''' Converts a string of solexa-encoded quals to a list of integers. '''
-    return [q - SOLEXA_OFFSET for q in qual]
+    return [ord(q) - SOLEXA_OFFSET for q in qual]
 
 def encode_sanger(ints):
     ''' Converts a list of integer quals to a sanger-encoded string. '''
@@ -50,10 +51,9 @@ def solexa_to_sanger(qual):
 # chr(ord('/') - 1). 
 # '_' is used as a field separator in annotations, so similarly needs to be
 # downgraded to chr(ord('_') - 1).
-_chars_to_sanitize = b'/_'
-_sanitized_chars = bytes(c - 1 for c in _chars_to_sanitize)
-_sanitize_table = bytes.maketrans(_chars_to_sanitize, _sanitized_chars)
-
+_chars_to_sanitize = '/_'
+_sanitized_chars = ''.join(chr(ord(c) - 1) for c in _chars_to_sanitize)
+_sanitize_table = str.maketrans(_chars_to_sanitize, _sanitized_chars)
 
 def sanitize_qual(qual):
     sanitized = qual.translate(_sanitize_table)
@@ -85,8 +85,8 @@ def quality_and_complexity_paired(read_pairs, max_read_length, results):
     joint_average_q_distribution = np.zeros((MAX_EXPECTED_QUAL + 1, MAX_EXPECTED_QUAL + 1), int)
     
     for R1, R2 in read_pairs:
-        R1_average_q = process_read(R1.seq, R1.qual, R1_q_array, R1_c_array)
-        R2_average_q = process_read(R2.seq, R2.qual, R2_q_array, R2_c_array)
+        R1_average_q = process_read(R1.seq.encode(), R1.qual.encode(), R1_q_array, R1_c_array)
+        R2_average_q = process_read(R2.seq.encode(), R2.qual.encode(), R2_q_array, R2_c_array)
         joint_average_q_distribution[int(R1_average_q), int(R2_average_q)] += 1
         yield R1, R2
         
@@ -130,7 +130,7 @@ class Read(object):
         self.qual = qual
         
     def __str__(self):
-        return make_record(self.name, self.seq.decode(), self.qual.decode())
+        return make_record(self.name, self.seq, self.qual)
     
     def reverse_complement(self):
         return Read(self.name,
@@ -150,19 +150,10 @@ class Read(object):
     def __add__(self, other):
         return Read(self.name, self.seq + other.seq, self.qual + other.qual)
 
-period_to_N = bytes.maketrans(b'.', b'N')
-
-def convert_to_bytes(possibly_s):
-    try:
-        b = possibly_s.encode()
-    except AttributeError:
-        b = possibly_s
-    return b
+period_to_N = str.maketrans('.', 'N')
 
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
-    seq_line = convert_to_bytes(seq_line)
-    qual_line = convert_to_bytes(qual_line)
 
     name = name_standardizer(name_line.rstrip().lstrip('@'))
 
@@ -171,8 +162,7 @@ def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=id
 
     qual = qual_convertor(qual_line.strip())
 
-    read = Read(name, seq, qual)
-    return read
+    return Read(name, seq, qual)
 
 def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_to_space=False):
     ''' Yields Read's from a file name or line iterator.
@@ -223,10 +213,11 @@ def detect_encoding(line_groups):
         for line_group in line_groups:
             groups_examined.append(line_group)
             read = line_group_to_read(line_group)
-            if min(read.qual) < SOLEXA_OFFSET - 5:
+            ords = [ord(q) for q in read.qual]
+            if min(ords) < SOLEXA_OFFSET - 5:
                 encoding = 'SANGER'
                 break
-            if max(read.qual) > SANGER_OFFSET + 41:
+            if max(ords) > SANGER_OFFSET + 41:
                 encoding = 'SOLEXA'
                 break
     except StopIteration:

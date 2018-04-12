@@ -3,7 +3,7 @@ import numpy as np
 from itertools import chain
 from functools import partial
 from collections import deque
-from Sequencing import fastq
+from sequencing import fastq
 
 def generate_suffix(num_pieces, which_piece):
     ''' Suffix to append to piece number which_piece out of num_pieces.

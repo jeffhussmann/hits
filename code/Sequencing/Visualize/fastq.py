@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from Sequencing import fastq, utilities, adapters
+
+from .. import fastq
+from .. import utilities
+from .. import adapters
 from . import optional_ax, igv_colors, blues
 
 @optional_ax
