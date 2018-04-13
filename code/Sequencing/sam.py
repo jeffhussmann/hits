@@ -289,7 +289,7 @@ def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     for read, ref in aligned_pairs:
         if read == None or read == '-':
             op_sequence.append(BAM_CDEL)
-        elif read == 'N':
+        elif read == 's':
             op_sequence.append(BAM_CREF_SKIP)
         elif ref == None or ref == '-':
             op_sequence.append(BAM_CINS)
@@ -341,7 +341,7 @@ def cigar_to_aligned_pairs(cigar, start):
         elif op == BAM_CREF_SKIP:
             # Skip results in gap in read
             for i in range(length):
-                aligned_pairs.append(('N', ref_pos))
+                aligned_pairs.append(('s', ref_pos))
                 
                 ref_pos += 1
 
