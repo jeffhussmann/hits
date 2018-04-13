@@ -420,7 +420,7 @@ def map_tophat(reads_file_names,
     options = [
         '--no-novel-juncs',
         '--num-threads', str(num_threads),
-        '--output-dir', tophat_dir,
+        '--output-dir', str(tophat_dir),
         '--report-secondary-alignments',
         '--read-realign-edit-dist', '0',
         #'--read-mismatches', '6',
@@ -438,7 +438,7 @@ def map_tophat(reads_file_names,
     if keep_temporary_files:
         options.append('--keep-tmp')
 
-    tophat_command = ['tophat2'] + options + [bowtie2_index, joined_reads_names]
+    tophat_command = ['tophat2'] + options + [str(bowtie2_index), joined_reads_names]
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     try:
