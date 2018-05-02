@@ -372,9 +372,11 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
 def align_read(read, targets, alignment_type, min_path_length, max_alignments=1):
     alignments = []
 
-    for seq, qual, is_reverse in ((read.seq, read.qual, False),
-                                  (utilities.reverse_complement(read.seq), read.qual[::-1], True),
-                                 ):
+    for r, is_reverse in ((read, False),
+                          (read.reverse_complement(), True),
+                         ):
+        seq = r.seq
+        qual = r.qual
 
         qual = array.array('B', fastq.decode_sanger(qual))
 
@@ -383,10 +385,10 @@ def align_read(read, targets, alignment_type, min_path_length, max_alignments=1)
                 path = alignment['path']
 
                 if len(path) >= min_path_length and alignment['score'] / (2. * len(path)) > 0.8:
-                    aligned_segment = pysam.AlignedSegment()
-                    aligned_segment.seq = seq
-                    aligned_segment.query_qualities = qual
-                    aligned_segment.is_reverse = is_reverse
+                    al = pysam.AlignedSegment()
+                    al.seq = seq
+                    al.query_qualities = qual
+                    al.is_reverse = is_reverse
 
                     char_pairs = make_char_pairs(path, seq, target_seq)
 
@@ -397,19 +399,23 @@ def align_read(read, targets, alignment_type, min_path_length, max_alignments=1)
                     clip_from_end = len(seq) - 1 - last_query_index(path)
                     if clip_from_end > 0:
                         cigar = cigar + [(sam.BAM_CSOFT_CLIP, clip_from_end)]
-                    aligned_segment.cigar = cigar
+                    al.cigar = cigar
+                    
+                    if al.query_length != al.infer_query_length():
+                        raise ValueError('CIGAR implies different query length - {0}: {1}, {2}'.format(al.query_name, al.query_length, al.infer_query_length()))
 
                     read_aligned, ref_aligned = zip(*char_pairs)
                     md = sam.alignment_to_MD_string(ref_aligned, read_aligned)
-                    aligned_segment.set_tag('MD', md)
+                    al.set_tag('MD', md)
 
-                    aligned_segment.set_tag('AS', alignment['score'])
-                    aligned_segment.tid = i
-                    aligned_segment.query_name = read.name
-                    aligned_segment.next_reference_id = -1
-                    aligned_segment.reference_start = first_target_index(path)
+                    al.set_tag('AS', alignment['score'])
+                    al.tid = i
+                    al.query_name = read.name
+                    al.next_reference_id = -1
+                    al.reference_start = first_target_index(path)
+
         
-                    alignments.append(aligned_segment)
+                    alignments.append(al)
 
     return alignments
 
@@ -426,9 +432,11 @@ def align_reads(target_fasta_fn,
     targets_dict = {r.name: r.seq for r in fasta.reads(target_fasta_fn)}
     targets = sorted(targets_dict.items())
 
-    target_names = [name for name, seq in targets]
-    target_lengths = [len(seq) for name, seq in targets]
-    alignment_sorter = sam.AlignmentSorter(target_names, target_lengths, bam_fn)
+    names = [name for name, seq in targets]
+    lengths = [len(seq) for name, seq in targets]
+    header = pysam.AlignmentHeader.from_references(names, lengths)
+    alignment_sorter = sam.AlignmentSorter(bam_fn, header)
+
     statistics = Counter()
     
     with alignment_sorter:

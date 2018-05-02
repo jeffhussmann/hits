@@ -2,6 +2,7 @@
 
 import numpy as np
 import gzip
+import functools
 
 from pathlib import Path
 from itertools import chain
@@ -113,7 +114,7 @@ def get_line_groups(line_source):
 
     if isinstance(line_source, str):
         if line_source.endswith('.gz'):
-            opener = gzip.open
+            opener = functools.partial(gzip.open, mode='rt')
         else:
             opener = open
     else:
