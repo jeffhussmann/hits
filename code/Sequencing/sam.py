@@ -260,6 +260,13 @@ def get_soft_clipped_block(alignment, edge):
 
     return seq, qual
 
+def get_max_soft_clipped_length(alignment):
+    max_soft_clipped = 0
+    for edge in [5, 3]:
+        seq, qual = get_soft_clipped_block(alignment, edge)
+        max_soft_clipped = max(max_soft_clipped, len(seq))
+    return max_soft_clipped
+
 def cigar_blocks_to_string(cigar_blocks):
     ''' Builds a CIGAR string out of a corresponding list of operations. '''
     string = ['{0}{1}'.format(length, op_to_char[op])
