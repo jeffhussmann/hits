@@ -1,5 +1,3 @@
-import sys
-import contextlib
 import numpy as np
 import pysam
 import string
@@ -402,7 +400,7 @@ def visualize_unpaired_alignments(get_reads,
                   R1_representation_groups,
                  ]
 
-    with possibly_fn(output_fn) as output_fh:
+    with utilities.possibly_fn(output_fn) as output_fh:
         for R1, (R1_qname, R1_representations) in zip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)
@@ -435,7 +433,7 @@ def visualize_bam_alignments(bam_fn, ref_fn, output_fn, max_reads=None):
         representation_groups,
     ]
 
-    with possibly_fn(output_fn) as output_fh:
+    with utilities.possibly_fn(output_fn) as output_fh:
         for read, (qname, representations) in zip_longest(*everything):
             if up_to_first_space(read.name) != qname:
                 raise ValueError('Iters out of sync', read.name, qname)
@@ -452,18 +450,6 @@ def visualize_bam_alignments(bam_fn, ref_fn, output_fn, max_reads=None):
 
             output_fh.write(seq + '\n')
             output_fh.write('\n\n')
-
-@contextlib.contextmanager
-def possibly_fn(fn=None):
-    # from https://stackoverflow.com/a/22264583
-    if fn is not None:
-        writer = open(str(fn), 'w')
-    else:
-        writer = sys.stdout
-
-    yield writer
-
-    if fn != None: writer.close()
 
 def visualize_paired_end_mappings(get_read_pairs,
                                   sw_genome_dirs,
@@ -540,7 +526,7 @@ def visualize_paired_end_mappings(get_read_pairs,
                   R2_representation_groups,
                  ]
     
-    with possibly_fn(output_fn) as output_fh:
+    with utilities.possibly_fn(output_fn) as output_fh:
         for R1, R2_rc, (R1_qname, R1_representations), (R2_qname, R2_representations) in zip_longest(*everything):
             if up_to_first_space(R1.name) != R1_qname:
                 raise ValueError('Iters out of sync', R1.name, R1_qname)

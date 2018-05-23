@@ -82,8 +82,11 @@ def make_char_pairs(index_pairs, query, target):
         char_pairs.append((q_char, t_char))
     return char_pairs
 
-def print_local_alignment(query, target, alignment_path, fh=sys.stdout):
-    if alignment_path == []:
+def print_local_alignment(alignment, fh=sys.stdout):
+    query = alignment['query']
+    target = alignment['target']
+    path = alignment['path']
+    if path == []:
         fh.write('{0}\n\n{1}\n'.format(query, target))
         return
 
@@ -95,10 +98,10 @@ def print_local_alignment(query, target, alignment_path, fh=sys.stdout):
                 raise ValueError(index, len(seq), seq)
             return seq[index]
     
-    first_q = first_query_index(alignment_path)
-    first_t = first_target_index(alignment_path)
-    last_q = last_query_index(alignment_path)
-    last_t = last_target_index(alignment_path)
+    first_q = first_query_index(path)
+    first_t = first_target_index(path)
+    last_q = last_query_index(path)
+    last_t = last_target_index(path)
 
     left_query = query[:first_q]
     left_target = target[:first_t]
@@ -112,7 +115,7 @@ def print_local_alignment(query, target, alignment_path, fh=sys.stdout):
     query_string = [left_query]
     target_string = [left_target]
 
-    for q, t in alignment_path:
+    for q, t in path:
         query_string.append(index_to_char(query, q))
         target_string.append(index_to_char(target, t))
 
@@ -166,6 +169,11 @@ def generate_alignments(query,
         force_target_start = False
         force_either_start = False
         force_edge_end = False
+    elif alignment_type == 'global':
+        force_query_start = True
+        force_target_start = True
+        force_either_start = False
+        force_edge_end = True
 
     query_bytes = query.encode()
     target_bytes = target.encode()
@@ -257,6 +265,10 @@ def propose_all_ends(score_matrix, cells_seen, min_score):
             continue
 
         yield cell
+
+def global_alignment(query, target, **kwargs):
+    al, = generate_alignments(query, target, 'global', **kwargs)
+    return al
 
 def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
     ''' Infer the length of the insert represented by R1 and R2 by performing

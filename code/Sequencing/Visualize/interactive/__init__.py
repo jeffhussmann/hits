@@ -1060,7 +1060,7 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
 
     def make_color_string(c):
         array = map(int, np.array(matplotlib.colors.to_rgb(c)) * 255)
-        return 'rgba({0}, {1}, {2}, '.format(*array)
+        return 'rgba({0}, {1}, {2})'.format(*array)
     df['_color'] = color_series.map(make_color_string)
 
     template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')

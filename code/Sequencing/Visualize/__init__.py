@@ -1,8 +1,12 @@
-from . import define_igv_colors
+from collections import Counter
+
 import scipy.stats
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+
+from .. import utilities
+from . import define_igv_colors
 
 igv_colors = define_igv_colors.normalized_rgbs
 
@@ -389,3 +393,27 @@ def apply_alpha(color, alpha):
 
 def force_integer_ticks(axis):
     axis.set_major_locator(matplotlib.ticker.MaxNLocator(interger=True))
+
+@optional_ax
+def plot_counts(l, ax=None, log_scales=None, **kwargs):
+    if log_scales is None:
+        log_scales = set()
+
+    counts = Counter(l)
+    ys = utilities.counts_to_array(counts)
+
+    first_nonzero = ys.nonzero()[0][0]
+    xs = np.arange(first_nonzero, len(ys))
+    ys = ys[first_nonzero:]
+    ax.plot(xs, ys, **kwargs)
+
+
+    if 'x' in log_scales:
+        ax.set_xscale('log')
+    else:
+        ax.set_xlim(-0.01 * len(ys), 1.01 * len(ys))
+
+    if 'y' in log_scales:
+        ax.set_yscale('log')
+    else:
+        ax.set_ylim(0)

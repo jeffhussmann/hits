@@ -60,22 +60,47 @@ def sanitize_qual(qual):
     sanitized = qual.translate(_sanitize_table)
     return sanitized
 
-def quality_and_complexity(reads, max_read_length):
-    q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
-    c_array = np.zeros((max_read_length, 256), int)
+def quality_and_complexity(reads, max_read_length, alignments=False, min_q=0):
+    stats = {
+        'q': np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int),
+        'c': np.zeros((max_read_length, 256), int),
+        'c_above_min_q': np.zeros((max_read_length, 256), int),
+        'average_q': np.zeros((max_read_length, 256), int),
+    }
 
-    average_q_distribution = np.zeros(MAX_EXPECTED_QUAL + 1, int)
-    
     for read in reads:
-        average_q = process_read(read.seq, read.qual, q_array, c_array)
-        average_q_distribution[int(average_q)] += 1
+        if alignments:
+            try:
+                process_Alignment(read.query_sequence.encode(),
+                                  read.query_qualities,
+                                  stats['q'],
+                                  stats['average_q'],
+                                  stats['c'],
+                                  stats['c_above_min_q'],
+                                  min_q,
+                                 )
+            except TypeError:
+                print(read.query_sequence)
+                print(read.query_qualities)
+                raise
+        else:
+            process_read(read.seq.encode(), read.qual.encode(),
+                         stats['q'],
+                         stats['average_q'],
+                         stats['c'],
+                         stats['c_above_min_q'],
+                         min_q,
+                        )
         
-    # To avoid a lookup at every single base, c_array is 2*max_read_length x 256.
+    # To avoid a lookup at every single base, base-specific arrays are 2*max_read_length x 256.
     # This pulls out only the columns corresponding to possible base
     # identities. 
-    c_array = np.vstack([c_array.T[ord(b)] for b in base_order]).T
+    for k in ['c', 'c_above_min_q', 'average_q']:
+        stats[k] = np.vstack([stats[k].T[ord(b)] for b in base_order]).T
+
+    stats['average_q'] = stats['average_q'] / np.maximum(1, stats['c'])
     
-    return q_array, c_array, average_q_distribution
+    return stats
 
 def quality_and_complexity_paired(read_pairs, max_read_length, results):
     R1_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
@@ -123,6 +148,8 @@ def get_line_groups(line_source):
     lines = opener(line_source)
     groups = zip(*[lines]*4)
     return groups
+
+make_record = '@{0}\n{1}\n+\n{2}\n'.format
 
 class Read(object):
     def __init__(self, name, seq, qual):
@@ -172,6 +199,11 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_t
         If ensure_sanger_encoding == True, detects the quality score encoding
         and converts to sanger if necessary.
     '''
+    if isinstance(file_name, list):
+        args = [standardize_names, ensure_sanger_encoding, up_to_space]
+        files = [reads(fn, *args) for fn in file_name]
+        return chain.from_iterable(files)
+
     line_groups = get_line_groups(file_name)
 
     if standardize_names:
@@ -186,10 +218,12 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_t
     else:
         qual_convertor = identity
     
-    reads = (line_group_to_read(line_group, name_standardizer, qual_convertor)
-             for line_group in line_groups)
+    reads_ = (
+        line_group_to_read(line_group, name_standardizer, qual_convertor)
+        for line_group in line_groups
+    )
 
-    return reads
+    return reads_
 
 def reverse_complement_reads(file_name, **kwargs):
     for read in reads(file_name, **kwargs):
@@ -250,7 +284,6 @@ def read_pairs_interleaved(lines, **kwargs):
         R2_renamed = Read(pair_name, R2.seq, R2.qual)
         yield R1_renamed, R2_renamed
 
-make_record = '@{0}\n{1}\n+\n{2}\n'.format
 
 def get_read_name_parser(read_name):
     if read_name.startswith('test'):
