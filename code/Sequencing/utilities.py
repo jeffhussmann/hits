@@ -1,11 +1,15 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from itertools import islice, groupby, cycle, product
+from itertools import islice, groupby, cycle, product, chain
 from six.moves import zip
+import contextlib
+import sys
 import functools
+
 import numpy as np
 import Bio.Data.IUPACData
+import scipy.optimize
 
 identity = lambda x: x
 
@@ -75,10 +79,13 @@ def mean_from_histogram(histogram):
         mean = weighted_sum / num_items
     return mean
 
-def group_by(iterable, key=None):
+def group_by(iterable, key=None, sort=False):
     ''' Groups iterable into lists of consecutive elements that are transformed
         into the same value key.
     '''
+    if sort:
+        iterable = sorted(iterable, key=key)
+
     groups = groupby(iterable, key)
     group_lists = ((value, list(iterator)) for value, iterator in groups)
     return group_lists
@@ -180,3 +187,52 @@ def reservoir_sample(iterable, n):
                 sample[j] = item
     
     return sample
+
+def chunks(iterable, n):
+    '''from https://stackoverflow.com/a/29524877
+    Note: this only works if you actually consume each chunk before getting the
+    next one.
+    '''
+    iterable = iter(iterable)
+    while True:
+        first = next(iterable)
+        rest = islice(iterable, n - 1)
+        yield chain([first], rest)
+
+@contextlib.contextmanager
+def possibly_fn(fn=None):
+    # from https://stackoverflow.com/a/22264583
+    if fn is not None:
+        writer = open(str(fn), 'w')
+    else:
+        writer = sys.stdout
+
+    yield writer
+
+    if fn != None: writer.close()
+
+
+def clopper_pearson(x, n, alpha=0.05):
+    if n == 0:
+        return 0., 0.
+
+    elif x == 0:
+        cdf = lambda t: scipy.stats.binom.cdf(x, n, t) - alpha
+        u = scipy.optimize.brentq(cdf, 0, 1)
+        l = 0.
+        mle = 0.
+
+    elif x == n:
+        sf = lambda t: scipy.stats.binom.sf(x - 1, n, t) - alpha
+        u = 1.
+        l = scipy.optimize.brentq(sf, 0, 1)
+        mle = 1.
+
+    else:
+        cdf = lambda t: scipy.stats.binom.cdf(x, n, t) - (alpha / 2)
+        sf = lambda t: scipy.stats.binom.sf(x - 1, n, t) - (alpha / 2)
+        u = scipy.optimize.brentq(cdf, 0, 1)
+        l = scipy.optimize.brentq(sf, 0, 1)
+        mle = float(x) / n
+
+    return mle - l, u - mle
