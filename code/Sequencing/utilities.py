@@ -1,11 +1,14 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from itertools import islice, groupby, cycle, product
-from six.moves import zip
+
 import functools
+from itertools import islice, groupby, cycle, product
+
 import numpy as np
 import Bio.Data.IUPACData
+import pandas as pd
+from six.moves import zip
 
 identity = lambda x: x
 
@@ -129,17 +132,8 @@ def mers(k, include_N=False):
         chars = 'TCAG'
     return (''.join(mer) for mer in product(chars, repeat=k))
 
-def smooth(ys, window):
-    smoothed = ys.astype(float)
-    for i in range(window, len(ys) - window):
-        smoothed[i] = sum(ys[i - window:i + window + 1]) / float(2 * window + 1)
-
-    for i in range(window):
-        smoothed[i] = sum(ys[:i + window + 1]) / float(i + window + 1)
-    
-    for i in range(len(ys) - window, len(ys)):
-        smoothed[i] = sum(ys[i - window:]) / float(len(ys) - (i - window ) + 1)
-
+def smooth(ys, either_side):
+    smoothed = pd.Series(ys).rolling(window=2 * either_side + 1, center=True, min_periods=1).mean()
     return smoothed
 
 def reverse_dictionary(d):
