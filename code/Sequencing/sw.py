@@ -381,7 +381,7 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     #for q, t in sorted(alignment['mismatches']):
     #    fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
 
-def align_read(read, targets, alignment_type, min_path_length, max_alignments=1):
+def align_read(read, targets, alignment_type, min_path_length, header, max_alignments=1, **kwargs):
     alignments = []
 
     for r, is_reverse in ((read, False),
@@ -393,11 +393,11 @@ def align_read(read, targets, alignment_type, min_path_length, max_alignments=1)
         qual = array.array('B', fastq.decode_sanger(qual))
 
         for i, (target_name, target_seq) in enumerate(targets):
-            for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments):
+            for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments, **kwargs):
                 path = alignment['path']
 
                 if len(path) >= min_path_length and alignment['score'] / (2. * len(path)) > 0.8:
-                    al = pysam.AlignedSegment()
+                    al = pysam.AlignedSegment(header)
                     al.seq = seq
                     al.query_qualities = qual
                     al.is_reverse = is_reverse
@@ -426,7 +426,6 @@ def align_read(read, targets, alignment_type, min_path_length, max_alignments=1)
                     al.next_reference_id = -1
                     al.reference_start = first_target_index(path)
 
-        
                     alignments.append(al)
 
     return alignments
