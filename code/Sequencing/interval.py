@@ -11,7 +11,7 @@ class Interval(object):
     def __init__(self, start, end):
         self.start = start
         self.end = end
-        
+
     def __or__(self, other):
         if are_disjoint(self, other):
             left, right = sorted([self, other])
@@ -58,10 +58,23 @@ class Interval(object):
 
     def __len__(self):
         return self.end - self.start + 1
+
+    def __sub__(self, other):
+        if isinstance(other, DisjointIntervals):
+            survived_all = DisjointIntervals([self])
+            for other_interval in other:
+                survived_this = self - other_interval
+                survived_all = survived_all & survived_this
+            return survived_all
+
+        else:
+            left = Interval(self.start, min(self.end, other.start - 1))
+            right = Interval(max(self.start, other.end + 1), self.end)
+            return DisjointIntervals([left, right])
     
 class DisjointIntervals(object):
     def __init__(self, intervals):
-        self.intervals = intervals
+        self.intervals = [i for i in intervals if i.end >= i.start]
         
     def __len__(self):
         return len(self.intervals)
@@ -80,31 +93,47 @@ class DisjointIntervals(object):
     def __getitem__(self, sl):
         return self.intervals[sl]
     
-    def __or__(self, other_interval):
-        disjoints = []
-        
-        for interval in self.intervals:
-            union = interval | other_interval
-            if len(union) > 1:
-                disjoints.append(interval)
-            else:
-                other_interval = union[0]
-                
-        disjoints.append(other_interval)
-        
-        return DisjointIntervals(sorted(disjoints))
+    def __or__(self, other):
+        if isinstance(other, DisjointIntervals):
+            everything = self
+            for other_interval in other:
+                everything = everything | other_interval
+            return everything
+        else:
+            disjoints = []
+            
+            for interval in self.intervals:
+                union = interval | other
+                if len(union) > 1:
+                    disjoints.append(interval)
+                else:
+                    other = union[0]
+                    
+            disjoints.append(other)
+            
+            return DisjointIntervals(sorted(disjoints))
     
-    def __and__(self, other_interval):
-        intersections = []
-        for interval in self.intervals:
-            intersection = interval & other_interval
-            if intersection:
-                intersections.append(intersection)
+    def __and__(self, other):
+        if isinstance(other, DisjointIntervals):
+            survived_some = DisjointIntervals([])
+            for other_interval in other:
+                survived_this = self & other_interval
+                survived_some = survived_some | survived_this
+            return survived_some
+        else:
+            intersections = []
+            for interval in self.intervals:
+                intersection = interval & other
+                if intersection:
+                    intersections.append(intersection)
                 
-        return DisjointIntervals(intersections)
+            return DisjointIntervals(intersections)
     
     def __eq__(self, other):
         return self.intervals == other.intervals
+
+    def __iter__(self):
+        return iter(self.intervals)
 
     def __hash__(self):
         return hash(self.intervals)
@@ -112,8 +141,18 @@ class DisjointIntervals(object):
     def __ne__(self, other):
         return not self == other
     
+    def __contains__(self, other):
+        return (self | other) == self
+
+    @property
+    def total_length(self):
+        return sum(len(i) for i in self.intervals)
+    
 def get_covered(alignment):
-    return Interval(*sam.query_interval(alignment))
+    if alignment.is_unmapped:
+        return Interval(-1, -1)
+    else:
+        return Interval(*sam.query_interval(alignment))
 
 def make_disjoint(intervals):
     disjoint = DisjointIntervals([])
@@ -138,7 +177,7 @@ def remove_nested(alignments):
     necessary = [al for i, al in enumerate(alignments) if i not in unnecessary]
     return necessary
 
-def make_parsimoninous(alignments):
+def make_parsimonious(alignments):
     initial_covered = get_disjoint_covered(alignments)
     
     no_nested = remove_nested(alignments)
