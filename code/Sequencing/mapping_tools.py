@@ -502,9 +502,11 @@ def map_tophat_paired(R1_fn,
 def map_STAR(R1_fn, index_dir, output_prefix,
              R2_fn=None,
              num_threads=1,
+             num_reads=-1,
              sort=True,
              include_unmapped=False,
              bam_fn=None,
+             min_fraction_matching=0.66,
             ):
     if sort:
         bam_suffix = 'Aligned.sortedByCoord.out.bam'
@@ -525,15 +527,16 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--outSAMunmapped', unmapped_option,
         '--outSAMattributes', 'MD',
         '--limitBAMsortRAM', '1345513406',
-        '--outFilterScoreMinOverLread', '0.2',
-        '--outFilterMatchNminOverLread', '0.2',
+        #'--outFilterScoreMinOverLread', '0.2',
+        '--outFilterMatchNminOverLread', str(min_fraction_matching),
         '--alignIntronMax', '1',
         '--runThreadN', str(num_threads),
-        '--outFileNamePrefix', output_prefix,
-        '--readFilesIn', R1_fn,
+        '--readMapNumber', str(num_reads),
+        '--outFileNamePrefix', str(output_prefix),
+        '--readFilesIn', str(R1_fn),
     ]
     if R2_fn is not None:
-        STAR_command.append(R2_fn)
+        STAR_command.append(str(R2_fn))
 
     subprocess.check_output(STAR_command)
 
