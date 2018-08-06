@@ -366,6 +366,9 @@ def map_bowtie2(index_prefix,
     if yield_unaligned and yield_mappings:
         raise RuntimeError('Can\'t yield unaligned and mappings.')
 
+    if yield_mappings and bam_output:
+        raise RuntimeError('yield_mappings and bam_output can\'t both be True.')
+
     if output_file_name == None and yield_mappings == False:
         raise RuntimeError('Need to give output_file_name or yield_mappings')
     
