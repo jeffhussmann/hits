@@ -348,7 +348,7 @@ def _map_bowtie2(index_prefix,
                                                 bowtie2_command,
                                                 err_output,
                                                )
-        if bam_output:
+        if bam_output and not by_name:
             pysam.index(str(output_file_name))
 
 def map_bowtie2(index_prefix,
