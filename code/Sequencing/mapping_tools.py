@@ -545,7 +545,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0
     for fasta_file in fasta_files:
-        for name, entry in genomes.parse_fai(fasta_file + '.fai').items():
+        for name, entry in genomes.parse_fai(str(fasta_file) + '.fai').items():
             total_length += entry.length
 
     if wonky_param is None:
@@ -554,8 +554,8 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     STAR_command = [
         'STAR',
         '--runMode', 'genomeGenerate',
-        '--genomeDir', index_dir,
-        '--genomeFastaFiles', ' '.join(fasta_files),
+        '--genomeDir', str(index_dir),
+        '--genomeFastaFiles', ' '.join(map(str, fasta_files)),
         '--genomeSAindexNbases', str(wonky_param),
     ]
     subprocess.check_output(STAR_command)
