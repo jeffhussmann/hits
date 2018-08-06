@@ -278,6 +278,7 @@ def _map_bowtie2(index_prefix,
                  yield_mappings=False,
                  yield_unaligned=False,
                  **options):
+
     using_input_fifos = reads != None or read_pairs != None
     is_paired = R2_fn != None or read_pairs != None
 
@@ -397,9 +398,11 @@ def map_bowtie2(index_prefix,
                              **options)
     if yield_unaligned:
         return generator
+
     elif yield_mappings:
         sam_file = next(generator)
         return sam_file, generator
+
     else:
         # There isn't a real yield in generator, so calling next() is just
         # executing the function.

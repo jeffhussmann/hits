@@ -1065,7 +1065,6 @@ def crop_al_to_ref_int(alignment, start, end):
         alignment.is_unmapped = True
         alignment.cigar = []
     
-
     return alignment
 
 def disallow_query_positions_from_other(alignment, other):
