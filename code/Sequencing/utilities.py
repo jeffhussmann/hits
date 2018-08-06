@@ -211,7 +211,6 @@ def possibly_fn(fn=None):
 
     if fn != None: writer.close()
 
-
 def clopper_pearson(x, n, alpha=0.05):
     if n == 0:
         return 0., 0.
