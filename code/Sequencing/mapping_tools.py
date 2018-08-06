@@ -12,8 +12,8 @@ from . import genomes, fasta, fastq
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
-                             ','.join(sequence_file_names),
-                             index_prefix,
+                             ','.join(map(str, sequence_file_names)),
+                             str(index_prefix),
                             ]
     subprocess.check_call(bowtie2_build_command)
 
@@ -430,15 +430,16 @@ def map_tophat(reads_file_names,
     ]
 
     if gtf_file_name is not None:
-        options.extend(['--GTF', gtf_file_name])
+        options.extend(['--GTF', str(gtf_file_name)])
     if transcriptome_index is not None:
-        options.extend(['--transcriptome-index', transcriptome_index])
+        options.extend(['--transcriptome-index', str(transcriptome_index)])
     if no_sort:
         options.append('--no-sort-bam')
     if keep_temporary_files:
         options.append('--keep-tmp')
 
     tophat_command = ['tophat2'] + options + [str(bowtie2_index), joined_reads_names]
+
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     try:
