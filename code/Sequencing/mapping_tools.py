@@ -199,6 +199,7 @@ def launch_bowtie2(index_prefix,
         ('ambiguous_penalty',         ['--np', str(options.get('ambiguous_penalty'))]),
         ('allow_dovetail',            ['--dovetail']),
         ('no_mixed',                  ['--no-mixed']),
+        ('num_reads',                 ['--qupto', str(options.get('num_reads'))]),
     ]
 
     if custom_binary:
