@@ -134,9 +134,14 @@ class ThreadFastqWriter(threading.Thread):
         self.start()
 
     def run(self):
-        with open(self.file_name, 'w') as fifo_fh:
-            for read in self.reads:
-                fifo_fh.write(str(read))
+        try:
+            with open(self.file_name, 'w') as fifo_fh:
+                for i, read in enumerate(self.reads):
+                    if i % 100000 == 0:
+                        print(i)
+                    fifo_fh.write(str(read))
+        except BrokenPipeError:
+            print('BrokenPipeError caught')
 
 class ThreadPairedFastqWriter(threading.Thread):
     def __init__(self, read_pairs, R1_fn, R2_fn):
