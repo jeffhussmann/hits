@@ -156,7 +156,7 @@ class ThreadPairedFastqWriter(threading.Thread):
 def confirm_index_exists(index_prefix):
     with open(os.devnull, 'w') as devnull:
         try:
-            command = ['bowtie2-inspect', '--names', index_prefix]
+            command = ['bowtie2-inspect', '--names', str(index_prefix)]
             subprocess.check_call(command, stdout=devnull, stderr=devnull)
         except subprocess.CalledProcessError:
             raise ValueError('Index prefix {0} does not exist'.format(index_prefix))
@@ -220,13 +220,13 @@ def launch_bowtie2(index_prefix,
     if len(options) > 0:
         raise ValueError('Unknown keyword argument', options)
 
-    bowtie2_command.extend(['-x', index_prefix])
+    bowtie2_command.extend(['-x', str(index_prefix)])
 
     if R2_fn != None:
-        bowtie2_command.extend(['-1', R1_fn])
-        bowtie2_command.extend(['-2', R2_fn])
+        bowtie2_command.extend(['-1', str(R1_fn)])
+        bowtie2_command.extend(['-2', str(R2_fn)])
     else:
-        bowtie2_command.extend(['-U', R1_fn])
+        bowtie2_command.extend(['-U', str(R1_fn)])
 
     error_file = open(error_file_name, 'w')
     if not bam_output:
@@ -382,7 +382,7 @@ def map_bowtie2(index_prefix,
     generator = _map_bowtie2(index_prefix,
                              R1_fn=R1_fn,
                              R2_fn=R2_fn,
-                             output_file_name=output_file_name,
+                             output_file_name=str(output_file_name),
                              error_file_name=error_file_name,
                              custom_binary=custom_binary,
                              bam_output=bam_output,
