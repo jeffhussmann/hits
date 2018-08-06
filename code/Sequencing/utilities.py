@@ -8,6 +8,7 @@ import sys
 import functools
 
 import numpy as np
+import pandas as pd
 import Bio.Data.IUPACData
 import scipy.optimize
 
@@ -17,9 +18,16 @@ mapping = Bio.Data.IUPACData.ambiguous_dna_complement
 for uppercase in list(mapping):
     mapping[uppercase.lower()] = mapping[uppercase].lower()
 order = ''.join(mapping)
-from_bytes = order.encode()
-to_bytes = ''.join(mapping[f] for f in order).encode()
-complement_table = bytes.maketrans(from_bytes, to_bytes)
+
+try:
+    from_bytes = order.encode()
+    to_bytes = ''.join(mapping[f] for f in order).encode()
+    complement_table = bytes.maketrans(from_bytes, to_bytes)
+except AttributeError:
+    # python2 compatibility
+    import string
+    to = ''.join(mapping[f] for f in order)
+    complement_table = string.maketrans(order, to)
 
 def complement(seq):
     return seq.translate(complement_table)
