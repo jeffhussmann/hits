@@ -242,7 +242,6 @@ def launch_bowtie2(index_prefix,
                                            stdout=subprocess.PIPE,
                                            stderr=error_file,
                                           )
-        view_command = ['samtools', 'view', '-ubh', '-']
         sort_command = ['samtools', 'sort',
                         '-T', output_file_name,
                         '-o', output_file_name,
@@ -252,16 +251,11 @@ def launch_bowtie2(index_prefix,
 
         sort_command.append('-')
 
-        view_process = subprocess.Popen(view_command,
-                                        stdin=bowtie2_process.stdout,
-                                        stdout=subprocess.PIPE,
-                                       )
         sort_process = subprocess.Popen(sort_command,
-                                        stdin=view_process.stdout,
+                                        stdin=bowtie2_process.stdout,
                                         stderr=subprocess.PIPE,
                                        )
         bowtie2_process.stdout.close()
-        view_process.stdout.close()
         process_to_return = sort_process
 
     return process_to_return, bowtie2_command
