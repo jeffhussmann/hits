@@ -150,7 +150,7 @@ def smooth(ys, window):
     return smoothed
 
 def reverse_dictionary(d):
-    r = {v: k for k, v in d.iteritems()}
+    r = {v: k for k, v in d.items()}
     return r
 
 def split_nonempty(string, delim):
@@ -235,3 +235,28 @@ def clopper_pearson(x, n, alpha=0.05):
         mle = float(x) / n
 
     return mle - l, u - mle
+
+def homopolymer_lengths(seq, b):
+    locations = []
+    
+    i = 0
+    while True:
+        # Advance until you find a b
+        while  i < len(seq) and seq[i] != b:
+            i += 1
+        # If you never did, you are done.
+        if i == len(seq):
+            break
+            
+        start = i
+        # Advance until the polyb stretch starting at i ends.
+        while  i < len(seq) and seq[i] == b:
+            i += 1
+        
+        length = i - start
+        locations.append((start, length))
+        
+        if i == len(seq):
+            break
+    
+    return locations
