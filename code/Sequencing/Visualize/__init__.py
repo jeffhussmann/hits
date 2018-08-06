@@ -420,7 +420,6 @@ def plot_counts(l, ax=None, log_scales=None, **kwargs):
     ys = ys[first_nonzero:]
     ax.plot(xs, ys, **kwargs)
 
-
     if 'x' in log_scales:
         ax.set_xscale('log')
     else:

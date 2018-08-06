@@ -64,7 +64,9 @@ def counts_to_array(counts, dim=1):
     if dim == 1:
         if len(counts) > 0:
             biggest = max(counts)
-            array = np.array([counts[i] for i in range(biggest + 1)])
+            array = np.zeros(biggest + 1, int)
+            for key, count in counts.items():
+                array[key] = count
         else:
             array = np.array([0])
     elif dim == 2:
@@ -149,7 +151,7 @@ def smooth(ys, either_side):
     return smoothed
 
 def reverse_dictionary(d):
-    r = {v: k for k, v in d.iteritems()}
+    r = {v: k for k, v in d.items()}
     return r
 
 def split_nonempty(string, delim):
@@ -210,7 +212,6 @@ def possibly_fn(fn=None):
 
     if fn != None: writer.close()
 
-
 def clopper_pearson(x, n, alpha=0.05):
     if n == 0:
         return 0., 0.
@@ -235,3 +236,28 @@ def clopper_pearson(x, n, alpha=0.05):
         mle = float(x) / n
 
     return mle - l, u - mle
+
+def homopolymer_lengths(seq, b):
+    locations = []
+    
+    i = 0
+    while True:
+        # Advance until you find a b
+        while  i < len(seq) and seq[i] != b:
+            i += 1
+        # If you never did, you are done.
+        if i == len(seq):
+            break
+            
+        start = i
+        # Advance until the polyb stretch starting at i ends.
+        while  i < len(seq) and seq[i] == b:
+            i += 1
+        
+        length = i - start
+        locations.append((start, length))
+        
+        if i == len(seq):
+            break
+    
+    return locations

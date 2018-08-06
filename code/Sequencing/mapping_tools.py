@@ -134,9 +134,14 @@ class ThreadFastqWriter(threading.Thread):
         self.start()
 
     def run(self):
-        with open(self.file_name, 'w') as fifo_fh:
-            for read in self.reads:
-                fifo_fh.write(str(read))
+        try:
+            with open(self.file_name, 'w') as fifo_fh:
+                for i, read in enumerate(self.reads):
+                    if i % 100000 == 0:
+                        print(i)
+                    fifo_fh.write(str(read))
+        except BrokenPipeError:
+            print('BrokenPipeError caught')
 
 class ThreadPairedFastqWriter(threading.Thread):
     def __init__(self, read_pairs, R1_fn, R2_fn):
@@ -242,7 +247,6 @@ def launch_bowtie2(index_prefix,
                                            stdout=subprocess.PIPE,
                                            stderr=error_file,
                                           )
-        view_command = ['samtools', 'view', '-ubh', '-']
         sort_command = ['samtools', 'sort',
                         '-T', output_file_name,
                         '-o', output_file_name,
@@ -252,16 +256,11 @@ def launch_bowtie2(index_prefix,
 
         sort_command.append('-')
 
-        view_process = subprocess.Popen(view_command,
-                                        stdin=bowtie2_process.stdout,
-                                        stdout=subprocess.PIPE,
-                                       )
         sort_process = subprocess.Popen(sort_command,
-                                        stdin=view_process.stdout,
+                                        stdin=bowtie2_process.stdout,
                                         stderr=subprocess.PIPE,
                                        )
         bowtie2_process.stdout.close()
-        view_process.stdout.close()
         process_to_return = sort_process
 
     return process_to_return, bowtie2_command
@@ -279,6 +278,7 @@ def _map_bowtie2(index_prefix,
                  yield_mappings=False,
                  yield_unaligned=False,
                  **options):
+
     using_input_fifos = reads != None or read_pairs != None
     is_paired = R2_fn != None or read_pairs != None
 
@@ -372,6 +372,9 @@ def map_bowtie2(index_prefix,
     if yield_unaligned and yield_mappings:
         raise RuntimeError('Can\'t yield unaligned and mappings.')
 
+    if yield_mappings and bam_output:
+        raise RuntimeError('yield_mappings and bam_output can\'t both be True.')
+
     if output_file_name == None and yield_mappings == False:
         raise RuntimeError('Need to give output_file_name or yield_mappings')
     
@@ -395,9 +398,11 @@ def map_bowtie2(index_prefix,
                              **options)
     if yield_unaligned:
         return generator
+
     elif yield_mappings:
         sam_file = next(generator)
         return sam_file, generator
+
     else:
         # There isn't a real yield in generator, so calling next() is just
         # executing the function.
@@ -498,9 +503,11 @@ def map_tophat_paired(R1_fn,
 def map_STAR(R1_fn, index_dir, output_prefix,
              R2_fn=None,
              num_threads=1,
+             num_reads=-1,
              sort=True,
              include_unmapped=False,
              bam_fn=None,
+             min_fraction_matching=0.66,
             ):
     if sort:
         bam_suffix = 'Aligned.sortedByCoord.out.bam'
@@ -521,15 +528,16 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--outSAMunmapped', unmapped_option,
         '--outSAMattributes', 'MD',
         '--limitBAMsortRAM', '1345513406',
-        '--outFilterScoreMinOverLread', '0.2',
-        '--outFilterMatchNminOverLread', '0.2',
+        #'--outFilterScoreMinOverLread', '0.2',
+        '--outFilterMatchNminOverLread', str(min_fraction_matching),
         '--alignIntronMax', '1',
         '--runThreadN', str(num_threads),
-        '--outFileNamePrefix', output_prefix,
-        '--readFilesIn', R1_fn,
+        '--readMapNumber', str(num_reads),
+        '--outFileNamePrefix', str(output_prefix),
+        '--readFilesIn', str(R1_fn),
     ]
     if R2_fn is not None:
-        STAR_command.append(R2_fn)
+        STAR_command.append(str(R2_fn))
 
     subprocess.check_output(STAR_command)
 

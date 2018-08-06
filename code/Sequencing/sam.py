@@ -18,6 +18,7 @@ import pysam
 from . import utilities
 from . import external_sort
 from . import fastq
+from . import fasta
 from . import mapping_tools
 
 BAM_CMATCH = 0     # M
@@ -70,6 +71,20 @@ def get_strand(mapping):
     else:
         strand = '+'
     return strand
+
+def get_original_seq(mapping):
+    if mapping.is_reverse:
+        original_seq = utilities.reverse_complement(mapping.query_sequence)
+    else:
+        original_seq = mapping.query_sequence
+    return original_seq
+
+def get_original_qual(mapping):
+    if mapping.is_reverse:
+        original_qual = mapping.query_qualities[::-1]
+    else:
+        original_qual = mapping.query_qualities
+    return original_qual
 
 def unmapped_aligned_read(qname):
     aligned_read = pysam.AlignedRead()
@@ -946,6 +961,7 @@ def merge_by_name(*mapping_iterators):
     for al_by_name in merged_wrapped:
         qname = al_by_name.aligned_segment.query_name
         if last_qname is not None and qname < last_qname:
+            print(last_qname, qname)
             raise ValueError('Attempted to merge unsorted mapping iterators')
 
         last_qname = qname
@@ -1072,7 +1088,6 @@ def crop_al_to_ref_int(alignment, start, end):
         alignment.is_unmapped = True
         alignment.cigar = []
     
-
     return alignment
 
 def disallow_query_positions_from_other(alignment, other):
@@ -1235,3 +1250,12 @@ def header_from_STAR_index(index):
     lengths = [int(l.strip()) for l in (index / 'chrLength.txt').open()]
     header = pysam.AlignmentHeader.from_references(names, lengths)
     return header
+
+def header_from_fasta(fasta_fn):
+    targets_dict = fasta.to_dict(fasta_fn)
+    targets = sorted(targets_dict.items())
+
+    names = [name for name, seq in targets]
+    lengths = [len(seq) for name, seq in targets]
+    header = pysam.AlignmentHeader.from_references(names, lengths)
+    return targets, header
