@@ -784,6 +784,9 @@ def sort(input_file_name, output_file_name):
         external_sort.external_sort(read_lines, output_file)
     
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
+    input_file_name = str(input_file_name)
+    output_file_name = str(output_file_name)
+
     samtools_command = ['samtools', 'sort']
     if by_name:
         samtools_command.append('-n')
@@ -798,17 +801,23 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
         pysam.index(output_file_name)
 
 def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
+    input_file_names = [str(fn) for fn in input_file_names]
+    merged_file_name = str(merged_file_name)
+
     if len(input_file_names) == 1:
         shutil.copy(input_file_names[0], merged_file_name)
     else:
         merge_command = ['samtools', 'merge', '-f']
+
         if by_name:
             merge_command.append('-n')
+
         merge_command.extend([merged_file_name] + input_file_names)
+
         subprocess.check_call(merge_command)
     
     if not by_name:
-        pysam.index(str(merged_file_name))
+        pysam.index(merged_file_name)
 
 def bam_to_sam(bam_file_name, sam_file_name):
     view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
