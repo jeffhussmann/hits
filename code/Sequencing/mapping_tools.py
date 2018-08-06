@@ -12,8 +12,8 @@ from . import genomes, fasta, fastq
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
-                             ','.join(sequence_file_names),
-                             index_prefix,
+                             ','.join(map(str, sequence_file_names)),
+                             str(index_prefix),
                             ]
     subprocess.check_call(bowtie2_build_command)
 
@@ -349,7 +349,7 @@ def _map_bowtie2(index_prefix,
                                                 bowtie2_command,
                                                 err_output,
                                                )
-        if bam_output:
+        if bam_output and not by_name:
             pysam.index(str(output_file_name))
 
 def map_bowtie2(index_prefix,
@@ -436,15 +436,16 @@ def map_tophat(reads_file_names,
     ]
 
     if gtf_file_name is not None:
-        options.extend(['--GTF', gtf_file_name])
+        options.extend(['--GTF', str(gtf_file_name)])
     if transcriptome_index is not None:
-        options.extend(['--transcriptome-index', transcriptome_index])
+        options.extend(['--transcriptome-index', str(transcriptome_index)])
     if no_sort:
         options.append('--no-sort-bam')
     if keep_temporary_files:
         options.append('--keep-tmp')
 
     tophat_command = ['tophat2'] + options + [str(bowtie2_index), joined_reads_names]
+
     # tophat maintains its own logs of everything that is written to the
     # console, so discard output.
     try:
@@ -553,7 +554,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0
     for fasta_file in fasta_files:
-        for name, entry in genomes.parse_fai(fasta_file + '.fai').items():
+        for name, entry in genomes.parse_fai(str(fasta_file) + '.fai').items():
             total_length += entry.length
 
     if wonky_param is None:
@@ -562,8 +563,8 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     STAR_command = [
         'STAR',
         '--runMode', 'genomeGenerate',
-        '--genomeDir', index_dir,
-        '--genomeFastaFiles', ' '.join(fasta_files),
+        '--genomeDir', str(index_dir),
+        '--genomeFastaFiles', ' '.join(map(str, fasta_files)),
         '--genomeSAindexNbases', str(wonky_param),
     ]
     subprocess.check_output(STAR_command)

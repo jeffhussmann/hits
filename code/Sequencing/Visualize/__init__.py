@@ -1,6 +1,5 @@
 from collections import Counter
 
-import itertools
 import scipy.stats
 import numpy as np
 import matplotlib
@@ -345,10 +344,11 @@ def label_scatter_plot(ax, xs, ys, labels,
         starting_labels = []
     bboxes = [label.get_window_extent() for label in starting_labels]
 
-    tuples = itertools.izip(xs[to_label],
-                            ys[to_label],
-                            labels[to_label],
-                            )
+    tuples = zip(xs[to_label],
+                 ys[to_label],
+                 labels[to_label],
+                )
+
     for x, y, label in tuples:
         distance = initial_distance
         text, bbox, coords = attempt_text(x, y, label, distance)
