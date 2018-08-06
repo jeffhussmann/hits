@@ -56,7 +56,9 @@ def counts_to_array(counts, dim=1):
     if dim == 1:
         if len(counts) > 0:
             biggest = max(counts)
-            array = np.array([counts[i] for i in range(biggest + 1)])
+            array = np.zeros(biggest + 1, int)
+            for key, count in counts.items():
+                array[key] = count
         else:
             array = np.array([0])
     elif dim == 2:
