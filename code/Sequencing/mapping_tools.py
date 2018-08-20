@@ -279,12 +279,12 @@ def _map_bowtie2(index_prefix,
                  yield_unaligned=False,
                  **options):
 
-    using_input_fifos = reads != None or read_pairs != None
-    is_paired = R2_fn != None or read_pairs != None
+    using_input_fifos = reads is not None or read_pairs is not None
+    is_paired = R2_fn is not None or read_pairs is not None
 
-    if reads:
+    if reads is not None:
         input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
-    elif read_pairs:
+    elif read_pairs is not None:
         input_fifo_source = PairedTemporaryFifos(name='input')
     else:
         input_fifo_source = DoNothing()
@@ -300,10 +300,10 @@ def _map_bowtie2(index_prefix,
         output_fifo_source = DoNothing()
     
     with input_fifo_source, output_fifo_source:
-        if reads:
+        if reads is not None:
             R1_fn = input_fifo_source.file_name
             writer = ThreadFastqWriter(reads, R1_fn)
-        elif read_pairs:
+        elif read_pairs is not None:
             R1_fn = input_fifo_source.R1_file_name
             R2_fn = input_fifo_source.R2_file_name
             writer = ThreadPairedFastqWriter(read_pairs, R1_fn, R2_fn)
@@ -366,7 +366,7 @@ def map_bowtie2(index_prefix,
                 yield_unaligned=False,
                 **options):
 
-    if reads and read_pairs:
+    if reads is not None and read_pairs is not None:
         raise RuntimeError('Can\'t give unpaired_Reads and paired_Reads')
 
     if yield_unaligned and yield_mappings:
