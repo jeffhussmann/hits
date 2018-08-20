@@ -172,7 +172,7 @@ def launch_bowtie2(index_prefix,
                    output_file_name,
                    error_file_name,
                    bam_output,
-                   by_name,
+                   sort_by,
                    custom_binary,
                    **options):
     kwarg_to_bowtie2_argument = [
@@ -235,6 +235,7 @@ def launch_bowtie2(index_prefix,
         bowtie2_command.extend(['-U', str(R1_fn)])
 
     error_file = open(error_file_name, 'w')
+
     if not bam_output:
         bowtie2_command.extend(['-S', output_file_name])
 
@@ -242,27 +243,42 @@ def launch_bowtie2(index_prefix,
                                            stderr=error_file,
                                           )
         process_to_return = bowtie2_process
+
     else:
         bowtie2_process = subprocess.Popen(bowtie2_command,
                                            stdout=subprocess.PIPE,
                                            stderr=error_file,
                                           )
-        sort_command = ['samtools', 'sort',
-                        '-T', output_file_name,
-                        '-o', output_file_name,
-                       ]
-        if by_name:
-            sort_command.append('-n')
+        if sort_by is not None:
+            sort_command = [
+                'samtools', 'sort',
+                '-T', output_file_name,
+                '-o', output_file_name,
+            ]
+            if sort_by == 'name':
+                sort_command.append('-n')
 
-        sort_command.append('-')
+            sort_command.append('-')
 
-        sort_process = subprocess.Popen(sort_command,
-                                        stdin=bowtie2_process.stdout,
-                                        stderr=subprocess.PIPE,
-                                       )
-        bowtie2_process.stdout.close()
-        process_to_return = sort_process
+            sort_process = subprocess.Popen(sort_command,
+                                            stdin=bowtie2_process.stdout,
+                                            stderr=subprocess.PIPE,
+                                           )
+            bowtie2_process.stdout.close()
+            process_to_return = sort_process
 
+        else:
+            view_command = [
+                'samtools', 'view', '-b',
+                '-o', output_file_name,
+            ]
+            view_process = subprocess.Popen(view_command,
+                                            stdin=bowtie2_process.stdout,
+                                            stderr=subprocess.PIPE,
+                                           )
+            bowtie2_process.stdout.close()
+            process_to_return = view_process
+                 
     return process_to_return, bowtie2_command
 
 def _map_bowtie2(index_prefix,
@@ -272,7 +288,7 @@ def _map_bowtie2(index_prefix,
                  error_file_name='/dev/null',
                  custom_binary=False,
                  bam_output=False,
-                 by_name=False,
+                 sort_by=None,
                  reads=None,
                  read_pairs=None,
                  yield_mappings=False,
@@ -326,7 +342,7 @@ def _map_bowtie2(index_prefix,
                                                           output_file_name,
                                                           error_file_name,
                                                           bam_output,
-                                                          by_name,
+                                                          sort_by,
                                                           custom_binary,
                                                           **options)
 
@@ -349,7 +365,7 @@ def _map_bowtie2(index_prefix,
                                                 bowtie2_command,
                                                 err_output,
                                                )
-        if bam_output and not by_name:
+        if bam_output and sort_by == 'position':
             pysam.index(str(output_file_name))
 
 def map_bowtie2(index_prefix,
@@ -357,7 +373,7 @@ def map_bowtie2(index_prefix,
                 R2_fn=None,
                 output_file_name=None,
                 bam_output=False,
-                by_name=False,
+                sort_by=None,
                 error_file_name='/dev/null',
                 custom_binary=False,
                 reads=None,
@@ -390,7 +406,7 @@ def map_bowtie2(index_prefix,
                              error_file_name=error_file_name,
                              custom_binary=custom_binary,
                              bam_output=bam_output,
-                             by_name=by_name,
+                             sort_by=sort_by,
                              reads=reads,
                              read_pairs=read_pairs,
                              yield_mappings=yield_mappings,
