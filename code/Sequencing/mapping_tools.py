@@ -353,6 +353,7 @@ def _map_bowtie2(index_prefix,
             else:
                 for read in fastq.reads(unal_R1_fn):
                     yield read
+
         elif yield_mappings:
             sam_file = pysam.AlignmentFile(str(output_file_name), 'r')
             yield sam_file
@@ -393,7 +394,7 @@ def map_bowtie2(index_prefix,
 
     if output_file_name == None and yield_mappings == False:
         raise RuntimeError('Need to give output_file_name or yield_mappings')
-    
+
     if read_pairs:
         # Can't used named pipes for paired Reads without custom binary because
         # of buffer size mismatch.
@@ -554,6 +555,9 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     ]
     if R2_fn is not None:
         STAR_command.append(str(R2_fn))
+
+    if R1_fn.suffix == '.gz':
+        STAR_command.extend(['--readFilesCommand', 'zcat'])
 
     subprocess.check_output(STAR_command)
 
