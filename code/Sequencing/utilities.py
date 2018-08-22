@@ -89,6 +89,11 @@ def mean_from_histogram(histogram):
         mean = weighted_sum / num_items
     return mean
 
+def mean_from_counts(counts):
+    weighted_sum = sum(count * value for value, count in counts.items())
+    num_items = sum(counts.values())
+    return weighted_sum / num_items
+
 def group_by(iterable, key=None, sort=False):
     ''' Groups iterable into lists of consecutive elements that are transformed
         into the same value key.
