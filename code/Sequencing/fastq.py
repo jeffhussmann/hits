@@ -289,6 +289,12 @@ def read_pairs_interleaved(lines, **kwargs):
         R2_renamed = Read(pair_name, R2.seq, R2.qual)
         yield R1_renamed, R2_renamed
 
+quartet_order = ['I1', 'I2', 'R1', 'R2']
+Quartet = namedtuple('Quartet', quartet_order)
+
+def read_quartets(fns, **kwargs):
+    all_reads = [reads(fn) for fn in fns]
+    return (Quartet(*reads) for reads in zip(*all_reads))
 
 def get_read_name_parser(read_name):
     if read_name.startswith('test'):
