@@ -1,13 +1,15 @@
 ''' Utilities for dealing with fastq files. '''
 
-import numpy as np
 import gzip
 import functools
+import array
 
 from pathlib import Path
 from itertools import chain
-from six.moves import zip
 from collections import namedtuple
+
+import numpy as np
+from six.moves import zip
 
 from . import utilities
 from .fastq_cython import *
@@ -70,19 +72,14 @@ def quality_and_complexity(reads, max_read_length, alignments=False, min_q=0):
 
     for read in reads:
         if alignments:
-            try:
-                process_Alignment(read.query_sequence.encode(),
-                                  read.query_qualities,
-                                  stats['q'],
-                                  stats['average_q'],
-                                  stats['c'],
-                                  stats['c_above_min_q'],
-                                  min_q,
-                                 )
-            except TypeError:
-                print(read.query_sequence)
-                print(read.query_qualities)
-                raise
+            process_Alignment(read.query_sequence.encode(),
+                              read.query_qualities,
+                              stats['q'],
+                              stats['average_q'],
+                              stats['c'],
+                              stats['c_above_min_q'],
+                              min_q,
+                             )
         else:
             process_read(read.seq.encode(), read.qual.encode(),
                          stats['q'],
@@ -178,6 +175,14 @@ class Read(object):
     def __add__(self, other):
         return Read(self.name, self.seq + other.seq, self.qual + other.qual)
 
+    @property
+    def query_sequence(self):
+        return self.seq
+    
+    @utilities.memoized_property
+    def query_qualities(self):
+        return array.array('B', decode_sanger(self.qual))
+    
 period_to_N = str.maketrans('.', 'N')
 
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
