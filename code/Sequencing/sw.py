@@ -137,7 +137,7 @@ NO_DETECTED_OVERLAP = -2
 
 def generate_alignments(query,
                         target,
-                        alignment_type,
+                        alignment_type='local',
                         match_bonus=2,
                         mismatch_penalty=-1,
                         indel_penalty=-5,
@@ -148,31 +148,56 @@ def generate_alignments(query,
         force_query_start = False
         force_target_start = False
         force_either_start = False
+        force_query_end = False
         force_edge_end = False
+
+    elif alignment_type == 'edge':
+        force_query_start = False
+        force_target_start = False
+        force_either_start = False
+        force_query_end = False
+        force_edge_end = True
+
     elif alignment_type == 'barcode':
         force_query_start = True
         force_target_start = True
         force_either_start = False
+        force_query_end = False
         force_edge_end = True
+
     elif alignment_type == 'overlap':
         force_query_start = False
         force_target_start = False
         force_either_start = True
+        force_query_end = False
         force_edge_end = True
+    
+    elif alignment_type == 'query_end':
+        force_query_start = False
+        force_target_start = False
+        force_either_start = True
+        force_query_end = True
+        force_edge_end = False
+
     elif alignment_type == 'unpaired_adapter':
         force_query_start = True
         force_target_start = False
         force_either_start = False
+        force_query_end = False
         force_edge_end = True
+
     elif alignment_type == 'IVT':
         force_query_start = True
         force_target_start = False
         force_either_start = False
+        force_query_end = False
         force_edge_end = False
+
     elif alignment_type == 'global':
         force_query_start = True
         force_target_start = True
         force_either_start = False
+        force_query_end = False
         force_edge_end = True
 
     query_bytes = query.encode()
@@ -187,9 +212,12 @@ def generate_alignments(query,
                                  force_target_start,
                                  force_either_start,
                                 )
+    
     cells_seen = set()
     if force_edge_end:
         possible_ends = propose_edge_ends(matrices['scores'], cells_seen, min_score, max_alignments=max_alignments)
+    elif force_query_end:
+        possible_ends = propose_query_edge_ends(matrices['scores'], cells_seen, min_score, max_alignments=max_alignments)
     else:
         possible_ends = propose_all_ends(matrices['scores'], cells_seen, min_score)
 
@@ -205,9 +233,10 @@ def generate_alignments(query,
                                      force_target_start,
                                      force_either_start,
                                     )
-        if alignment != None:
+        if alignment != None and len(alignment['path']) != 0:
             alignment['query'] = query
             alignment['target'] = target
+            alignment['score_ratio'] = alignment['score'] / (len(alignment['path']) * match_bonus)
             alignments.append(alignment)
             if len(alignments) == max_alignments:
                 break
@@ -249,19 +278,40 @@ def propose_edge_ends(score_matrix,
 
         yield cell
 
+def propose_query_edge_ends(score_matrix,
+                            cells_seen,
+                            min_score=None,
+                            max_alignments=1,
+                           ):
+    num_rows, num_cols = score_matrix.shape
+    if max_alignments == 1:
+        max_col = np.argmax(score_matrix[num_rows - 1, :])
+        sorted_edge_cells = [(num_rows - 1, max_col)]
+    else:
+        bottom_edge = [(num_rows - 1, i) for i in range(num_cols)]
+        sorted_edge_cells = sorted(bottom_edge,
+                                   key=lambda cell: score_matrix[cell],
+                                   reverse=True,
+                                  )
+    for cell in sorted_edge_cells:
+        if min_score != None and score_matrix[cell] < min_score:
+            break
+
+        if cell in cells_seen:
+            continue
+
+        yield cell
+
 def propose_all_ends(score_matrix, cells_seen, min_score):
     sorted_indices = score_matrix.ravel().argsort()[::-1]
     for index in sorted_indices:
         cell = np.unravel_index(index, score_matrix.shape)
 
-        try:
-            if score_matrix[cell] < min_score:
-                break
-        except TypeError:
-            print(score_matrix[cell], min_score)
-            raise
+        if score_matrix[cell] < min_score:
+            break
 
         if cell in cells_seen:
+            #print(cell)
             continue
 
         yield cell
@@ -286,7 +336,6 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
                                       1,
                                       0,
                                      )
-    #print_local_alignment(extended_R1, extended_R2, alignment['path'])
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
@@ -308,10 +357,10 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         illegal_deletion = any(d <= R2_start for d in alignment['deletions'])
     
     if illegal_insertion or illegal_deletion:
-        return 'illegal', 500, -1
+        return 'illegal', len(R1) + len(R2), -1
 
     if len(alignment['path']) == 0:
-        return 'illegal', 500, -1
+        return 'illegal', len(R1) + len(R2), -1
 
     if R1_start_in_R2 != SOFT_CLIPPED and R2_start_in_R1 != SOFT_CLIPPED:
         length_from_R1 = R2_start_in_R1 - R1_start + 1
@@ -381,22 +430,40 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     #for q, t in sorted(alignment['mismatches']):
     #    fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
 
-def align_read(read, targets, alignment_type, min_path_length, header, max_alignments=1, **kwargs):
+def align_read(read, targets, min_path_length, header,
+               min_score_ratio=0.8,
+               max_alignments_per_target=1,
+               both_directions=True,
+               **kwargs):
+    forward_seq = read.seq
+    forward_qual = array.array('B', fastq.decode_sanger(read.qual))
+
+    rc_read = read.reverse_complement()
+    rc_seq = rc_read.seq
+    rc_qual = array.array('B', fastq.decode_sanger(rc_read.qual))
+
     alignments = []
 
-    for r, is_reverse in ((read, False),
-                          (read.reverse_complement(), True),
-                         ):
-        seq = r.seq
-        qual = r.qual
+    if both_directions:
+        directions = [False, True]
+    else:
+        directions = [False]
 
-        qual = array.array('B', fastq.decode_sanger(qual))
+    for target_name, target_seq in targets:
+        target_alignments = []
 
-        for i, (target_name, target_seq) in enumerate(targets):
-            for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments, **kwargs):
+        for is_reverse in directions:
+            if is_reverse:
+                seq = rc_seq
+                qual = rc_qual
+            else:
+                seq = forward_seq
+                qual = forward_qual
+
+            for alignment in generate_alignments(seq, target_seq, max_alignments=max_alignments_per_target, **kwargs):
                 path = alignment['path']
 
-                if len(path) >= min_path_length and alignment['score'] / (2. * len(path)) > 0.8:
+                if len(path) >= min_path_length and alignment['score_ratio'] >= min_score_ratio:
                     al = pysam.AlignedSegment(header)
                     al.seq = seq
                     al.query_qualities = qual
@@ -421,12 +488,15 @@ def align_read(read, targets, alignment_type, min_path_length, header, max_align
                     al.set_tag('MD', md)
 
                     al.set_tag('AS', alignment['score'])
-                    al.tid = i
+                    al.reference_name = target_name
                     al.query_name = read.name
                     al.next_reference_id = -1
                     al.reference_start = first_target_index(path)
 
-                    alignments.append(al)
+                    target_alignments.append(al)
+
+        target_alignments = sorted(target_alignments, key=lambda al: al.get_tag('AS'), reverse=True)
+        alignments.extend(target_alignments[:max_alignments_per_target])
 
     return alignments
 
@@ -436,53 +506,60 @@ def align_reads(target_fasta_fn,
                 min_path_length=15,
                 error_fn='/dev/null',
                 alignment_type='overlap',
+                yield_unaligned=False,
                ):
     ''' Aligns reads to targets in target_fasta_fn by Smith-Waterman, storing
     alignments in bam_fn and yielding unaligned reads.
     '''
-    targets_dict = {r.name: r.seq for r in fasta.reads(target_fasta_fn)}
-    targets = sorted(targets_dict.items())
+    header = sam.header_from_fasta(target_fasta_fn)
 
-    names = [name for name, seq in targets]
-    lengths = [len(seq) for name, seq in targets]
-    header = pysam.AlignmentHeader.from_references(names, lengths)
+    targets = fasta.to_dict(target_fasta_fn)
+    targets = {r: targets[r] for r in header.references}
+
     alignment_sorter = sam.AlignmentSorter(bam_fn, header)
 
     statistics = Counter()
     
-    with alignment_sorter:
-        for read in reads:
-            statistics['input'] += 1
+    def generator():
+        with alignment_sorter:
+            for read in reads:
+                statistics['input'] += 1
 
-            alignments = align_read(read, targets, alignment_type, min_path_length)
-            
-            if alignments:
-                statistics['aligned'] += 1
+                alignments = align_read(read, targets, alignment_type, min_path_length, header)
+                
+                if alignments:
+                    statistics['aligned'] += 1
 
-                sorted_alignments = sorted(alignments, key=lambda m: m.get_tag('AS'), reverse=True)
-                grouped = utilities.group_by(sorted_alignments, key=lambda m: m.get_tag('AS'))
-                _, highest_group = next(grouped)
-                primary_already_assigned = False
-                for alignment in highest_group:
-                    if len(highest_group) == 1:
-                        alignment.mapping_quality = 2
-                    else:
-                        alignment.mapping_quality = 1
+                    sorted_alignments = sorted(alignments, key=lambda m: m.get_tag('AS'), reverse=True)
+                    grouped = utilities.group_by(sorted_alignments, key=lambda m: m.get_tag('AS'))
+                    _, highest_group = next(grouped)
+                    primary_already_assigned = False
+                    for alignment in highest_group:
+                        if len(highest_group) == 1:
+                            alignment.mapping_quality = 2
+                        else:
+                            alignment.mapping_quality = 1
 
-                    if not primary_already_assigned:
-                        primary_already_assigned = True
-                    else:
-                        alignment.is_secondary = True
+                        if not primary_already_assigned:
+                            primary_already_assigned = True
+                        else:
+                            alignment.is_secondary = True
 
-                    alignment_sorter.write(alignment)
-            else:
-                statistics['unaligned'] += 1
+                        alignment_sorter.write(alignment)
+                else:
+                    statistics['unaligned'] += 1
 
-                yield read
+                    yield read
 
-        with open(error_fn, 'w') as error_fh:
-            for key in ['input', 'aligned', 'unaligned']:
-                error_fh.write('{0}: {1:,}\n'.format(key, statistics[key]))
+            with open(error_fn, 'w') as error_fh:
+                for key in ['input', 'aligned', 'unaligned']:
+                    error_fh.write('{0}: {1:,}\n'.format(key, statistics[key]))
+
+    if yield_unaligned:
+        return generator()
+    else:
+        for _ in generator():
+            pass
 
 def stitch_read_pair(R1, R2, before_R1='', before_R2=''):    
     status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
@@ -514,4 +591,5 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2=''):
     overlap = fastq.Read('', ''.join(overlap_seq), ''.join(overlap_qual))
 
     stitched = just_R1 + overlap + just_R2
+
     return stitched

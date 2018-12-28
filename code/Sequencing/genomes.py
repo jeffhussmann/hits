@@ -72,10 +72,16 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
         RNAMEs.
     '''
     genome_index = get_genome_index(genome_dir)
-    fasta_files = {fasta_file_name: pysam.Fastafile(fasta_file_name)
-                   for fasta_file_name in get_all_fasta_file_names(genome_dir)}
-    seq_name_to_file = {seq_name: fasta_files[genome_index[seq_name].file_name]
-                        for seq_name in genome_index}
+
+    fasta_files = {
+        fasta_file_name: pysam.Fastafile(fasta_file_name)
+        for fasta_file_name in get_all_fasta_file_names(genome_dir)
+    }
+
+    seq_name_to_file = {
+        seq_name: fasta_files[genome_index[seq_name].file_name]
+        for seq_name in genome_index
+    }
 
     def possibly_transform_tid(seq_name):
         ''' pysam AlignedRead's gives ints. ''' 

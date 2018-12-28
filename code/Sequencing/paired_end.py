@@ -5,12 +5,14 @@ from collections import Counter
 from . import sam
 from . import utilities
 from . import fastq
+from . import interval
 
 def keep_same_names(R1_aligned, R2_aligned):
     return R1_aligned.qname, R2_aligned.qname
 
 def is_disoriented(R1_aligned, R2_aligned):
     disoriented = False
+
     if R1_aligned.is_reverse:
         if R2_aligned.is_reverse:
             disoriented = True
@@ -24,18 +26,19 @@ def is_disoriented(R1_aligned, R2_aligned):
 
     return disoriented
 
-def get_reference_extent(R1_m, R2_m):
+def reference_interval(R1_m, R2_m):
     if R1_m.tid != R2_m.tid:
-        raise ValueError(R1_m, R2_m)
+        return None
     
     min_start = min(R1_m.reference_start, R2_m.reference_start)
     max_end = max(R1_m.reference_end, R2_m.reference_end)
 
-    # No +1 needed in tlen subtraction because reference_end points
-    # one past the end.
-    tlen = max_end - min_start
+    # reference_end points one past the end.
+    return interval.Interval(min_start, max_end - 1)
 
-    return tlen
+def get_reference_extent(R1_m, R2_m):
+    ref_interval = reference_interval(R1_m, R2_m)
+    return len(ref_interval)
 
 def is_discordant(R1_m, R2_m, max_insert_length):
     discordant = False
@@ -660,7 +663,9 @@ def get_concordant_pairs(R1_group, R2_group, max_insert_length):
         for R2_m in R2_group:
             if not is_discordant(R1_m, R2_m, max_insert_length) and not is_disoriented(R1_m, R2_m):
                 pairs.append((R1_m, R2_m))
+
     pairs = sorted(pairs, key=lambda p: get_reference_extent(*p))
+
     return pairs
 
 def group_mapping_pairs(mappings):

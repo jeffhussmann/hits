@@ -4,6 +4,7 @@ import logging
 import subprocess
 import threading
 import shutil
+from pathlib import Path
 
 import pysam
 import numpy as np
@@ -137,8 +138,6 @@ class ThreadFastqWriter(threading.Thread):
         try:
             with open(self.file_name, 'w') as fifo_fh:
                 for i, read in enumerate(self.reads):
-                    if i % 100000 == 0:
-                        print(i)
                     fifo_fh.write(str(read))
         except BrokenPipeError:
             print('BrokenPipeError caught')
@@ -191,6 +190,8 @@ def launch_bowtie2(index_prefix,
         ('seed_mismatches',           ['-N', str(options.get('seed_mismatches'))]),
         ('seed_interval_function',    ['-i', options.get('seed_interval_function')]),
         ('gbar',                      ['--gbar', str(options.get('gbar'))]),
+        ('rdg',                       ['--rdg', str(options.get('rdg'))]),
+        ('insertion_penalties',       ['--rfg', '{},{}'.format(*options.get('insertion_penalties', (5, 3)))]),
         ('report_all',                ['-a']),
         ('report_up_to',              ['-k', str(options.get('report_up_to'))]),
         ('fasta_input',               ['-f']),
@@ -205,6 +206,7 @@ def launch_bowtie2(index_prefix,
         ('allow_dovetail',            ['--dovetail']),
         ('no_mixed',                  ['--no-mixed']),
         ('num_reads',                 ['--qupto', str(options.get('num_reads'))]),
+        ('very_sensitive_local',      ['--very-sensitive-local']),
     ]
 
     if custom_binary:
@@ -524,7 +526,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
              sort=True,
              include_unmapped=False,
              bam_fn=None,
-             min_fraction_matching=0.66,
+             mode='stringent',
             ):
     if sort:
         bam_suffix = 'Aligned.sortedByCoord.out.bam'
@@ -540,23 +542,62 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     STAR_command = [
         'STAR',
-        '--genomeDir', index_dir,
+        '--genomeDir', str(index_dir),
         '--outSAMtype', 'BAM', sort_option,
         '--outSAMunmapped', unmapped_option,
-        '--outSAMattributes', 'MD',
+        '--outSAMattributes', 'All',
         '--limitBAMsortRAM', '1345513406',
-        #'--outFilterScoreMinOverLread', '0.2',
-        '--outFilterMatchNminOverLread', str(min_fraction_matching),
         '--alignIntronMax', '1',
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
         '--readFilesIn', str(R1_fn),
     ]
+
+    if mode == 'stringent':
+        STAR_command.extend([
+            '--outFilterScoreMinOverLread', '0.2',
+            '--outFilterMatchNminOverLread', '0.2',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+        ])
+
+    elif mode == 'permissive':
+        STAR_command.extend([
+            '--outFilterMultimapScoreRange', '1000',
+            '--outFilterMultimapNmax', '1000',
+            '--outFilterScoreMinOverLread', '0',
+            '--outFilterMatchNminOverLread', '0',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+        ])
+
+    elif mode == 'tcell':
+        STAR_command.extend([
+            '--outFilterMismatchNoverLmax', '0.02',
+            '--outFilterScoreMinOverLread', '0',
+            '--outFilterMatchNminOverLread', '0',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+            '--alignEndsType', 'Extend5pOfRead1',
+        ])
+
+    elif mode == 'guide_alignment':
+        STAR_command.extend([
+            '--alignEndsType', 'EndToEnd',
+        ])
+        #STAR_command.extend([
+        #    '--outFilterScoreMinOverLread', '0.9',
+        #])
+        pass
+
+    else:
+        raise ValueError(mode)
+
     if R2_fn is not None:
         STAR_command.append(str(R2_fn))
 
-    if R1_fn.suffix == '.gz':
+    if Path(R1_fn).suffix == '.gz':
         STAR_command.extend(['--readFilesCommand', 'zcat'])
 
     subprocess.check_output(STAR_command)
@@ -566,10 +607,12 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     if bam_fn is None:
         bam_fn = initial_bam_fn
     else:
-        shutil.move(initial_bam_fn, bam_fn)
+        shutil.move(str(initial_bam_fn), str(bam_fn))
 
     if sort:
         pysam.index(str(bam_fn))
+
+    return bam_fn
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0
@@ -592,7 +635,7 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
 def _map_STAR(reads,
               index_prefix,
               output_prefix,
-             ):
+              **kwargs):
     input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
 
     with input_fifo_source:
@@ -602,7 +645,7 @@ def _map_STAR(reads,
         STAR_process, STAR_command = map_STAR(R1_fn,
                                               index_prefix,
                                               output_prefix,
-                                             )
+                                              **kwargs)
 
         _, err_output = STAR_process.communicate()
         if STAR_process.returncode != 0:
@@ -610,3 +653,26 @@ def _map_STAR(reads,
                                                 STAR_command,
                                                 err_output,
                                                )
+
+def map_bwa_mem(reads,
+                index_prefix,
+               ):
+    input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
+
+    with input_fifo_source:
+        R1_fn = input_fifo_source.file_name
+        writer = ThreadFastqWriter(reads, R1_fn)
+
+        bwa_command = [
+            'bwa', 'mem',
+            '-a',
+            index_prefix,
+            R1_fn,
+        ]
+
+        bwa_process = subprocess.Popen(bwa_command,
+                                       stdout=subprocess.PIPE,
+                                      )
+        fh = pysam.AlignmentFile(bwa_process.stdout)
+        for mapping in fh:
+            yield mapping

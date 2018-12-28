@@ -20,6 +20,7 @@ from . import external_sort
 from . import fastq
 from . import fasta
 from . import mapping_tools
+from . import interval
 
 BAM_CMATCH = 0     # M
 BAM_CINS = 1       # I
@@ -134,8 +135,7 @@ def indel_distance_from_edge(cigar):
     return min(ref_nucs_before, ref_nucs_after)
 
 def contains_splicing(read):
-    kinds = [k for k, l in read.cigar]
-    return (BAM_CREF_SKIP in kinds)
+    return any(k == BAM_CREF_SKIP for k, l in read.cigar)
 
 def contains_soft_clipping(parsed_line):
     cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
@@ -635,7 +635,6 @@ def alignment_to_MD_string(ref_aligned, read_aligned):
                 current_match_length = 0
 
             if read_char == '-':
-                MD_list.append('^{0}'.format(ref_char))
                 MD_list.append(0)
             else:
                 MD_list.append(ref_char)
@@ -672,24 +671,8 @@ def alignment_to_MD_string(ref_aligned, read_aligned):
         collapsed_MD_list.append(0)
     
     MD_string = ''.join(map(str, collapsed_MD_list))
-    return ''.join(map(str, collapsed_MD_list))
+    return MD_string
 
-def line_groups(sam_file_name, key):
-    ''' Yields (key value, list of consecutive lines from sam_file_name
-        that are all transormed to key value).
-    '''
-    sam_file = open_to_reads(sam_file_name)
-    groups = utilities.group_by(sam_file, key)
-    return groups
-
-def sort(input_file_name, output_file_name):
-    header_lines, read_lines = separate_header_and_read_lines(input_file_name)
-    with open(output_file_name, 'w') as output_file:
-        for header_line in header_lines:
-            output_file.write(header_line)
-        
-        external_sort.external_sort(read_lines, output_file)
-    
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     input_file_name = str(input_file_name)
     output_file_name = str(output_file_name)
@@ -724,7 +707,15 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
         subprocess.check_call(merge_command)
     
     if not by_name:
-        pysam.index(merged_file_name)
+        try:
+            pysam.index(merged_file_name)
+        except pysam.utils.SamtoolsError:
+            # Need to sort the merged file because one input file was missing a target.
+            temp_sorted_name = merged_file_name + '.temp_sorted'
+            sort_bam(merged_file_name, temp_sorted_name)
+            os.rename(temp_sorted_name, merged_file_name)
+            os.rename(temp_sorted_name + '.bai', merged_file_name + '.bai')
+
 
 def bam_to_sam(bam_file_name, sam_file_name):
     view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
@@ -862,17 +853,21 @@ def merge_by_name(*mapping_iterators):
 def aligned_pairs_exclude_soft_clipping(mapping):
     cigar = mapping.cigartuples
     aligned_pairs = mapping.aligned_pairs
+    
     first_op, first_length = cigar[0]
+
     if first_op == BAM_CSOFT_CLIP:
         aligned_pairs = aligned_pairs[first_length:]
+
     if len(cigar) > 1:
         last_op, last_length = cigar[-1]
         if last_op == BAM_CSOFT_CLIP:
             aligned_pairs = aligned_pairs[:-last_length]
+
     return aligned_pairs
 
 def parse_idxstats(bam_fn):
-    lines = pysam.idxstats(bam_fn).splitlines()
+    lines = pysam.idxstats(str(bam_fn)).splitlines()
     fields = [line.split('\t') for line in lines]
     parsed = {rname: int(count) for rname, _, count, _ in fields}
     return parsed
@@ -890,6 +885,10 @@ def crop_al_to_query_int(alignment, start, end):
 
     if alignment.is_unmapped:
         return alignment
+    
+    overlap = interval.Interval(start, end) & interval.get_covered(alignment)
+    if len(overlap) == 0:
+        return None
 
     if alignment.is_reverse:
         start, end = alignment.query_length - 1 - end, alignment.query_length - 1 - start
@@ -903,6 +902,18 @@ def crop_al_to_query_int(alignment, start, end):
     end_i = len(aligned_pairs) - 1
     while aligned_pairs[end_i][0] is None or aligned_pairs[end_i][0] > end:
         end_i -= 1
+
+    if alignment.has_tag('MD'):
+        MD = alignment.get_tag('MD')
+
+        total_ref_nucs = total_reference_nucs(alignment.cigar)
+        removed_from_start = total_reference_nucs(aligned_pairs_to_cigar(aligned_pairs[:start_i]))
+        removed_from_end = total_reference_nucs(aligned_pairs_to_cigar(aligned_pairs[end_i + 1:]))
+
+        MD = truncate_md_string_up_to(MD, total_ref_nucs - removed_from_end)
+        MD = truncate_md_string_from_beginning(MD, total_ref_nucs - removed_from_end - removed_from_start)
+
+        alignment.set_tag('MD', MD)
 
     restricted_pairs = aligned_pairs[start_i:end_i + 1]
     cigar = aligned_pairs_to_cigar(restricted_pairs) 
@@ -989,56 +1000,119 @@ def disallow_query_positions_from_other(alignment, other):
         if other_start > start and other_end < end:
             raise ValueError
         elif other_start <= start:
-            crop_al_to_query_int(alignment, other_end + 1, alignment.query_length - 1)
+            alignment = crop_al_to_query_int(alignment, other_end + 1, alignment.query_length - 1)
         elif other_end >= end:
-            crop_al_to_query_int(alignment, 0, other_start - 1)
+            alignment = crop_al_to_query_int(alignment, 0, other_start - 1)
 
     return alignment
 
 def query_interval(alignment):
     start = alignment.query_alignment_start
     end = alignment.query_alignment_end - 1
+
     if alignment.is_reverse:
         start, end = true_query_position(end, alignment), true_query_position(start, alignment)
+
     return start, end
 
-def merge_adjacent_alignments(first, second):
-    ''' Takes two alignments to the same reference name and strand that
-    are adjacent or partially overlap on the query and merges them by
-    assigning the overlapping query bases to the rightmost alignment
-    and adding an appropriately sized deletion.
+def merge_adjacent_alignments(first, second, ref_seqs):
+    ''' If first and second are alignments to the same reference name and strand
+    that are adjacent or partially overlap on the query, returns a single merged
+    alignment with an appropriately sized deletion that minimizes edit distance,
+    otherwise return None.
     '''
-    if first.reference_name != second.reference_name:
-        raise ValueError
-    if get_strand(first) != get_strand(second):
-        raise ValueError
+    if first == second:
+        return first
+
+    first_covered = interval.get_covered(first)
+    second_covered = interval.get_covered(second)
     
-    (q_left_start, q_left_end), (q_right_start, q_right_end) = sorted(map(query_interval, (first, second)))
-    if q_left_start == q_right_start and q_left_end == q_right_end:
-        # query intervals are identical
-        raise ValueError
-
-    if not (q_right_start - 1 <= q_left_end <= q_right_end - 1):
-        # query intervals are not partially overlapping or adjacent
-        raise ValueError
-
-    left, right = sorted((first, second), key=lambda al: al.reference_start)
-
-    disallow_query_positions_from_other(left, right)
-
-    # Since they were adjacent or overlapping before disallowing in left,
-    # they are now adjacent and right's cigar starts with a soft clip
-    # block of size left.query_alignment_length
-
-    deletion_length = right.reference_start - left.reference_end
-    if deletion_length < 0:
-        # These shouldn't actually be merged.
-        raise ValueError(deletion_length)
+    if first.reference_name != second.reference_name:
+        return None
     else:
-        cigar = left.cigar[:-1] + [(BAM_CDEL, deletion_length)] + right.cigar[1:]
-        left.cigar = cigar
+        ref_seq = ref_seqs[first.reference_name]
 
-    return left
+    if get_strand(first) != get_strand(second):
+        return None
+
+    left_query, right_query = sorted([first, second], key=query_interval)
+
+    # Ensure that the alignments point towards each other.
+    strand = get_strand(first)
+    if strand == '+':
+        if left_query.reference_end > right_query.reference_start:
+            return None
+    elif strand == '-':
+        if right_query.reference_start > left_query.reference_end:
+            return None
+
+    if interval.are_adjacent(first_covered, second_covered):
+        left_cropped, right_cropped = left_query, right_query
+
+    elif interval.are_disjoint(first_covered, second_covered):
+        return None
+
+    else:
+        overlap = first_covered & second_covered
+        left_ceds = cumulative_edit_distances(left_query, ref_seq, overlap, False)
+        right_ceds = cumulative_edit_distances(right_query, ref_seq, overlap, True)
+
+        switch_after_edits = {
+            overlap.start - 1 : right_ceds[overlap.start],
+            overlap.end: left_ceds[overlap.end],
+        }
+
+        for q in range(overlap.start, overlap.end):
+            switch_after_edits[q] = left_ceds[q] + right_ceds[q + 1]
+
+        min_edits = min(switch_after_edits.values())
+        best_switch_points = [s for s, d in switch_after_edits.items() if d == min_edits]
+        switch_after = best_switch_points[0]
+
+        left_cropped = crop_al_to_query_int(left_query, 0, switch_after)
+        right_cropped = crop_al_to_query_int(right_query, switch_after + 1, right_query.query_length)
+
+    left_ref, right_ref = sorted([left_cropped, right_cropped], key=lambda al: al.reference_start)
+
+    if left_ref.reference_end >= right_ref.reference_start:
+        return None
+
+    deletion_length = right_ref.reference_start - left_ref.reference_end
+
+    merged = copy.deepcopy(left_ref)
+    merged.cigar = left_ref.cigar[:-1] + [(BAM_CDEL, deletion_length)] + right_ref.cigar[1:]
+
+    return merged
+
+def cumulative_edit_distances(mapping, ref_seq, query_interval, from_end):
+    ''' Returns a dictionary of how many cumulatives edits are involved
+    in mapping from the beginning (or end, if from_end is True) of query_interval
+    to each query position in query_interval.
+    '''
+    tuples = aligned_tuples(mapping, ref_seq)
+    
+    if get_strand(mapping) == '-':    
+        tuples = tuples[::-1]
+        
+    beginning = [i for i, (q, read, r, ref, qual) in enumerate(tuples) if q == query_interval.start][0]
+    end = [i for i, (q, read, r, ref, qual) in enumerate(tuples) if q == query_interval.end][-1]
+    
+    relevant = tuples[beginning:end + 1]
+    if from_end:
+        relevant = relevant[::-1]
+
+    c_e_ds = {}
+
+    total = 0
+
+    for q, read_b, r, ref_b, qual in relevant:
+        if read_b != ref_b:
+            total += 1
+        
+        if q is not None:
+            c_e_ds[q] = total
+            
+    return c_e_ds
 
 def true_query_position(p, alignment):
     if alignment.is_reverse:
@@ -1066,6 +1140,31 @@ def closest_query_position(r, alignment, which_side='either'):
 
     return q
 
+def closest_ref_position(q, alignment, which_side='either'):
+    ''' Return ref position paired with q (or with the closest to q) '''
+    q_to_r = {true_query_position(q, alignment): r
+              for q, r in alignment.aligned_pairs
+              if r is not None and q is not None
+             }
+
+    if q in q_to_r:
+        r = q_to_r[q]
+    else:
+        if which_side == 'either':
+            qs = q_to_r
+        elif which_side == 'before':
+            qs = [other_q for other_q in q_to_r if other_q < q]
+        elif which_side == 'after':
+            qs = [other_q for other_q in q_to_r if other_q > q]
+
+        if len(qs) == 0:
+            r = None
+        else:
+            closest_q = min(qs, key=lambda other_q: abs(other_q - q))
+            r = q_to_r[closest_q]
+
+    return r
+
 def max_block_length(alignment, block_types):
     if alignment.is_unmapped:
         return 0
@@ -1084,16 +1183,19 @@ def total_indel_lengths(alignment):
 
 def get_ref_pos_to_block(alignment):
     ref_pos_to_block = {}
-    reference_start = alignment.reference_start
+    ref_pos = alignment.reference_start
     for kind, length in alignment.cigar:
         if kind in ref_consuming_ops:
-            for r in range(reference_start, reference_start + length):
-                ref_pos_to_block[r] = (kind, length)
-            reference_start += length
+            starts_at = ref_pos
+
+            for r in range(ref_pos, ref_pos + length):
+                ref_pos_to_block[r] = (kind, length, starts_at)
+
+            ref_pos += length
 
     return ref_pos_to_block
 
-def split_at_first_large_insertion(alignment, min_length=20):
+def split_at_first_large_insertion(alignment, min_length):
     q = 0
 
     # Using cigar blocks, march from beginning of the read to the (possible)
@@ -1115,14 +1217,14 @@ def split_at_first_large_insertion(alignment, min_length=20):
 
     return [alignment]
 
-def split_at_large_insertions(alignment):
+def split_at_large_insertions(alignment, min_length):
     all_split = []
     
     to_split = [alignment]
 
     while len(to_split) > 0:
         candidate = to_split.pop()
-        split = split_at_first_large_insertion(candidate)
+        split = split_at_first_large_insertion(candidate, min_length)
         if len(split) > 1:
             to_split.extend(split)
         else:
@@ -1130,11 +1232,79 @@ def split_at_large_insertions(alignment):
 
     return all_split
 
+def split_at_deletions(alignment, max_length, exempt_if_overlaps=None):
+    '''Split at deletions larger than max_length that don't overlap exempt_if_overlaps. '''
+
+    if exempt_if_overlaps is None:
+        exempt_if_overlaps = interval.Interval(-1, -2)
+
+    ref_start = alignment.reference_start
+    query_bases_before = 0
+    query_bases_after = alignment.query_length
+    
+    tuples = []
+
+    split_at = []
+    
+    for i, (kind, length) in enumerate(alignment.cigar):
+        if kind == BAM_CDEL:
+            del_interval = interval.Interval(ref_start, ref_start + length - 1)
+            overlaps = len(del_interval & exempt_if_overlaps) > 0
+            if length > max_length and not overlaps:
+                split_at.append(i)
+        
+        if kind in read_consuming_ops:
+            read_consumed = length
+        else:
+            read_consumed = 0
+            
+        if kind in ref_consuming_ops:
+            ref_consumed = length
+        else:
+            ref_consumed = 0
+            
+        query_bases_after -= read_consumed
+        tuples.append((query_bases_before, query_bases_after, ref_start))
+        
+        query_bases_before += read_consumed
+        ref_start += ref_consumed
+        
+    split_alignments = []
+
+    if len(split_at) == 0:
+        split_alignments = [alignment]
+    else:
+        split_at = [-1] + split_at + [len(alignment.cigar)]
+    
+        for i in range(len(split_at) - 1):
+            query_bases_before, _, ref_start = tuples[split_at[i] + 1]
+            if split_at[i + 1] == len(alignment.cigar):
+                query_bases_after = 0
+            else:
+                _, query_bases_after, _ = tuples[split_at[i + 1]]
+
+            new_cigar = alignment.cigar[split_at[i] + 1:split_at[i + 1]]
+
+            if query_bases_before > 0:
+                new_cigar = [(BAM_CSOFT_CLIP, query_bases_before)] + new_cigar
+
+            if query_bases_after > 0:
+                new_cigar = new_cigar + [(BAM_CSOFT_CLIP, query_bases_after)]
+
+            split_al = copy.deepcopy(alignment)
+            split_al.cigar = new_cigar
+            split_al.reference_start = ref_start
+            
+            split_alignments.append(split_al)
+
+    return split_alignments
+
 def grouped_by_name(als):
     if isinstance(als, (str, Path)):
         als = pysam.AlignmentFile(str(als))
 
     grouped = utilities.group_by(als, lambda al: al.query_name)
+
     return grouped
 
 def header_from_STAR_index(index):
@@ -1144,10 +1314,104 @@ def header_from_STAR_index(index):
     return header
 
 def header_from_fasta(fasta_fn):
-    targets_dict = fasta.to_dict(fasta_fn)
-    targets = sorted(targets_dict.items())
+    fai = fasta.load_fai(fasta_fn).sort_index()
 
-    names = [name for name, seq in targets]
-    lengths = [len(seq) for name, seq in targets]
+    names = [name for name, row in fai.iterrows()]
+    lengths = [row['LENGTH'] for name, row in fai.iterrows()]
+
     header = pysam.AlignmentHeader.from_references(names, lengths)
-    return targets, header
+
+    return header
+
+def overlaps_feature(alignment, feature):
+    same_reference = alignment.reference_name == feature.seqname
+    num_overlapping_bases = alignment.get_overlap(feature.start, feature.end)
+    return same_reference and (num_overlapping_bases > 0)
+
+def reference_edges(alignment):
+    strand = get_strand(alignment)
+
+    if strand == '+':
+        edges = {
+            5: alignment.reference_start,
+            3: alignment.reference_end - 1,
+        }
+    elif strand == '-':
+        edges = {
+            5: alignment.reference_end - 1,
+            3: alignment.reference_start,
+        }
+
+    return edges
+
+def reference_interval(alignment):
+    return interval.Interval(alignment.reference_start, alignment.reference_end - 1)
+
+def aligned_tuples(alignment, ref_seq=None):
+    tuples = []
+
+    if ref_seq is None:
+        aligned_pairs = alignment.get_aligned_pairs(with_seq=True)
+
+        # Remove soft-clipping
+        min_i = min(i for i, (q, _, ref_b) in enumerate(aligned_pairs) if ref_b is not None)
+        max_i = max(i for i, (q, _, ref_b) in enumerate(aligned_pairs) if ref_b is not None)
+        aligned_pairs = aligned_pairs[min_i:max_i + 1]
+
+        for read_i, ref_i, ref_b in aligned_pairs:
+            if read_i is None:
+                true_read_i = None
+                read_b = '-'
+                qual = -1
+            else:
+                true_read_i = true_query_position(read_i, alignment)
+                read_b = alignment.query_sequence[read_i].upper()
+                qual = alignment.query_qualities[read_i]
+
+            if ref_i is None:
+                ref_b = '-'
+            else:
+                ref_b = ref_b.upper()
+
+            tuples.append((true_read_i, read_b, ref_i, ref_b, qual))
+
+    else:
+        aligned_pairs = aligned_pairs_exclude_soft_clipping(alignment)
+        
+        for read_i, ref_i in aligned_pairs:
+            if read_i is None:
+                read_b = '-'
+                true_read_i = None
+                qual = -1
+            else:
+                true_read_i = true_query_position(read_i, alignment)
+                read_b = alignment.query_sequence[read_i].upper()
+                qual = alignment.query_qualities[read_i]
+                
+            if ref_i is None:
+                ref_b = '-'
+            else:
+                ref_b = ref_seq[ref_i].upper()
+                
+            tuples.append((true_read_i, read_b, ref_i, ref_b, qual))
+
+    return tuples
+
+def edit_distance_in_query_interval(alignment, query_interval, ref_seq=None):
+    distance = 0
+
+    start = query_interval.start
+    end = query_interval.end
+
+    tuples = aligned_tuples(alignment, ref_seq)
+    if alignment.is_reverse:
+        tuples = tuples[::-1]
+
+    first_i = min(i for i, (q, _, _, _, _) in enumerate(tuples) if q is not None and q >= start)
+    last_i = max(i for i, (q, _, _, _, _) in enumerate(tuples) if q is not None and q <= end)
+    
+    for q, q_base, r, r_base, qual in tuples[first_i:last_i + 1]:
+        if q_base != r_base:
+            distance += 1
+
+    return distance

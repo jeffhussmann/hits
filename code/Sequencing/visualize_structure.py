@@ -30,7 +30,6 @@ def mapping_to_alignment(mapping, base_lookup):
             path.append((read_i, ref_i))
         else:
             deletions.add(ref_i)
-
     
     alignment = {
         'path': path,
@@ -53,14 +52,16 @@ def produce_bowtie2_alignments(reads,
                                index_prefix,
                                genome_dir,
                                score_min,
+                               max_alignments=5,
                               ):
 
-    bowtie2_options = {'local': True,
-                       'report_up_to': 10,
-                       'seed_mismatches': 1,
-                       'seed_interval_function': 'C,1,0',
-                       'seed_length': 10,
-                      }
+    bowtie2_options = {
+        'local': True,
+        'report_up_to': 10,
+        'seed_mismatches': 1,
+        'seed_interval_function': 'C,1,0',
+        'seed_length': 10,
+    }
 
     sam_file, mappings = mapping_tools.map_bowtie2(index_prefix,
                                                    reads=reads,
@@ -74,6 +75,7 @@ def produce_bowtie2_alignments(reads,
     
     for qname, group in mapping_groups:
         mapped = [m for m in group if not m.is_unmapped]
+        mapped = sorted(mapped, key=lambda m: m.get_tag('AS'), reverse=True)[:max_alignments]
         group = sorted(mapped, key=lambda m: (m.reference_name, m.pos))
         alignments = [mapping_to_alignment(mapping, base_lookup)
                       for mapping in mapped]
@@ -92,6 +94,10 @@ def get_local_alignments(read, targets):
                                                 min_score=min_score,
                                                 max_alignments=3,
                                                )
+            #if '10872' in read.name:
+            #    print(targets)
+            #    print(alignments)
+            #    print()
             for alignment in alignments:
                 if alignment['score'] >= 0.75 * 2 * len(alignment['path']):
                     alignment['query'] = query
