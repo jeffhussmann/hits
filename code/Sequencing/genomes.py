@@ -15,7 +15,8 @@ def get_all_fai_file_names(genome_dir):
 
 def make_fais(genome_dir):
     fasta_file_names = get_all_fasta_file_names(genome_dir)
-    map(pysam.faidx, fasta_file_names)
+    for fn in fasta_file_names:
+        pysam.faidx(fn)
 
 fai_entry_fields = [
     'file_name',
