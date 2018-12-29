@@ -7,7 +7,6 @@ import functools
 from pathlib import Path
 from itertools import chain
 from six.moves import zip
-from collections import namedtuple
 
 from . import utilities
 from .fastq_cython import *
@@ -54,7 +53,13 @@ def solexa_to_sanger(qual):
 # downgraded to chr(ord('_') - 1).
 _chars_to_sanitize = '/_'
 _sanitized_chars = ''.join(chr(ord(c) - 1) for c in _chars_to_sanitize)
-_sanitize_table = str.maketrans(_chars_to_sanitize, _sanitized_chars)
+try:
+    _sanitize_table = str.maketrans(_chars_to_sanitize, _sanitized_chars)
+    period_to_N = str.maketrans('.', 'N')
+except AttributeError:
+    import string
+    _sanitize_table = string.maketrans(_chars_to_sanitize, _sanitized_chars)
+    period_to_N = string.maketrans('.', 'N')
 
 def sanitize_qual(qual):
     sanitized = qual.translate(_sanitize_table)
@@ -178,8 +183,6 @@ class Read(object):
 
     def __add__(self, other):
         return Read(self.name, self.seq + other.seq, self.qual + other.qual)
-
-period_to_N = str.maketrans('.', 'N')
 
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
