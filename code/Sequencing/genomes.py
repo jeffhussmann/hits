@@ -60,27 +60,19 @@ def build_base_lookup(genome_dir):
 
     return base_lookup
 
-def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
+def build_region_fetcher(genome_dir, load_references=False):
     ''' Returns a function for fetching regions from the genome in genome_dir.
         If load_references == True, loads entire reference sequences into memory
         the first time they are fetched from.
         If the returned function is given a negative start or an end that is
         longer than the seq_name's sequence, the region returned will be
         padded with -.
-        If sam_file is given, use sam_file.getrname to transform tids into
-        RNAMEs.
     '''
     genome_index = get_genome_index(genome_dir)
     fasta_files = {fasta_file_name: pysam.Fastafile(fasta_file_name)
                    for fasta_file_name in get_all_fasta_file_names(genome_dir)}
     seq_name_to_file = {seq_name: fasta_files[genome_index[seq_name].file_name]
                         for seq_name in genome_index}
-
-    def possibly_transform_tid(seq_name):
-        ''' pysam AlignedRead's gives ints. ''' 
-        if isinstance(seq_name, int):
-            seq_name = sam_file.getrname(seq_name)
-        return seq_name
 
     references = {}
     def lookup_loaded(seq_name, start, end):
@@ -100,7 +92,6 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
         lookup = lookup_unloaded
 
     def region_fetcher(seq_name, start, end):
-        seq_name = possibly_transform_tid(seq_name)
         if end < 0:
             return '-'*(end - start)
         if start < 0:
