@@ -31,7 +31,7 @@ def read_file(log_file_name):
     ''' Reads the format written by write_file into a list of tuples.
     '''
     def process_line(line):
-        description, value = line.strip().split(':')
+        description, value = line.strip().rsplit(':', 1)
         strings = value.split(',')
         try:
             int(strings[0])
