@@ -1,4 +1,5 @@
 from collections import defaultdict
+from numbers import Number
 from . import sam
 
 def are_disjoint(first, second):
@@ -31,8 +32,13 @@ class Interval(object):
             return Interval(max(self.start, other.start), min(self.end, other.end))
         
     def __contains__(self, other):
-        ''' is a strict sub-interval of '''
-        return (other.start >= self.start and other.end <= self.end) and (self != other)
+        if isinstance(other, Interval):
+            # is a strict sub-interval of
+            return (other.start >= self.start and other.end <= self.end) and (self != other)
+        elif isinstance(other, Number):
+            return self.start <= other <= self.end
+        else:
+            raise ValueError(other)
         
     @property    
     def comparison_key(self):
@@ -70,11 +76,18 @@ class Interval(object):
         else:
             left = Interval(self.start, min(self.end, other.start - 1))
             right = Interval(max(self.start, other.end + 1), self.end)
-            return DisjointIntervals([left, right])
+            disjoint = DisjointIntervals([left, right])
+
+            if disjoint.total_length == 0:
+                return Interval(-1, -2)
+            elif len(disjoint.intervals) == 1:
+                return disjoint.intervals[0]
+            else:
+                return disjoint
     
 class DisjointIntervals(object):
     def __init__(self, intervals):
-        self.intervals = [i for i in intervals if i.end >= i.start]
+        self.intervals = sorted([i for i in intervals if i.end >= i.start])
         
     def __len__(self):
         return len(self.intervals)
@@ -142,12 +155,21 @@ class DisjointIntervals(object):
         return not self == other
     
     def __contains__(self, other):
+        if isinstance(other, Number):
+            other = Interval(other, other)
+
         return (self | other) == self
 
     @property
     def total_length(self):
         return sum(len(i) for i in self.intervals)
     
+    def __sub__(self, other):
+        if isinstance(other, DisjointIntervals):
+            raise NotImplementedError
+        else:
+            return DisjointIntervals([interval - other for interval in self.intervals])
+
 def get_covered(alignment):
     if alignment.is_unmapped:
         return Interval(-1, -1)
@@ -161,7 +183,7 @@ def make_disjoint(intervals):
     return disjoint
 
 def get_disjoint_covered(alignments):
-    intervals = [get_covered(al) for al in alignments]
+    intervals = [get_covered(al) for al in alignments if al is not None]
     covered = make_disjoint(intervals)
     return covered
 

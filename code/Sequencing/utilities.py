@@ -6,6 +6,8 @@ from six.moves import zip
 import contextlib
 import sys
 import functools
+import subprocess
+from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -266,3 +268,28 @@ def homopolymer_lengths(seq, b):
             break
     
     return locations
+
+def get_one_mismatch_resolver(sample_indices):
+    def get_all_one_mismatch(seq):
+        seqs = set()
+        for i in range(len(seq)):
+            for b in 'TCAGN':
+                seqs.add(seq[:i] + b + seq[i + 1:])
+
+        return seqs
+    
+    resolver = defaultdict(list)
+    for name, seqs in sample_indices.items():
+        if not isinstance(seqs, list):
+            seqs = [seqs]
+        for seq in seqs:
+            for one_mismatch_seq in get_all_one_mismatch(seq):
+                resolver[one_mismatch_seq].append(name)
+            
+    for seq, names in resolver.items():
+        if len(names) > 1:
+            print('warning: {} within hamming distance 1 of {}'.format(seq, names))
+            
+    resolver = {seq: names[0] for seq, names in resolver.items()}
+            
+    return resolver

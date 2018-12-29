@@ -305,6 +305,7 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
             **kwargs)
 
 def label_scatter_plot(ax, xs, ys, labels,
+                       data=None,
                        to_label=slice(None),
                        vector='orthogonal',
                        initial_distance=50,
@@ -314,14 +315,42 @@ def label_scatter_plot(ax, xs, ys, labels,
                        manual_alignments=None,
                        text_kwargs={'size': 10},
                        arrow_color='black',
+                       avoid=True,
                        avoid_axis_labels=False,
+                       avoid_existing=False,
+                       min_arrow_distance=10,
                       ):
-    def attempt_text(x, y, site, distance):
+    if data is not None:
+        xs = data[xs]
+        ys = data[ys]
+        if labels in data:
+            labels = data[labels]
+        elif labels == data.index.name:
+            labels = data.index
+        else:
+            raise IndexError
+
+    def attempt_text(x, y, site, distance, vector):
         if vector == 'orthogonal':
             x_offset = np.sign(x - y) * distance
             y_offset = -np.sign(x - y) * distance
             ha = 'center'
             va = 'top' if y_offset < 0 else 'bottom'
+        elif vector == 'upper left':
+            x_offset = -distance
+            y_offset = distance
+            ha = 'center'
+            va = 'bottom'
+        elif vector == 'lower right':
+            x_offset = distance
+            y_offset = -distance
+            ha = 'center'
+            va = 'top'
+        elif vector == 'upper right':
+            x_offset = distance
+            y_offset = distance
+            ha = 'center'
+            va = 'bottom'
         elif vector == 'radial':
             norm = np.linalg.norm([x, y])
             x_offset = x * distance / norm
@@ -351,38 +380,57 @@ def label_scatter_plot(ax, xs, ys, labels,
         return text, text.get_window_extent(), (x, y, x_offset, y_offset)
 
     ax.figure.canvas.draw()
+
+    starting_labels = []
+
     if avoid_axis_labels:
-        starting_labels = [ax.xaxis.get_label(), ax.yaxis.get_label()] + ax.get_yticklabels() + ax.get_xticklabels()
-    else:
-        starting_labels = []
-    bboxes = [label.get_window_extent() for label in starting_labels]
+        to_add = [ax.xaxis.get_label(), ax.yaxis.get_label()] + ax.get_yticklabels() + ax.get_xticklabels()
+        starting_labels.extend(to_add)
+
+    if avoid_existing:
+        to_add = [c for c in ax.get_children() if isinstance(c, matplotlib.text.Annotation)]
+        starting_labels.extend(to_add)
+
+    bboxes = []
+    for label in starting_labels:
+        try:
+            bboxes.append(label.get_window_extent())
+        except:
+            pass
+
+    if isinstance(vector, str):
+        vector = np.array([vector]*len(xs))
 
     tuples = zip(xs[to_label],
                  ys[to_label],
                  labels[to_label],
+                 vector[to_label],
                 )
 
-    for x, y, label in tuples:
+    for x, y, label, vec in tuples:
         distance = initial_distance
-        text, bbox, coords = attempt_text(x, y, label, distance)
-        while any(bbox.fully_overlaps(other_bbox) for other_bbox in bboxes):
+        text, bbox, coords = attempt_text(x, y, label, distance, vec)
+
+        while avoid and any(bbox.fully_overlaps(other_bbox) for other_bbox in bboxes):
             text.remove()
             distance += distance_increment
-            text, bbox, coords = attempt_text(x, y, label, distance)
+            text, bbox, coords = attempt_text(x, y, label, distance, vec)
             if distance >= distance_increment * 50:
+                print('gave up on {}'.format(label))
                 break
         
-        x, y, x_offset, y_offset = coords
-        ax.annotate('',
-                    xy=(x, y),
-                    xycoords=('data', 'data'),
-                    xytext=(x_offset, y_offset),
-                    textcoords=('offset points', 'offset points'),
-                    arrowprops={'arrowstyle': '->',
-                                'alpha': arrow_alpha,
-                                'color': arrow_color,
-                               },
-                   )
+        if distance >= min_arrow_distance:
+            x, y, x_offset, y_offset = coords
+            ax.annotate('',
+                        xy=(x, y),
+                        xycoords=('data', 'data'),
+                        xytext=(x_offset, y_offset),
+                        textcoords=('offset points', 'offset points'),
+                        arrowprops={'arrowstyle': '-',
+                                    'alpha': arrow_alpha,
+                                    'color': arrow_color,
+                                   },
+                       )
 
         bboxes.append(bbox)
 
@@ -408,7 +456,7 @@ def force_integer_ticks(axis):
     axis.set_major_locator(matplotlib.ticker.MaxNLocator(interger=True))
 
 @optional_ax
-def plot_counts(l, ax=None, log_scales=None, **kwargs):
+def plot_counts(l, ax=None, log_scales=None, normalize=False, **kwargs):
     if log_scales is None:
         log_scales = set()
 
@@ -418,6 +466,9 @@ def plot_counts(l, ax=None, log_scales=None, **kwargs):
     first_nonzero = ys.nonzero()[0][0]
     xs = np.arange(first_nonzero, len(ys))
     ys = ys[first_nonzero:]
+    if normalize:
+        ys = ys / ys.sum()
+
     ax.plot(xs, ys, **kwargs)
 
     if 'x' in log_scales:

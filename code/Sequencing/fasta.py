@@ -1,5 +1,9 @@
 from collections import OrderedDict
+from pathlib import Path
+
 import Bio.SeqIO
+import pandas as pd
+import pysam
 
 class Read(object):
     def __init__(self, name, seq):
@@ -36,3 +40,23 @@ def reads(file_name):
 
 def to_dict(file_name):
     return OrderedDict((r.name, r.seq) for r in reads(file_name))
+
+def load_fai(fasta_fn):
+    fasta_fn = Path(fasta_fn)
+    fai_fn = fasta_fn.with_suffix(fasta_fn.suffix + '.fai')
+
+    if not fai_fn.exists():
+        pysam.faidx(str(fasta_fn))
+
+    column_names = [
+        'NAME',
+        'LENGTH',
+        'OFFSET',
+        'LINEBASES',
+        'LINEWIDTH',
+    ]
+
+    fai = pd.read_table(fai_fn, index_col=0, header=None, names=column_names)
+
+    return fai
+

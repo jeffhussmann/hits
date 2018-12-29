@@ -4,6 +4,7 @@ import logging
 import subprocess
 import threading
 import shutil
+from pathlib import Path
 
 import pysam
 import numpy as np
@@ -171,7 +172,7 @@ def launch_bowtie2(index_prefix,
                    output_file_name,
                    error_file_name,
                    bam_output,
-                   by_name,
+                   sort_by,
                    custom_binary,
                    **options):
     kwarg_to_bowtie2_argument = [
@@ -190,6 +191,8 @@ def launch_bowtie2(index_prefix,
         ('seed_mismatches',           ['-N', str(options.get('seed_mismatches'))]),
         ('seed_interval_function',    ['-i', options.get('seed_interval_function')]),
         ('gbar',                      ['--gbar', str(options.get('gbar'))]),
+        ('rdg',                       ['--rdg', str(options.get('rdg'))]),
+        ('insertion_penalties',       ['--rfg', '{},{}'.format(*options.get('insertion_penalties', (5, 3)))]),
         ('report_all',                ['-a']),
         ('report_up_to',              ['-k', str(options.get('report_up_to'))]),
         ('fasta_input',               ['-f']),
@@ -204,6 +207,7 @@ def launch_bowtie2(index_prefix,
         ('allow_dovetail',            ['--dovetail']),
         ('no_mixed',                  ['--no-mixed']),
         ('num_reads',                 ['--qupto', str(options.get('num_reads'))]),
+        ('very_sensitive_local',      ['--very-sensitive-local']),
     ]
 
     if custom_binary:
@@ -234,6 +238,7 @@ def launch_bowtie2(index_prefix,
         bowtie2_command.extend(['-U', str(R1_fn)])
 
     error_file = open(error_file_name, 'w')
+
     if not bam_output:
         bowtie2_command.extend(['-S', output_file_name])
 
@@ -241,27 +246,42 @@ def launch_bowtie2(index_prefix,
                                            stderr=error_file,
                                           )
         process_to_return = bowtie2_process
+
     else:
         bowtie2_process = subprocess.Popen(bowtie2_command,
                                            stdout=subprocess.PIPE,
                                            stderr=error_file,
                                           )
-        sort_command = ['samtools', 'sort',
-                        '-T', output_file_name,
-                        '-o', output_file_name,
-                       ]
-        if by_name:
-            sort_command.append('-n')
+        if sort_by is not None:
+            sort_command = [
+                'samtools', 'sort',
+                '-T', output_file_name,
+                '-o', output_file_name,
+            ]
+            if sort_by == 'name':
+                sort_command.append('-n')
 
-        sort_command.append('-')
+            sort_command.append('-')
 
-        sort_process = subprocess.Popen(sort_command,
-                                        stdin=bowtie2_process.stdout,
-                                        stderr=subprocess.PIPE,
-                                       )
-        bowtie2_process.stdout.close()
-        process_to_return = sort_process
+            sort_process = subprocess.Popen(sort_command,
+                                            stdin=bowtie2_process.stdout,
+                                            stderr=subprocess.PIPE,
+                                           )
+            bowtie2_process.stdout.close()
+            process_to_return = sort_process
 
+        else:
+            view_command = [
+                'samtools', 'view', '-b',
+                '-o', output_file_name,
+            ]
+            view_process = subprocess.Popen(view_command,
+                                            stdin=bowtie2_process.stdout,
+                                            stderr=subprocess.PIPE,
+                                           )
+            bowtie2_process.stdout.close()
+            process_to_return = view_process
+                 
     return process_to_return, bowtie2_command
 
 def _map_bowtie2(index_prefix,
@@ -271,7 +291,7 @@ def _map_bowtie2(index_prefix,
                  error_file_name='/dev/null',
                  custom_binary=False,
                  bam_output=False,
-                 by_name=False,
+                 sort_by=None,
                  reads=None,
                  read_pairs=None,
                  yield_mappings=False,
@@ -325,7 +345,7 @@ def _map_bowtie2(index_prefix,
                                                           output_file_name,
                                                           error_file_name,
                                                           bam_output,
-                                                          by_name,
+                                                          sort_by,
                                                           custom_binary,
                                                           **options)
 
@@ -336,6 +356,7 @@ def _map_bowtie2(index_prefix,
             else:
                 for read in fastq.reads(unal_R1_fn):
                     yield read
+
         elif yield_mappings:
             sam_file = pysam.AlignmentFile(str(output_file_name), 'r')
             yield sam_file
@@ -348,7 +369,7 @@ def _map_bowtie2(index_prefix,
                                                 bowtie2_command,
                                                 err_output,
                                                )
-        if bam_output and not by_name:
+        if bam_output and sort_by == 'position':
             pysam.index(str(output_file_name))
 
 def map_bowtie2(index_prefix,
@@ -356,7 +377,7 @@ def map_bowtie2(index_prefix,
                 R2_fn=None,
                 output_file_name=None,
                 bam_output=False,
-                by_name=False,
+                sort_by=None,
                 error_file_name='/dev/null',
                 custom_binary=False,
                 reads=None,
@@ -376,7 +397,7 @@ def map_bowtie2(index_prefix,
 
     if output_file_name == None and yield_mappings == False:
         raise RuntimeError('Need to give output_file_name or yield_mappings')
-    
+
     if read_pairs:
         # Can't used named pipes for paired Reads without custom binary because
         # of buffer size mismatch.
@@ -389,7 +410,7 @@ def map_bowtie2(index_prefix,
                              error_file_name=error_file_name,
                              custom_binary=custom_binary,
                              bam_output=bam_output,
-                             by_name=by_name,
+                             sort_by=sort_by,
                              reads=reads,
                              read_pairs=read_pairs,
                              yield_mappings=yield_mappings,
@@ -506,7 +527,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
              sort=True,
              include_unmapped=False,
              bam_fn=None,
-             min_fraction_matching=0.66,
+             mode='stringent',
             ):
     if sort:
         bam_suffix = 'Aligned.sortedByCoord.out.bam'
@@ -522,21 +543,63 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     STAR_command = [
         'STAR',
-        '--genomeDir', index_dir,
+        '--genomeDir', str(index_dir),
         '--outSAMtype', 'BAM', sort_option,
         '--outSAMunmapped', unmapped_option,
-        '--outSAMattributes', 'MD',
+        '--outSAMattributes', 'All',
         '--limitBAMsortRAM', '1345513406',
-        #'--outFilterScoreMinOverLread', '0.2',
-        '--outFilterMatchNminOverLread', str(min_fraction_matching),
         '--alignIntronMax', '1',
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
         '--readFilesIn', str(R1_fn),
     ]
+
+    if mode == 'stringent':
+        STAR_command.extend([
+            '--outFilterScoreMinOverLread', '0.2',
+            '--outFilterMatchNminOverLread', '0.2',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+        ])
+
+    elif mode == 'permissive':
+        STAR_command.extend([
+            '--outFilterMultimapScoreRange', '1000',
+            '--outFilterMultimapNmax', '1000',
+            '--outFilterScoreMinOverLread', '0',
+            '--outFilterMatchNminOverLread', '0',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+        ])
+
+    elif mode == 'tcell':
+        STAR_command.extend([
+            '--outFilterMismatchNoverLmax', '0.02',
+            '--outFilterScoreMinOverLread', '0',
+            '--outFilterMatchNminOverLread', '0',
+            '--outFilterMatchNmin', '50',
+            '--genomeLoad', 'LoadAndKeep',
+            '--alignEndsType', 'Extend5pOfRead1',
+        ])
+
+    elif mode == 'guide_alignment':
+        STAR_command.extend([
+            '--alignEndsType', 'EndToEnd',
+        ])
+        #STAR_command.extend([
+        #    '--outFilterScoreMinOverLread', '0.9',
+        #])
+        pass
+
+    else:
+        raise ValueError(mode)
+
     if R2_fn is not None:
         STAR_command.append(str(R2_fn))
+
+    if Path(R1_fn).suffix == '.gz':
+        STAR_command.extend(['--readFilesCommand', 'zcat'])
 
     subprocess.check_output(STAR_command)
 
@@ -545,10 +608,12 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     if bam_fn is None:
         bam_fn = initial_bam_fn
     else:
-        shutil.move(initial_bam_fn, bam_fn)
+        shutil.move(str(initial_bam_fn), str(bam_fn))
 
     if sort:
         pysam.index(str(bam_fn))
+
+    return bam_fn
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None):
     total_length = 0
@@ -571,7 +636,7 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
 def _map_STAR(reads,
               index_prefix,
               output_prefix,
-             ):
+              **kwargs):
     input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
 
     with input_fifo_source:
@@ -581,7 +646,7 @@ def _map_STAR(reads,
         STAR_process, STAR_command = map_STAR(R1_fn,
                                               index_prefix,
                                               output_prefix,
-                                             )
+                                              **kwargs)
 
         _, err_output = STAR_process.communicate()
         if STAR_process.returncode != 0:
@@ -589,3 +654,26 @@ def _map_STAR(reads,
                                                 STAR_command,
                                                 err_output,
                                                )
+
+def map_bwa_mem(reads,
+                index_prefix,
+               ):
+    input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
+
+    with input_fifo_source:
+        R1_fn = input_fifo_source.file_name
+        writer = ThreadFastqWriter(reads, R1_fn)
+
+        bwa_command = [
+            'bwa', 'mem',
+            '-a',
+            index_prefix,
+            R1_fn,
+        ]
+
+        bwa_process = subprocess.Popen(bwa_command,
+                                       stdout=subprocess.PIPE,
+                                      )
+        fh = pysam.AlignmentFile(bwa_process.stdout)
+        for mapping in fh:
+            yield mapping

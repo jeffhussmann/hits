@@ -17,7 +17,8 @@ def get_all_fai_file_names(genome_dir):
 
 def make_fais(genome_dir):
     fasta_file_names = get_all_fasta_file_names(genome_dir)
-    map(pysam.faidx, fasta_file_names)
+    for fn in fasta_file_names:
+        pysam.faidx(fn)
 
 fai_entry_fields = [
     'file_name',
@@ -74,10 +75,16 @@ def build_region_fetcher(genome_dir, load_references=False):
         padded with -.
     '''
     genome_index = get_genome_index(genome_dir)
-    fasta_files = {fasta_file_name: pysam.Fastafile(fasta_file_name)
-                   for fasta_file_name in get_all_fasta_file_names(genome_dir)}
-    seq_name_to_file = {seq_name: fasta_files[genome_index[seq_name].file_name]
-                        for seq_name in genome_index}
+
+    fasta_files = {
+        fasta_file_name: pysam.Fastafile(fasta_file_name)
+        for fasta_file_name in get_all_fasta_file_names(genome_dir)
+    }
+
+    seq_name_to_file = {
+        seq_name: fasta_files[genome_index[seq_name].file_name]
+        for seq_name in genome_index
+    }
 
     references = {}
     def lookup_loaded(seq_name, start, end):
