@@ -392,7 +392,7 @@ def align_read(read, targets, alignment_type, min_path_length, header, max_align
 
         qual = array.array('B', fastq.decode_sanger(qual))
 
-        for i, (target_name, target_seq) in enumerate(targets):
+        for target_name, target_seq in targets:
             for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments, **kwargs):
                 path = alignment['path']
 
@@ -421,7 +421,7 @@ def align_read(read, targets, alignment_type, min_path_length, header, max_align
                     al.set_tag('MD', md)
 
                     al.set_tag('AS', alignment['score'])
-                    al.tid = i
+                    al.reference_name = target_name
                     al.query_name = read.name
                     al.next_reference_id = -1
                     al.reference_start = first_target_index(path)
@@ -454,7 +454,7 @@ def align_reads(target_fasta_fn,
         for read in reads:
             statistics['input'] += 1
 
-            alignments = align_read(read, targets, alignment_type, min_path_length)
+            alignments = align_read(read, targets, alignment_type, min_path_length, header)
             
             if alignments:
                 statistics['aligned'] += 1
