@@ -1,4 +1,4 @@
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 import Bio.SeqIO
 
 class Read(object):
