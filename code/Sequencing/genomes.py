@@ -52,6 +52,9 @@ def build_base_lookup(genome_dir):
     references = {}
 
     def base_lookup(rname, position):
+        if position < 0:
+            raise IndexError
+
         if rname not in references:
             fasta_file_name = genome_index[rname].file_name
             with pysam.Fastafile(fasta_file_name) as fasta_file:
