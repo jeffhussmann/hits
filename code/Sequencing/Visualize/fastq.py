@@ -21,11 +21,11 @@ def plot_quality_histograms(quality_counts, ax=None):
     ax.set_xlabel('Cycle index')
     ax.set_ylabel('Quality score')
 
-def plot_paired_quality_histograms(R1_quality_counts, R2_quality_counts):
-    num_cycles, num_q_scores = R1_quality_counts.shape
+def plot_paired_quality_histograms(stats):
+    num_cycles, num_q_scores = stats['R1_qs'].shape
     fig, (R1_ax, R2_ax) = plt.subplots(2, 1, figsize=(0.1 * num_cycles, 0.1 * (num_q_scores * 2 + 10)))
-    plot_quality_histograms(R1_quality_counts, ax=R1_ax)
-    plot_quality_histograms(R2_quality_counts, ax=R2_ax)
+    plot_quality_histograms(stats['R1_qs'], ax=R1_ax)
+    plot_quality_histograms(stats['R2_qs'], ax=R2_ax)
     R1_ax.set_title('R1')
     R2_ax.set_title('R2')
 
@@ -39,10 +39,7 @@ def plot_joint_average_quality_distribution(joint_average_q_distribution):
     ax.set_xlabel('R2 average quality')
     ax.set_ylabel('R1 average quality')
     
-def plot_data_statistics(R1_base_counts,
-                         R2_base_counts,
-                         R1_qualities,
-                         R2_qualities,
+def plot_data_statistics(stats,
                          R1_expected_seq=None,
                          R2_expected_seq=None,
                          R1_bracket_ranges=None,
@@ -52,8 +49,8 @@ def plot_data_statistics(R1_base_counts,
     '''
     fig, (R1_ax, R2_ax) = plt.subplots(2, 1, figsize=(20, 10))
 
-    plot_composition(R1_base_counts, ax=R1_ax, expected_seq=R1_expected_seq, bracket_ranges=R1_bracket_ranges)
-    plot_composition(R2_base_counts, ax=R2_ax, expected_seq=R2_expected_seq, bracket_ranges=R2_bracket_ranges)
+    plot_composition(stats['R1_cs'], ax=R1_ax, expected_seq=R1_expected_seq, bracket_ranges=R1_bracket_ranges)
+    plot_composition(stats['R2_cs'], ax=R2_ax, expected_seq=R2_expected_seq, bracket_ranges=R2_bracket_ranges)
     R1_ax.set_title('R1')
     R2_ax.set_title('R2')
 
@@ -63,8 +60,8 @@ def plot_data_statistics(R1_base_counts,
     R1_q_ax = R1_ax.twinx()
     R2_q_ax = R2_ax.twinx()
     
-    R1_mean_qs = [utilities.mean_from_histogram(row) for row in R1_qualities]
-    R2_mean_qs = [utilities.mean_from_histogram(row) for row in R2_qualities]
+    R1_mean_qs = [utilities.mean_from_histogram(row) for row in stats['R1_qs']]
+    R2_mean_qs = [utilities.mean_from_histogram(row) for row in stats['R2_qs']]
 
     style = {'linestyle': '-',
              'color': 'black',
@@ -79,7 +76,7 @@ def plot_data_statistics(R1_base_counts,
         ax.set_ylabel('Average quality score', rotation=90 + 180, va='bottom')
         ax.set_ylim(0, 41)
     
-    total = R1_base_counts.sum(axis=1)[0]
+    total = stats['R1_cs'].sum(axis=1)[0]
     plt.suptitle('Base composition vs. cycle index\n{0:,d} total reads'.format(total))
 
 @optional_ax
@@ -211,15 +208,15 @@ def plot_average_qualities(average_q_distribution, label=None, save_as=None, ax=
     ax.set_ylabel('Fraction of reads')
 
 @optional_ax
-def plot_paired_average_qualities(R1_average_q_distribution, R2_average_q_distribution, name=None, save_as=None, ax=None):
+def plot_paired_average_qualities(stats, name=None, save_as=None, ax=None):
     if name == None:
         R1_label = 'R1'
         R2_label = 'R2'
     else:
         R1_label = '{}_R1'.format(name)
         R2_label = '{}_R2'.format(name)
-    plot_average_qualities(R1_average_q_distribution, label=R1_label, ax=ax)
-    plot_average_qualities(R2_average_q_distribution, label=R2_label, ax=ax)
+    plot_average_qualities(stats['R1_qs'], label=R1_label, ax=ax)
+    plot_average_qualities(stats['R2_qs'], label=R2_label, ax=ax)
     ax.legend(loc='upper left', framealpha=0.5)
 
 def remaining_Ns(base_counts, fig_file_name, paired=False):
