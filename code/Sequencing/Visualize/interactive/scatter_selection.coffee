@@ -31,10 +31,10 @@ filtered_data = models['filtered_source'].data
 for key, values of full_data
     filtered_data[key] = (values[i] for i in indices)
 
-models['filtered_source'].change.emit()#('change')
+models['filtered_source'].change.emit()
 
 if (models['table']?)
-    models['table'].change.emit()#('change')
+    models['table'].change.emit()
 
 get_domain_info = (name) ->
     bins_left = models['histogram_source'].data[name + '_bins_left']

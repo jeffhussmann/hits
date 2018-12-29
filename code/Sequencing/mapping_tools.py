@@ -137,9 +137,8 @@ class ThreadFastqWriter(threading.Thread):
         try:
             with open(self.file_name, 'w') as fifo_fh:
                 for i, read in enumerate(self.reads):
-                    if i % 100000 == 0:
-                        print(i)
                     fifo_fh.write(str(read))
+
         except BrokenPipeError:
             print('BrokenPipeError caught')
 
