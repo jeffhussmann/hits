@@ -102,7 +102,7 @@ def quality_and_complexity(reads, max_read_length, alignments=False, min_q=0):
     
     return stats
 
-def quality_and_complexity_paired(read_pairs, max_read_length, results):
+def quality_and_complexity_paired(read_pairs, max_read_length):
     R1_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
     R1_c_array = np.zeros((max_read_length, 256), int)
     R2_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
@@ -114,7 +114,6 @@ def quality_and_complexity_paired(read_pairs, max_read_length, results):
         R1_average_q = process_read(R1.seq.encode(), R1.qual.encode(), R1_q_array, R1_c_array)
         R2_average_q = process_read(R2.seq.encode(), R2.qual.encode(), R2_q_array, R2_c_array)
         joint_average_q_distribution[int(R1_average_q), int(R2_average_q)] += 1
-        yield R1, R2
         
     # See comment in quality_and_complexity above. 
     R1_c_array = np.vstack([R1_c_array.T[ord(b)] for b in base_order]).T
@@ -123,7 +122,7 @@ def quality_and_complexity_paired(read_pairs, max_read_length, results):
     R1_average_q_distribution = joint_average_q_distribution.sum(axis=1) 
     R2_average_q_distribution = joint_average_q_distribution.sum(axis=0) 
 
-    results.update({
+    results = {
         'R1_qs': R1_q_array,
         'R1_cs': R1_c_array,
         'R2_qs': R2_q_array,
@@ -131,7 +130,9 @@ def quality_and_complexity_paired(read_pairs, max_read_length, results):
         'joint_average_qs': joint_average_q_distribution,
         'R1_average_qs': R1_average_q_distribution,
         'R2_average_qs': R2_average_q_distribution,
-    })
+    }
+    
+    return results
 
 def get_line_groups(line_source):
     if isinstance(line_source, Path):
