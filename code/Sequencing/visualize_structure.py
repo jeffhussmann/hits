@@ -55,12 +55,13 @@ def produce_bowtie2_alignments(reads,
                                score_min,
                               ):
 
-    bowtie2_options = {'local': True,
-                       'report_up_to': 10,
-                       'seed_mismatches': 1,
-                       'seed_interval_function': 'C,1,0',
-                       'seed_length': 10,
-                      }
+    bowtie2_options = {
+        'local': True,
+        'report_up_to': 10,
+        'seed_mismatches': 1,
+        'seed_interval_function': 'C,1,0',
+        'seed_length': 10,
+    }
 
     sam_file, mappings = mapping_tools.map_bowtie2(index_prefix,
                                                    reads=reads,

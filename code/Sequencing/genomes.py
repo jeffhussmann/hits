@@ -5,8 +5,10 @@ from collections import namedtuple
 import Bio.SeqIO
 
 def get_all_fasta_file_names(genome_dir):
-    fasta_file_names = [fn for fn in glob.glob('{0}/*.fa*'.format(genome_dir))
-                        if not fn.endswith('.fai')]
+    fasta_file_names = [
+        fn for fn in glob.glob('{0}/*.fa*'.format(genome_dir))
+        if not fn.endswith('.fai') and not 'fastq' in fn
+    ]
     return fasta_file_names
 
 def get_all_fai_file_names(genome_dir):
