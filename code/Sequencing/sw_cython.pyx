@@ -12,9 +12,10 @@ def generate_matrices(char* query,
                       int match_bonus,
                       int mismatch_penalty,
                       int indel_penalty,
-                      force_query_start,
-                      force_target_start,
-                      force_either_start,
+                      bint force_query_start,
+                      bint force_target_start,
+                      bint force_either_start,
+                      bint N_matches,
                      ):
     cdef unsigned int row, col, next_col, next_row
     cdef int match_or_mismatch, diagonal, from_left, from_above, new_score, unconstrained_start
@@ -44,7 +45,7 @@ def generate_matrices(char* query,
 
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
-            if query[row - 1] == 'N' or target[col - 1] == 'N':
+            if N_matches and (query[row - 1] == 'N' or target[col - 1] == 'N'):
                 match_or_mismatch = match_bonus
             elif query[row - 1] == target[col - 1]:
                 match_or_mismatch = match_bonus
@@ -174,3 +175,14 @@ def backtrack_cython(char* query,
                 }
 
     return alignment
+
+def extend_perfect_seed(char* query_seq, char* target_seq, int query_start, int query_end, int target_start, int target_end):
+    while query_start > 0 and target_start > 0 and (query_seq[query_start - 1] == target_seq[target_start - 1]):
+        query_start -= 1
+        target_start -= 1
+
+    while query_end < len(query_seq) and target_end < len(target_seq) and (query_seq[query_end] == target_seq[target_end]):
+        query_end += 1
+        target_end += 1
+
+    return query_start, query_end, target_start

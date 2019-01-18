@@ -143,6 +143,7 @@ def generate_alignments(query,
                         indel_penalty=-5,
                         max_alignments=1,
                         min_score=-np.inf,
+                        N_matches=True,
                        ):
     if alignment_type == 'local':
         force_query_start = False
@@ -211,6 +212,7 @@ def generate_alignments(query,
                                  force_query_start,
                                  force_target_start,
                                  force_either_start,
+                                 N_matches,
                                 )
     
     cells_seen = set()
@@ -593,3 +595,41 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2=''):
     stitched = just_R1 + overlap + just_R2
 
     return stitched
+
+def seed_and_extend(query_seq, target_seq, seed_locations, true_query_start, true_query_end, header, reference_name, query_name):
+    als = []
+    for is_reverse in [True, False]:
+        if is_reverse:
+            seed_query_start = len(query_seq) - true_query_end
+            seed_query_end = len(query_seq) - true_query_start
+            possibly_RCd_query_seq = utilities.reverse_complement(query_seq)
+        else:
+            seed_query_start = true_query_start
+            seed_query_end = true_query_end
+            possibly_RCd_query_seq = query_seq
+            
+        seed = possibly_RCd_query_seq[seed_query_start:seed_query_end]
+        
+        for target_start in seed_locations[seed]:
+            query_start, query_end, target_start = extend_perfect_seed(possibly_RCd_query_seq, target_seq, seed_query_start, seed_query_end, target_start, target_start + len(seed))
+
+            cigar = [(sam.BAM_CMATCH, query_end - query_start)]
+            if query_start > 0:
+                cigar = [(sam.BAM_CSOFT_CLIP, query_start)] + cigar
+            if query_end < len(query_seq):
+                cigar = cigar + [(sam.BAM_CSOFT_CLIP, len(query_seq) - query_end)]
+
+            al = pysam.AlignedSegment(header)
+            al.cigartuples = cigar
+            al.is_reverse = is_reverse
+            al.is_unmapped = False
+            al.reference_name = reference_name
+            al.query_sequence = possibly_RCd_query_seq
+            al.query_qualities = [41] * len(query_seq)
+            al.query_name = query_name
+
+            al.reference_start = target_start
+            
+            als.append(al)
+    
+    return als
