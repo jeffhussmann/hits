@@ -151,6 +151,9 @@ class Feature(object):
                self.start >= other.start and \
                self.end <= other.end
 
+    def __len__(self):
+        return self.end - self.start + 1
+
 def populate_all_connections(features):
     for f in features:
         f.children = set()
