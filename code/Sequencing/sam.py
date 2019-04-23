@@ -806,27 +806,25 @@ class AlignmentSorter(object):
     def write(self, alignment):
         self.sam_file.write(alignment)
 
-@contextlib.contextmanager
-def multiple_AlignmentSorters(handlers):
-    ''' from http://hoardedhomelyhints.dietbuddha.com/2014/02/python-aggregating-multiple-context.html '''
-    for handler in handlers:
-        handler.__enter__()
-  
-    err = None
-    exc_info = (None, None, None)
-    try:
-        yield
-    except Exception as err:
-        exc_info = sys.exc_info()
- 
-    # exc_info get's passed to each subsequent handler.__exit__
-    # unless one of them suppresses the exception by returning True
-    for handler in reversed(handlers):
-        if handler.__exit__(*exc_info):
-            err = False
-            exc_info = (None, None, None)
-    if err:
-        raise err
+class multiple_AlignmentSorters(contextlib.ExitStack):
+    def __init__(self, header, by_name=False):
+        super().__init__()
+        self.sorters = {}
+        self.header = header
+        self.by_name = by_name
+            
+    def __enter__(self):
+        super().__enter__()
+        for name in self.sorters:
+            self.enter_context(self.sorters[name])
+
+        return self
+            
+    def __getitem__(self, key):
+        return self.sorters[key]
+
+    def __setitem__(self, name, fn):
+        self.sorters[name] = AlignmentSorter(fn, self.header, self.by_name)
 
 class AlignedSegmentByName(object):
     def __init__(self, aligned_segment):
