@@ -1,8 +1,20 @@
-import numpy as np
+# cython: language_level=3
+
+from cpython cimport array
 cimport cython
+import numpy as np
+import array
 
 cdef int SANGER_OFFSET_typed = 33
+cdef unsigned char SANGER_OFFSET_char = 33
 SANGER_OFFSET = SANGER_OFFSET_typed
+
+def subtract_sanger_offset(unsigned char[:] q_array):
+    cdef unsigned int i, seq_length
+    seq_length = len(q_array)
+    
+    for i in range(seq_length):
+        q_array[i] -= SANGER_OFFSET_char
 
 @cython.boundscheck(False)
 def process_read(char* seq,

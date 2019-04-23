@@ -24,6 +24,13 @@ def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
     return [ord(q) - SANGER_OFFSET for q in qual]
 
+def decode_sanger_to_array(qual):
+    ''' Converts a string of sanger-encoded quals to a (python, not numpy) array of unsigned chars
+    suitable for assignment to a pysam.AlignedSegment.query_qualities '''
+    q_array = array.array('B', qual.encode())
+    subtract_sanger_offset(q_array)
+    return q_array
+
 def decode_solexa(qual):
     ''' Converts a string of solexa-encoded quals to a list of integers. '''
     return [ord(q) - SOLEXA_OFFSET for q in qual]
