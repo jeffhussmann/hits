@@ -676,3 +676,28 @@ def map_bwa_mem(reads,
         fh = pysam.AlignmentFile(bwa_process.stdout)
         for mapping in fh:
             yield mapping
+
+def map_minimap2(fastq_fn, index, bam_fn):
+    minimap2_command = [
+        'minimap2',
+        '-a', # sam output
+        '-Y', # use soft clipping for supplmentary alignments instead of hard clipping
+        '-P', # (roughly equivalent to?) report all
+        '--MD', # populate MD tags
+        '-r', '20', # max bandwidth
+        str(index),
+        str(fastq_fn),
+    ]
+
+    minimap2_process = subprocess.Popen(minimap2_command,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL,
+                                       )
+
+    view_command = ['samtools', 'view', '-b', '-o', str(bam_fn)]
+    view_process = subprocess.Popen(view_command,
+                                    stdin=minimap2_process.stdout,
+                                   )
+
+    minimap2_process.stdout.close()
+    view_process.communicate()
