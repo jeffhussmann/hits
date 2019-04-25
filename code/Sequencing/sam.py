@@ -690,32 +690,50 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     if not by_name:
         pysam.index(output_file_name)
 
-def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False):
-    input_file_names = [str(fn) for fn in input_file_names]
-    merged_file_name = str(merged_file_name)
+def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False, make_index=True):
+    # To avoid running into max open file limits, split into groups of 500.
+    if len(input_file_names) > 500:
+        chunks = utilities.list_chunks(input_file_names, 500)
+        merged_chunk_fns = []
+        for i, chunk in enumerate(chunks):
+            merged_chunk_fn = str(merged_file_name) + '.{:04d}'.format(i)
+            merged_chunk_fns.append(merged_chunk_fn)
+            merge_sorted_bam_files(chunk, merged_chunk_fn, by_name=by_name, make_index=False)
 
-    if len(input_file_names) == 1:
-        shutil.copy(input_file_names[0], merged_file_name)
+        merge_sorted_bam_files(merged_chunk_fns, merged_file_name)
+
+        for merged_chunk_fn in merged_chunk_fns:
+            os.remove(merged_chunk_fn)
+
     else:
-        merge_command = ['samtools', 'merge', '-f']
+        input_file_names = [str(fn) for fn in input_file_names]
+        merged_file_name = str(merged_file_name)
 
-        if by_name:
-            merge_command.append('-n')
+        if len(input_file_names) == 1:
+            shutil.copy(input_file_names[0], merged_file_name)
+        else:
+            merge_command = ['samtools', 'merge', '-f']
 
-        merge_command.extend([merged_file_name] + input_file_names)
+            if by_name:
+                merge_command.append('-n')
 
-        subprocess.check_call(merge_command)
-    
-    if not by_name:
-        try:
-            pysam.index(merged_file_name)
-        except pysam.utils.SamtoolsError:
-            # Need to sort the merged file because one input file was missing a target.
-            temp_sorted_name = merged_file_name + '.temp_sorted'
-            sort_bam(merged_file_name, temp_sorted_name)
-            os.rename(temp_sorted_name, merged_file_name)
-            os.rename(temp_sorted_name + '.bai', merged_file_name + '.bai')
+            merge_command.extend([merged_file_name] + input_file_names)
 
+            try:
+                subprocess.run(merge_command, check=True, stderr=subprocess.PIPE)
+            except subprocess.CalledProcessError as e:
+                print(e.stderr)
+                raise
+        
+        if make_index and not by_name:
+            try:
+                pysam.index(merged_file_name)
+            except pysam.utils.SamtoolsError:
+                # Need to sort the merged file because at least one input file was missing a target.
+                temp_sorted_name = merged_file_name + '.temp_sorted'
+                sort_bam(merged_file_name, temp_sorted_name)
+                os.rename(temp_sorted_name, merged_file_name)
+                os.rename(temp_sorted_name + '.bai', merged_file_name + '.bai')
 
 def bam_to_sam(bam_file_name, sam_file_name):
     view_command = ['samtools', 'view', '-h', '-o', sam_file_name, bam_file_name]
