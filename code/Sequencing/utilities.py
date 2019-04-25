@@ -184,6 +184,24 @@ def memoized_property(f):
     
     return memoized_f
 
+def memoized_with_key(f):
+    @functools.wraps(f)
+    def memoized_f(self, key):
+        attr_name = '_' + f.__name__
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, {})
+
+        already_computed = getattr(self, attr_name)
+        if key in already_computed:
+            value = already_computed[key]
+        else:
+            value = f(self, key)
+            already_computed[key] = value
+
+        return value
+
+    return memoized_f
+
 def reservoir_sample(iterable, n):
     sample = []
     for i, item in enumerate(iterable):
