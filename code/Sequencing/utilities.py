@@ -225,6 +225,12 @@ def chunks(iterable, n):
         rest = islice(iterable, n - 1)
         yield chain([first], rest)
 
+def list_chunks(full_list, n):
+    starts = np.arange(0, len(full_list), n)
+    ends = starts + n
+    chunks = [full_list[start:end] for start, end in zip(starts, ends)]
+    return chunks
+
 @contextlib.contextmanager
 def possibly_fn(fn=None):
     # from https://stackoverflow.com/a/22264583
