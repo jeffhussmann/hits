@@ -877,7 +877,7 @@ def aligned_pairs_exclude_soft_clipping(mapping):
 
     if len(cigar) > 1:
         last_op, last_length = cigar[-1]
-        if last_op == BAM_CSOFT_CLIP:
+        if last_op == BAM_CSOFT_CLIP and last_length != 0:
             aligned_pairs = aligned_pairs[:-last_length]
 
     return aligned_pairs
@@ -890,6 +890,36 @@ def parse_idxstats(bam_fn):
 
 def get_num_alignments(bam_fn):
     return sum(parse_idxstats(bam_fn).values())
+
+def collapse_soft_clip_blocks(cigar_blocks):
+    ''' If there are multiple consecutive soft clip blocks on either end,
+    collapse them into a single block.
+    '''
+    first_non_cigar_index = 0
+    while cigar_blocks[first_non_cigar_index][0] == BAM_CSOFT_CLIP:
+        first_non_cigar_index += 1
+
+    if first_non_cigar_index > 0:
+        total_length = sum(length for kind, length in cigar_blocks[:first_non_cigar_index])
+        if total_length > 0:
+            to_add = [(BAM_CSOFT_CLIP, total_length)]
+        else:
+            to_add = []
+        cigar_blocks = to_add + cigar_blocks[first_non_cigar_index:]
+    
+    last_non_cigar_index = len(cigar_blocks) - 1
+    while cigar_blocks[last_non_cigar_index][0] == BAM_CSOFT_CLIP:
+        last_non_cigar_index -= 1
+
+    if last_non_cigar_index < len(cigar_blocks) - 1:
+        total_length = sum(length for kind, length in cigar_blocks[last_non_cigar_index + 1:])
+        if total_length > 0:
+            to_add = [(BAM_CSOFT_CLIP, total_length)]
+        else:
+            to_add = []
+        cigar_blocks = cigar_blocks[:last_non_cigar_index + 1] + to_add
+
+    return cigar_blocks
 
 def crop_al_to_query_int(alignment, start, end):
     ''' Replace any parts of alignment that involve query bases not in the
@@ -941,6 +971,8 @@ def crop_al_to_query_int(alignment, start, end):
     after_soft = alignment.query_length - end - 1
     if after_soft > 0:
         cigar = cigar + [(BAM_CSOFT_CLIP, after_soft)]
+
+    cigar = collapse_soft_clip_blocks(cigar)
 
     restricted_rs = [r for q, r in restricted_pairs if r != None and r != 'S']
     if not restricted_rs:
