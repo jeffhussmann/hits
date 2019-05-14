@@ -334,7 +334,7 @@ def global_alignment(query, target, **kwargs):
     al, = generate_alignments(query, target, 'global', **kwargs)
     return al
 
-def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
+def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=False):
     ''' Infer the length of the insert represented by R1 and R2 by performing
         a semi-local alignment of R1 and the reverse complement of R2 with
         the expected adapter sequences prepended to each read.
@@ -346,10 +346,12 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
                                       'overlap',
                                       2,
                                       -1,
-                                      -5,
+                                      indel_penalty,
                                       1,
                                       0,
                                      )
+
+    results = {'alignment': alignment}
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
@@ -371,10 +373,16 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         illegal_deletion = any(d <= R2_start for d in alignment['deletions'])
     
     if illegal_insertion or illegal_deletion:
-        return 'illegal', len(R1) + len(R2), -1
+        if illegal_insertion:
+            results['failed'] = 'illegal insertion'
+        elif illegal_deletion:
+            results['failed'] = 'illegal insertion'
+
+        return results
 
     if len(alignment['path']) == 0:
-        return 'illegal', len(R1) + len(R2), -1
+        results['failed'] = 'no alignment'
+        return results
 
     if R1_start_in_R2 != SOFT_CLIPPED and R2_start_in_R1 != SOFT_CLIPPED:
         length_from_R1 = R2_start_in_R1 - R1_start + 1
@@ -401,33 +409,28 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         length_from_R2 = (R2_start - last_R2_index + 1) + (len(R1.seq) - 1)
         
         if first_R1_index == 0 or last_R2_index == 0:
-            return 'illegal', 500, -1 
+            results['failed'] = 'only adapters'
+            return results
 
     if length_from_R1 < -1 or length_from_R2 < -1:
         # Negative insert lengths are non-physical. Even though I don't
         # understand it, -1 is relatively common so is tolerated.
-        return 'illegal', 500, -1
+        results['failed'] = 'negative insert length'
+        return results
 
-    insert_length = length_from_R1
-
-    if 2 * len(alignment['path']) - alignment['score'] > .2 * len(alignment['path']):
-        status = 'bad'
+    if alignment['score_ratio'] < 0.7:
+        results['failed'] = 'bad score'
     else:
-        status = 'good'
-    
-    if status == 'good' and (length_from_R1 != length_from_R2):
-        if solid and not(alignment['insertions'] or alignment['deletions']):
-            pass
+        if length_from_R1 != length_from_R2:
+            if solid and not(alignment['insertions'] or alignment['deletions']):
+                pass
+            else:
+                # This shouldn't be possible without an illegal indel.
+                results['failed'] = 'length mismatch'
         else:
-            # This shouldn't be possible without an illegal indel.
-            #print('length from R1', length_from_R1)
-            #print('length from R2', length_from_R2)
-            #print(diagnostic(R1, R2, before_R1, before_R2, alignment)
-            return 'illegal', 500, -1
+            results['length'] = length_from_R1
     
-    #print_diagnostic(R1, R2, before_R1, before_R2, alignment)
-
-    return status, insert_length, alignment
+    return results
 
 def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     extended_R1 = (before_R1.lower() + R1.seq).decode()
@@ -575,8 +578,13 @@ def align_reads(target_fasta_fn,
         for _ in generator():
             pass
 
-def stitch_read_pair(R1, R2, before_R1='', before_R2=''):    
-    status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
+def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
+    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty)
+    if 'failed' in results:
+        insert_length = len(R1) + len(R2)
+    else:
+        insert_length = results['length']
+
     R2_rc = R2.reverse_complement()
 
     overlap_start = max(0, insert_length - len(R1))
