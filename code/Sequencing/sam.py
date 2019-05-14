@@ -3,6 +3,7 @@
 import re
 import subprocess
 import os
+import sys
 import shutil
 import logging
 import heapq
@@ -14,6 +15,7 @@ from itertools import chain
 from pathlib import Path
 
 import pysam
+import numpy as np
 
 from . import utilities
 from . import external_sort
@@ -113,6 +115,9 @@ def cigar_string_to_blocks(cigar_string):
 
 def total_reference_nucs(cigar):
     return sum(length for op, length in cigar if op in ref_consuming_ops)
+
+def total_reference_nucs_except_splicing(cigar):
+    return sum(length for op, length in cigar if op in ref_consuming_ops and op != BAM_CREF_SKIP)
 
 def total_read_nucs(cigar):
     return sum(length for op, length in cigar if op in read_consuming_ops)
@@ -685,7 +690,11 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
                              input_file_name,
                             ])
 
-    subprocess.check_call(samtools_command)
+    try:
+        subprocess.check_call(samtools_command)
+    except:
+        print(' '.join(samtools_command))
+        raise
 
     if not by_name:
         pysam.index(output_file_name)
@@ -825,7 +834,7 @@ class AlignmentSorter(object):
         self.sam_file.write(alignment)
 
 class multiple_AlignmentSorters(contextlib.ExitStack):
-    def __init__(self, header, by_name=False):
+    def __init__(self, header=None, by_name=False):
         super().__init__()
         self.sorters = {}
         self.header = header
@@ -841,8 +850,14 @@ class multiple_AlignmentSorters(contextlib.ExitStack):
     def __getitem__(self, key):
         return self.sorters[key]
 
-    def __setitem__(self, name, fn):
-        self.sorters[name] = AlignmentSorter(fn, self.header, self.by_name)
+    def __setitem__(self, name, fn_and_possibly_header):
+        if isinstance(fn_and_possibly_header, tuple):
+            fn, header = fn_and_possibly_header
+        else:
+            fn = fn_and_possibly_header
+            header = self.header
+
+        self.sorters[name] = AlignmentSorter(fn, header, self.by_name)
 
 class AlignedSegmentByName(object):
     def __init__(self, aligned_segment):
@@ -929,12 +944,16 @@ def crop_al_to_query_int(alignment, start, end):
     '''
     alignment = copy.deepcopy(alignment)
 
-    if alignment.is_unmapped:
+    if alignment is None or alignment.is_unmapped:
         return alignment
     
-    overlap = interval.Interval(start, end) & interval.get_covered(alignment)
-    if len(overlap) == 0:
+    if end < start:
+        # query interval is empty
         return None
+    else:
+        overlap = interval.Interval(start, end) & interval.get_covered(alignment)
+        if len(overlap) == 0:
+            return None
 
     if alignment.is_reverse:
         start, end = alignment.query_length - 1 - end, alignment.query_length - 1 - start
@@ -942,19 +961,23 @@ def crop_al_to_query_int(alignment, start, end):
     aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start)
 
     start_i = 0
-    while aligned_pairs[start_i][0] == None or aligned_pairs[start_i][0] < start:
+    read, ref = aligned_pairs[start_i]
+    while read is None or read == 's' or read < start:
         start_i += 1
+        read, ref = aligned_pairs[start_i]
         
     end_i = len(aligned_pairs) - 1
-    while aligned_pairs[end_i][0] is None or aligned_pairs[end_i][0] > end:
+    read, ref = aligned_pairs[end_i]
+    while read is None or read == 's' or read > end:
         end_i -= 1
+        read, ref = aligned_pairs[end_i]
 
     if alignment.has_tag('MD'):
         MD = alignment.get_tag('MD')
 
-        total_ref_nucs = total_reference_nucs(alignment.cigar)
-        removed_from_start = total_reference_nucs(aligned_pairs_to_cigar(aligned_pairs[:start_i]))
-        removed_from_end = total_reference_nucs(aligned_pairs_to_cigar(aligned_pairs[end_i + 1:]))
+        total_ref_nucs = total_reference_nucs_except_splicing(alignment.cigar)
+        removed_from_start = total_reference_nucs_except_splicing(aligned_pairs_to_cigar(aligned_pairs[:start_i]))
+        removed_from_end = total_reference_nucs_except_splicing(aligned_pairs_to_cigar(aligned_pairs[end_i + 1:]))
 
         MD = truncate_md_string_up_to(MD, total_ref_nucs - removed_from_end)
         MD = truncate_md_string_from_beginning(MD, total_ref_nucs - removed_from_end - removed_from_start)
@@ -993,8 +1016,7 @@ def crop_al_to_ref_int(alignment, start, end):
 
     if alignment.reference_start > end or alignment.reference_end - 1 < start:
         # alignment doesn't overlap the ref interval at all
-        alignment.is_unmapped = True
-        return alignment
+        return None
 
     if alignment.reference_start >= start and alignment.reference_end - 1 <= end:
         # alignment is entirely contained in the ref_interval
@@ -1069,6 +1091,9 @@ def merge_adjacent_alignments(first, second, ref_seqs):
     alignment with an appropriately sized deletion that minimizes edit distance,
     otherwise return None.
     '''
+    if first is None or second is None:
+        return None
+
     if first == second:
         return first
 
@@ -1120,6 +1145,10 @@ def merge_adjacent_alignments(first, second, ref_seqs):
         left_cropped = crop_al_to_query_int(left_query, 0, switch_after)
         right_cropped = crop_al_to_query_int(right_query, switch_after + 1, right_query.query_length)
 
+    if left_cropped is None or left_cropped.is_unmapped or right_cropped is None or right_cropped.is_unmapped:
+        # this may not be appropriate in all circumstances
+        return None
+
     left_ref, right_ref = sorted([left_cropped, right_cropped], key=lambda al: al.reference_start)
 
     if left_ref.reference_end >= right_ref.reference_start:
@@ -1161,6 +1190,59 @@ def cumulative_edit_distances(mapping, ref_seq, query_interval, from_end):
             c_e_ds[q] = total
             
     return c_e_ds
+
+def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq, tie_break):
+    ''' If left_al and right_al overlap on the query, find the query position such that switching from
+    left_al to right_al after that position minimizes the total number of edits.
+    '''
+    left_covered = interval.get_covered(left_al)
+    right_covered = interval.get_covered(right_al)
+    overlap = left_covered & right_covered
+
+    if left_al is None:
+        if right_al is None:
+            raise ValueError
+        gap_interval = interval.Interval(0, right_covered.start - 1)
+    elif right_al is None:
+        if left_al is None:
+            raise ValueError
+        gap_interval = interval.Interval(left_covered.end + 1, len(left_al.seq) - 1)
+    else:
+        gap_interval = interval.Interval(left_covered.end + 1, right_covered.start - 1)
+
+    if overlap:
+        left_ceds = cumulative_edit_distances(left_al, left_ref_seq, overlap, False)
+        right_ceds = cumulative_edit_distances(right_al, right_ref_seq, overlap, True)
+
+        switch_after_edits = {
+            overlap.start - 1 : right_ceds[overlap.start],
+            overlap.end: left_ceds[overlap.end],
+        }
+
+        for q in range(overlap.start, overlap.end):
+            switch_after_edits[q] = left_ceds[q] + right_ceds[q + 1]
+
+        min_edits = min(switch_after_edits.values())
+        best_switch_points = [s for s, d in switch_after_edits.items() if d == min_edits]
+        switch_after = tie_break(best_switch_points)
+    else:
+        min_edits = 0
+        switch_after = left_covered.end
+
+    if gap_interval.is_empty:
+        gap_length = 0
+        gap_interval = None
+    else:
+        gap_length = len(gap_interval)
+    
+    results = {
+        'switch_after': switch_after,
+        'min_edits': min_edits,
+        'gap_interval': gap_interval,
+        'gap_length': gap_length,
+    }
+
+    return results
 
 def true_query_position(p, alignment):
     if alignment.is_reverse:
@@ -1214,7 +1296,7 @@ def closest_ref_position(q, alignment, which_side='either'):
     return r
 
 def max_block_length(alignment, block_types):
-    if alignment.is_unmapped:
+    if alignment is None or alignment.is_unmapped:
         return 0
     else:
         block_lengths = [l for k, l in alignment.cigar if k in block_types]
@@ -1280,11 +1362,8 @@ def split_at_large_insertions(alignment, min_length):
 
     return all_split
 
-def split_at_deletions(alignment, max_length, exempt_if_overlaps=None):
-    '''Split at deletions larger than max_length that don't overlap exempt_if_overlaps. '''
-
-    if exempt_if_overlaps is None:
-        exempt_if_overlaps = interval.Interval(-1, -2)
+def split_at_deletions(alignment, min_length, exempt_if_overlaps=None):
+    ''' Split at deletions at least min_length that don't overlap exempt_if_overlaps. '''
 
     ref_start = alignment.reference_start
     query_bases_before = 0
@@ -1297,8 +1376,13 @@ def split_at_deletions(alignment, max_length, exempt_if_overlaps=None):
     for i, (kind, length) in enumerate(alignment.cigar):
         if kind == BAM_CDEL:
             del_interval = interval.Interval(ref_start, ref_start + length - 1)
-            overlaps = len(del_interval & exempt_if_overlaps) > 0
-            if length > max_length and not overlaps:
+
+            if exempt_if_overlaps is None:
+                overlaps = False
+            else:
+                overlaps = len(del_interval & exempt_if_overlaps) > 0
+
+            if length >= min_length and not overlaps:
                 split_at.append(i)
         
         if kind in read_consuming_ops:
@@ -1345,17 +1429,75 @@ def split_at_deletions(alignment, max_length, exempt_if_overlaps=None):
             
             split_alignments.append(split_al)
 
+    split_alignments = [soft_clip_terminal_insertions(al) for al in split_alignments]
+
     return split_alignments
+
+def soft_clip_terminal_insertions(al):
+    ''' If al starts or ends with insertions, convert the relevant bases into soft-clipping. '''
+    initial_cigar = al.cigar
+    clip_lengths = {}
+    
+    if initial_cigar[0][0] == BAM_CSOFT_CLIP:
+        clip_lengths['beginning'] = initial_cigar[0][1]
+    else:
+        clip_lengths['beginning'] = 0
+    
+    if len(initial_cigar) > 1 and initial_cigar[-1][0] == BAM_CSOFT_CLIP:
+        clip_lengths['end'] = initial_cigar[-1][1]
+    else:
+        clip_lengths['end'] = 0
+        
+    non_soft_clipped_blocks = [(kind, length) for kind, length in al.cigar if kind != BAM_CSOFT_CLIP]
+    
+    if len(non_soft_clipped_blocks) == 0:
+        return al
+    
+    had_terminal_insertion = False
+    
+    first_kind, first_length = non_soft_clipped_blocks[0]
+
+    if first_kind == BAM_CINS:
+        had_terminal_insertion = True
+        clip_lengths['beginning'] += first_length
+
+        non_soft_clipped_blocks = non_soft_clipped_blocks[1:]
+        
+    if len(non_soft_clipped_blocks) > 0:
+        last_kind, last_length = non_soft_clipped_blocks[-1]
+        
+        if last_kind == BAM_CINS:
+            had_terminal_insertion = True
+            clip_lengths['end'] += last_length
+
+            non_soft_clipped_blocks = non_soft_clipped_blocks[:-1]
+    
+    if had_terminal_insertion:
+        new_cigar = non_soft_clipped_blocks
+
+        if clip_lengths['beginning'] > 0:
+            new_cigar = [(BAM_CSOFT_CLIP, clip_lengths['beginning'])] + new_cigar
+
+        if clip_lengths['end'] > 0:
+            new_cigar = new_cigar + [(BAM_CSOFT_CLIP, clip_lengths['end'])]
+
+        new_al = copy.deepcopy(al)
+        new_al.cigar = new_cigar
+    else:
+        new_al = al
+    
+    return new_al
 
 def grouped_by_name(als):
     if isinstance(als, (str, Path)):
-        als = pysam.AlignmentFile(str(als))
+        als = pysam.AlignmentFile(als)
 
     grouped = utilities.group_by(als, lambda al: al.query_name)
 
     return grouped
 
 def header_from_STAR_index(index):
+    index = Path(index)
     names = [l.strip() for l in (index / 'chrName.txt').open()]
     lengths = [int(l.strip()) for l in (index / 'chrLength.txt').open()]
     header = pysam.AlignmentHeader.from_references(names, lengths)
@@ -1371,12 +1513,24 @@ def header_from_fasta(fasta_fn):
 
     return header
 
-def overlaps_feature(alignment, feature):
+def overlaps_feature(alignment, feature, require_same_strand=True):
+    if alignment is None or alignment.is_unmapped:
+        return False
+
     same_reference = alignment.reference_name == feature.seqname
     num_overlapping_bases = alignment.get_overlap(feature.start, feature.end)
-    return same_reference and (num_overlapping_bases > 0)
+
+    if require_same_strand:
+        same_strand = (get_strand(alignment) == feature.strand)
+    else:
+        same_strand = True
+
+    return same_reference and same_strand and (num_overlapping_bases > 0) 
 
 def reference_edges(alignment):
+    if alignment is None or alignment.is_unmapped:
+        return {5: None, 3: None}
+
     strand = get_strand(alignment)
 
     if strand == '+':
@@ -1415,6 +1569,10 @@ def aligned_tuples(alignment, ref_seq=None):
                 true_read_i = true_query_position(read_i, alignment)
                 read_b = alignment.query_sequence[read_i].upper()
                 qual = alignment.query_qualities[read_i]
+            
+            if ref_i is not None and ref_b is None:
+                # don't include spliced reference positions. (Is this an appropriate check for this situation?)
+                continue
 
             if ref_i is None:
                 ref_b = '-'
@@ -1445,7 +1603,16 @@ def aligned_tuples(alignment, ref_seq=None):
 
     return tuples
 
-def edit_distance_in_query_interval(alignment, query_interval, ref_seq=None):
+def total_edit_distance(alignment, ref_seq=None):
+    return edit_distance_in_query_interval(alignment, ref_seq=ref_seq)
+
+def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None):
+    if query_interval is None:
+        query_interval = interval.Interval(0, np.inf)
+
+    if query_interval.is_empty or alignment is None or alignment.is_unmapped:
+        return 0
+
     distance = 0
 
     start = query_interval.start
@@ -1463,3 +1630,25 @@ def edit_distance_in_query_interval(alignment, query_interval, ref_seq=None):
             distance += 1
 
     return distance
+
+def get_header(bam_fn):
+    with pysam.AlignmentFile(bam_fn) as bam_file:
+        header = bam_file.header
+    return header
+
+def flip_alignment(alignment):
+    flipped_alignment = copy.deepcopy(alignment)
+    flipped_alignment.is_reverse = not alignment.is_reverse
+    return flipped_alignment
+
+def make_nonredundant(alignments):
+    ''' Two alignments of the same read are redundant if they pair the same read bases with the same
+    reference bases. Given alignments of the same read, return alignments in which only one representative
+    of each equivalent class of redundancy is retained.
+    ''' 
+    def fingerprint(al):
+        return tuple(al.cigar), al.reference_start, al.reference_name, al.is_reverse
+    
+    nonredundant = {fingerprint(al): al for al in alignments}
+    
+    return list(nonredundant.values())
