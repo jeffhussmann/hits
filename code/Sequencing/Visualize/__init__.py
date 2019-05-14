@@ -306,6 +306,7 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
 
 def label_scatter_plot(ax, xs, ys, labels,
                        data=None,
+                       color=None,
                        to_label=slice(None),
                        vector='orthogonal',
                        initial_distance=50,
@@ -323,6 +324,11 @@ def label_scatter_plot(ax, xs, ys, labels,
     if data is not None:
         xs = data[xs]
         ys = data[ys]
+        if color is not None:
+            if color in data:
+                color = data[color]
+            else:
+                color = [color]*len(xs)
         if labels in data:
             labels = data[labels]
         elif labels == data.index.name:
@@ -330,7 +336,7 @@ def label_scatter_plot(ax, xs, ys, labels,
         else:
             raise IndexError
 
-    def attempt_text(x, y, site, distance, vector):
+    def attempt_text(x, y, site, distance, vector, color):
         if vector == 'orthogonal':
             x_offset = np.sign(x - y) * distance
             y_offset = -np.sign(x - y) * distance
@@ -357,6 +363,16 @@ def label_scatter_plot(ax, xs, ys, labels,
             y_offset = y * distance / norm
             ha = 'center'
             va = 'top' if y_offset < 0 else 'bottom'
+        elif vector == 'above':
+            x_offset = 0
+            y_offset = distance
+            ha = 'center'
+            va = 'bottom'
+        elif vector == 'below':
+            x_offset = 0
+            y_offset = -distance
+            ha = 'center'
+            va = 'top'
         elif vector == 'sideways':
             x_offset = distance
             y_offset = 0
@@ -374,6 +390,7 @@ def label_scatter_plot(ax, xs, ys, labels,
                            textcoords='offset points',
                            ha=ha,
                            va=va,
+                           color=color,
                            **text_kwargs)
         ax.figure.canvas.draw()
 
@@ -401,20 +418,27 @@ def label_scatter_plot(ax, xs, ys, labels,
     if isinstance(vector, str):
         vector = np.array([vector]*len(xs))
 
+    if color is None:
+        color = 'black'
+
+    if isinstance(color, str):
+        color = np.array([color]*len(xs))
+
     tuples = zip(xs[to_label],
                  ys[to_label],
                  labels[to_label],
                  vector[to_label],
+                 color[to_label],
                 )
 
-    for x, y, label, vec in tuples:
+    for x, y, label, vec, color in tuples:
         distance = initial_distance
-        text, bbox, coords = attempt_text(x, y, label, distance, vec)
+        text, bbox, coords = attempt_text(x, y, label, distance, vec, color)
 
         while avoid and any(bbox.fully_overlaps(other_bbox) for other_bbox in bboxes):
             text.remove()
             distance += distance_increment
-            text, bbox, coords = attempt_text(x, y, label, distance, vec)
+            text, bbox, coords = attempt_text(x, y, label, distance, vec, color)
             if distance >= distance_increment * 50:
                 print('gave up on {}'.format(label))
                 break
