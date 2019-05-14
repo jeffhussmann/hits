@@ -143,7 +143,7 @@ def all_consecutive(s):
 def empirical_cdf(values):
     ''' From stackoverflow. '''
     sorted_values = np.sort(values)
-    cumulative = np.true_divide(np.arange(len(sorted_values)), len(sorted_values))
+    cumulative = np.true_divide(np.arange(len(sorted_values)) + 1, len(sorted_values))
     return sorted_values, cumulative
 
 def mers(k, include_N=False):
