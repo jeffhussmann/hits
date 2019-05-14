@@ -6,7 +6,7 @@ models = cb_obj.document._all_models_by_name._dict
 
 # To prevent this from erasing a selection that was just made, store indices
 # and re-assign them afterwards.
-indices = cb_obj.selected.indices
+indices = cb_obj.indices
 
 if cb_data == 'from_heatmap'
 else
@@ -15,7 +15,7 @@ else
     if (models['subset_menu']?) and cb_data != 'from_subset'
         models['subset_menu'].value = ''
 
-cb_obj.selected.indices = indices
+cb_obj.indices = indices
 
 # Make the histograms of all data slightly darker if nothing is selected. 
 if indices.length == 0
@@ -31,10 +31,10 @@ filtered_data = models['filtered_source'].data
 for key, values of full_data
     filtered_data[key] = (values[i] for i in indices)
 
-models['filtered_source'].change.emit()#('change')
+models['filtered_source'].change.emit()
 
 if (models['table']?)
-    models['table'].change.emit()#('change')
+    models['table'].change.emit()
 
 get_domain_info = (name) ->
     bins_left = models['histogram_source'].data[name + '_bins_left']

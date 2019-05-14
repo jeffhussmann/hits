@@ -10,4 +10,11 @@ if not Array.isArray(diagonals)
     diagonals = [diagonals]
 
 for diagonal in diagonals
-    diagonal.visible = choice == 'diagonal'
+    diagonal.visible = choice.includes('diagonal')
+
+axes_lines = models['axes_line']
+if not Array.isArray(axes_lines)
+    axes_lines = [axes_lines]
+
+for axes_line in axes_lines
+    axes_line.visible = choice.includes('axes')

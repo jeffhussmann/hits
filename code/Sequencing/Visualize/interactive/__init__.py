@@ -50,6 +50,8 @@ def scatter(df=None,
             num_bins=100,
             show_axes_lines=False,
             return_layout=False,
+            title=None,
+            two_level_index=False,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -161,6 +163,7 @@ def scatter(df=None,
 
     # Copy before changing.
     original_index_name = df.index.name
+    original_df = df
     df = df.copy()
 
     # Collapse multiindex if present
@@ -221,7 +224,7 @@ def scatter(df=None,
         plot_width=size,
         plot_height=size,
         tools=tools,
-        lod_threshold=10000,
+        lod_threshold=40000,
         name='scatter_fig',
     )
 
@@ -249,7 +252,25 @@ def scatter(df=None,
     fig.add_tools(lasso)
     
     if initial_xy_names is None:
-        x_name, y_name = numerical_cols[:2]
+        if two_level_index:
+            first_level = original_df.columns.levels[0]
+            second_level = original_df.columns.levels[1]
+
+            if first_level[1] != 'gene':
+                initial_xy_names = (
+                    (first_level[0], second_level[0]),
+                    (first_level[1], second_level[0]),
+                )
+            else:
+                initial_xy_names = (
+                    (first_level[0], second_level[0]),
+                    (first_level[0], second_level[1]),
+                )
+        else:
+            initial_xy_names = numerical_cols[:2]
+
+    if two_level_index:
+        x_name, y_name = [' '.join(t) for t in initial_xy_names]
     else:
         x_name, y_name = initial_xy_names
     
@@ -301,7 +322,6 @@ def scatter(df=None,
     scatter_data['_label'] = scatter_data[label_options[0]]
 
     if isinstance(marker_size, numbers.Number):
-        show_marker_size_menu = False
         size_widget_type = 'slider'
     else:
         if isinstance(marker_size, six.string_types):
@@ -309,7 +329,6 @@ def scatter(df=None,
         else:
             size_options = [''] + list(marker_size)
     
-        show_marker_size_menu = True
         size_widget_type = 'menu'
         marker_size = '_size'
         scatter_data[marker_size] = scatter_data[size_options[1]]
@@ -416,16 +435,9 @@ def scatter(df=None,
     for line in lines:
         line.visible = diagonals_visible
     
-    axes_line_kwargs = dict(
-        color='black',
-        nonselection_color='black',
-        alpha=0.4,
-        nonselection_alpha=0.4,
-    ) 
-
     axes_lines = [
-        fig.line(x=bounds, y=1, **line_kwargs),
-        fig.line(x=1, y=bounds, **line_kwargs),
+        fig.line(x=bounds, y=0, name='axes_line', **line_kwargs),
+        fig.line(x=0, y=bounds, name='axes_line', **line_kwargs),
     ]
 
     for line in axes_lines:
@@ -495,6 +507,12 @@ def scatter(df=None,
                                    name='hists_y',
                                   ),
     }
+
+    if title is not None:
+        hist_figs['x'].title.text = title
+
+    # Name the title to give javascript easy access to it.
+    hist_figs['x'].title.name = 'title'
 
     for axis, name in [('x', x_name), ('y', y_name)]:
         for data_type in ['all', 'bins_left', 'bins_right']:
@@ -607,6 +625,9 @@ def scatter(df=None,
         if col_name in numerical_cols:
             formatter = bokeh.models.widgets.NumberFormatter(format='0.00')
             width = 50
+        elif 'gene' in col_name:
+            formatter = bokeh.models.widgets.HTMLTemplateFormatter(template='<a href="https://www.genecards.org/cgi-bin/carddisp.pl?gene=<%= value %>" target="_blank"><%= value %></a>')
+            width = 100
         else:
             formatter = None
             width = min(500, int(12 * mean_length))
@@ -636,7 +657,7 @@ def scatter(df=None,
                                           )
     
     # Callback to filter the table when selection changes.
-    scatter_source.js_on_change('selected', build_callback('scatter_selection'))
+    scatter_source.selected.js_on_change('indices', build_callback('scatter_selection'))
     
     labels = bokeh.models.LabelSet(x='x',
                                    y='y',
@@ -741,9 +762,6 @@ def scatter(df=None,
         ]
         heatmap_fig.add_tools(hover)
 
-        first_row = [heatmap_fig]
-        heatmap_source.js_on_change('selected', build_callback('scatter_heatmap'))
-
         def make_tick_formatter(order):
             return '''dict = {dict};\nreturn dict[tick].slice(0, 15);'''.format(dict=dict(enumerate(order)))
         
@@ -761,6 +779,7 @@ def scatter(df=None,
         name_pairs = list(zip(heatmap_source.data['x_name'], heatmap_source.data['y_name']))
         initial_index = name_pairs.index((x_name, y_name))
         heatmap_source.selected = bokeh.models.Selection(indices=[initial_index])
+        heatmap_source.selected.js_on_change('indices', build_callback('scatter_heatmap'))
 
         heatmap_fig.min_border = 1
         
@@ -800,6 +819,27 @@ def scatter(df=None,
         callback = build_callback('scatter_cluster_button', format_kwargs=format_kwargs)
         cluster_button.js_on_click(callback)
 
+    elif two_level_index:
+        menu_callback = build_callback('scatter_two_level_menu')
+
+        menus = {}
+        for level in (0, 1):
+            level_name = original_df.columns.names[level]
+            if level_name is None:
+                level_name = level
+
+            options = [v for v in original_df.columns.levels[level] if v != 'gene' and v != '']
+
+            for names, axis in zip(initial_xy_names, ('x', 'y')):
+                menus[axis, level] = bokeh.models.widgets.MultiSelect(title='{} {}'.format(axis.upper(), level_name),
+                                                                      options=options,
+                                                                      value=[names[level]],
+                                                                      size=min(10, len(options)),
+                                                                      name='{}_{}_menu'.format(axis, level),
+                                                                      width=400,
+                                                                     )
+                menus[axis, level].js_on_change('value', menu_callback)
+
     else:
         x_menu = bokeh.models.widgets.MultiSelect(title='X',
                                                   options=numerical_cols,
@@ -814,15 +854,14 @@ def scatter(df=None,
                                                   name='y_menu',
                                                  )
         
-        # Just a placeholder so that we can assume cluster_button exists.
-        cluster_button = bokeh.models.widgets.Toggle(name='cluster_button')
-
         menu_callback = build_callback('scatter_menu')
         x_menu.js_on_change('value', menu_callback)
         y_menu.js_on_change('value', menu_callback)
-        
-        first_row = [bokeh.layouts.widgetbox([x_menu, y_menu])],
-    
+
+    if not heatmap:
+        # Just a placeholder so that we can assume cluster_button exists.
+        cluster_button = bokeh.models.widgets.Toggle(name='cluster_button')
+
     # Button to toggle labels.
     label_button = bokeh.models.widgets.Toggle(label='label selected points',
                                                width=50,
@@ -851,16 +890,16 @@ def scatter(df=None,
     label_menu.js_on_change('value', build_callback('scatter_label'))
 
     # Menu to choose color source.
-    color_menu = bokeh.models.widgets.Select(title='Color by:',
+    color_menu = bokeh.models.widgets.MultiSelect(title='Color by:',
                                              options=color_options,
-                                             value=color_options[-1],
+                                             value=[color_options[-1]],
                                              name='color_menu',
                                             )
     color_menu.js_on_change('value', build_callback('scatter_color'))
 
     # Radio group to choose whether to draw a vertical/horizontal grid or
     # diagonal guide lines. 
-    options = ['grid', 'diagonal', 'none']
+    options = ['grid', 'diagonal', 'diagonal+axes', 'none']
     active = options.index(grid)
     grid_options = bokeh.models.widgets.RadioGroup(labels=options,
                                                    active=active,
@@ -898,6 +937,14 @@ def scatter(df=None,
     callback = build_callback('scatter_save_button', format_kwargs=dict(column_names=str(table_col_names)))
     save_button.js_on_click(callback)
     
+    # button to dump annotations to file.
+    annotation_button = bokeh.models.widgets.Button(label='save annotations to file',
+                                                    width=50,
+                                                    name='annotation_button',
+                                                   )
+    callback = build_callback('scatter_annotation_button', format_kwargs=dict(column_names=str(table_col_names)))
+    annotation_button.js_on_click(callback)
+    
     if alpha_widget_type == 'slider':
         alpha_widget = bokeh.models.Slider(start=0.,
                                            end=1.,
@@ -909,7 +956,7 @@ def scatter(df=None,
     elif alpha_widget_type == 'text':
         alpha_widget = bokeh.models.TextInput(title='alpha', name='alpha', value=str(initial_alpha))
     else:
-        raise valueerror('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
+        raise ValueError('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
 
     alpha_widget.js_on_change('value', build_callback('scatter_alpha'))
     
@@ -929,7 +976,34 @@ def scatter(df=None,
                                                   name='marker_size',
                                                  )
         size_widget.js_on_change('value', build_callback('scatter_size_menu'))
+    
+    rect_source = bokeh.models.ColumnDataSource(data={
+        'x': [],
+        'y': [],
+        'width': [],
+        'height': [],
+    }, name='rect_source')
 
+    rects = fig.rect('x', 'y', 'width', 'height',
+                     source=rect_source,
+                     fill_alpha=0,
+                     line_color='black',
+                     line_alpha=0.5,
+                    )
+    rect_annotater = bokeh.models.BoxEditTool(renderers=[rects])
+    fig.add_tools(rect_annotater)
+    
+    cross_source = bokeh.models.ColumnDataSource(data={
+        'x': [],
+        'y': [],
+    }, name='cross_source')
+
+    crosses = fig.cross('x', 'y', size=25,
+                        line_color='black',
+                        source=cross_source,
+                       )
+    cross_annotater = bokeh.models.PointDrawTool(renderers=[crosses])
+    fig.add_tools(cross_annotater)
 
     fig.min_border = 1
 
@@ -946,6 +1020,7 @@ def scatter(df=None,
         case_sensitive,
         subset_menu,
         save_button,
+        annotation_button,
     ]
 
     if 'table' in hide_widgets:
@@ -962,16 +1037,11 @@ def scatter(df=None,
 
     if not show_label_by_menu:
         hide_widgets.add('label_menu')
-
+    
     if len(subset_options) == 1:
         hide_widgets.add('subset_menu')
 
     widgets = [w for w in widgets if w.name not in hide_widgets]
-
-    if not heatmap:
-        widgets = [x_menu, y_menu] + widgets
-
-    widget_box = bokeh.layouts.widgetbox(children=widgets)
 
     #toolbar = bokeh.models.ToolbarBox(tools=fig.toolbar.tools, merge_tools=False)
     toolbar = bokeh.models.ToolbarBox(toolbar=fig.toolbar)
@@ -981,15 +1051,31 @@ def scatter(df=None,
         bokeh.layouts.column(children=[hist_figs['x'], fig]),
         bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), hist_figs['y']]),
         bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=100), toolbar]),
-        bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
-                                       widget_box,
-                                      ]),
     ]
-
     if heatmap:
         heatmap_column = bokeh.layouts.column(children=[dendro_fig, heatmap_fig])
-        columns = columns[:-1] + [heatmap_column] + columns[-1:]
-
+        columns.append(heatmap_column)
+        widget_box = bokeh.layouts.widgetbox(children=widgets)
+        final_column = bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
+                                                        widget_box,
+                                                        ])
+    else:
+        if not two_level_index:
+            widgets = [x_menu, y_menu] + widgets
+            widget_box = bokeh.layouts.widgetbox(children=widgets)
+            final_column = bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
+                                                          widget_box,
+                                                         ])
+        else:
+            x_row = bokeh.layouts.row(children=[menus['x', 0], menus['x', 1]])
+            y_row = bokeh.layouts.row(children=[menus['y', 0], menus['y', 1]])
+            widget_box = bokeh.layouts.widgetbox(children=widgets)
+            final_column = bokeh.layouts.column(children=[bokeh.layouts.Spacer(height=min_border),
+                                                          x_row, y_row,
+                                                          widget_box,
+                                                         ])
+    columns.append(final_column)
+        
     rows = [
         bokeh.layouts.row(children=columns),
     ]
@@ -1060,14 +1146,14 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
 
     def make_color_string(c):
         array = map(int, np.array(matplotlib.colors.to_rgb(c)) * 255)
-        return 'rgba({0}, {1}, {2})'.format(*array)
+        return 'rgba({0}, {1}, {2}, '.format(*array)
     df['_color'] = color_series.map(make_color_string)
 
     template_fn = os.path.join(os.path.dirname(__file__), 'template_inline.html')
     html_template = open(template_fn).read()
 
-    encoded_data = base64.b64encode(df.to_csv())
-    URI = "'data:text/plain;base64,{0}'".format(encoded_data)
+    encoded_data = base64.b64encode(df.to_csv().encode())
+    URI = "'data:text/plain;base64,{0}'".format(encoded_data.decode())
 
     # Has to be checked in this order since bool subclasses int.
     if isinstance(log_scale, bool):
@@ -1100,5 +1186,5 @@ link.click()\
 '''.format(save_as)
         output = IPython.display.Javascript(js)
     else:
-        output = IPython.display.HTML(template_with_data.decode('utf8'))
+        output = IPython.display.HTML(template_with_data)
     return output
