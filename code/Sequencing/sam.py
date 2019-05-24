@@ -1097,9 +1097,6 @@ def merge_adjacent_alignments(first, second, ref_seqs):
     if first == second:
         return first
 
-    first_covered = interval.get_covered(first)
-    second_covered = interval.get_covered(second)
-    
     if first.reference_name != second.reference_name:
         return None
     else:
@@ -1109,24 +1106,37 @@ def merge_adjacent_alignments(first, second, ref_seqs):
         return None
 
     left_query, right_query = sorted([first, second], key=query_interval)
+    left_covered = interval.get_covered(left_query)
+    right_covered = interval.get_covered(right_query)
 
     # Ensure that the alignments point towards each other.
     strand = get_strand(first)
     if strand == '+':
-        if left_query.reference_end > right_query.reference_start:
-            return None
-    elif strand == '-':
-        if right_query.reference_start > left_query.reference_end:
+        left_cropped = crop_al_to_query_int(left_query, 0, right_covered.start - 1)
+        if left_cropped is None:
+            # left alignment doesn't cover any query not covered by right
             return None
 
-    if interval.are_adjacent(first_covered, second_covered):
+        if left_cropped.reference_end > right_query.reference_start:
+            return None
+
+    elif strand == '-':
+        right_cropped = crop_al_to_query_int(right_query, left_covered.end + 1, np.inf)
+        if right_cropped is None:
+           # right alignment doesn't cover any query not covered by left
+           return None
+
+        if right_cropped.reference_end > left_query.reference_start:
+            return None
+
+    if interval.are_adjacent(left_covered, right_covered):
         left_cropped, right_cropped = left_query, right_query
 
-    elif interval.are_disjoint(first_covered, second_covered):
+    elif interval.are_disjoint(left_covered, right_covered):
         return None
 
     else:
-        overlap = first_covered & second_covered
+        overlap = left_covered & right_covered
         left_ceds = cumulative_edit_distances(left_query, ref_seq, overlap, False)
         right_ceds = cumulative_edit_distances(right_query, ref_seq, overlap, True)
 
