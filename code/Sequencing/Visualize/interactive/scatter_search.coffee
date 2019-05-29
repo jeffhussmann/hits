@@ -18,4 +18,4 @@ if query != ''
         all_matches.push matches...
 
 models['scatter_source'].selected.indices = all_matches
-models['scatter_selection_callback'].func(models['scatter_source'], 'from_search', require, exports)
+#models['scatter_selection_callback'].func(models['scatter_source'].selected, 'from_search', require, exports)

@@ -1,3 +1,4 @@
+import sys
 import os
 import tempfile
 import logging
@@ -587,10 +588,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         STAR_command.extend([
             '--alignEndsType', 'EndToEnd',
         ])
-        #STAR_command.extend([
-        #    '--outFilterScoreMinOverLread', '0.9',
-        #])
-        pass
 
     else:
         raise ValueError(mode)
@@ -601,7 +598,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     if Path(R1_fn).suffix == '.gz':
         STAR_command.extend(['--readFilesCommand', 'zcat'])
 
-    subprocess.check_output(STAR_command)
+    subprocess.run(STAR_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     initial_bam_fn = str(output_prefix) + bam_suffix
 
@@ -611,7 +608,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         shutil.move(str(initial_bam_fn), str(bam_fn))
 
     if sort:
-        pysam.index(str(bam_fn))
+        pysam.index(bam_fn)
 
     return bam_fn
 
@@ -677,3 +674,28 @@ def map_bwa_mem(reads,
         fh = pysam.AlignmentFile(bwa_process.stdout)
         for mapping in fh:
             yield mapping
+
+def map_minimap2(fastq_fn, index, bam_fn):
+    minimap2_command = [
+        'minimap2',
+        '-a', # sam output
+        '-Y', # use soft clipping for supplmentary alignments instead of hard clipping
+        '-P', # (roughly equivalent to?) report all
+        '--MD', # populate MD tags
+        '-r', '20', # max bandwidth
+        str(index),
+        str(fastq_fn),
+    ]
+
+    minimap2_process = subprocess.Popen(minimap2_command,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.DEVNULL,
+                                       )
+
+    view_command = ['samtools', 'view', '-b', '-o', str(bam_fn)]
+    view_process = subprocess.Popen(view_command,
+                                    stdin=minimap2_process.stdout,
+                                   )
+
+    minimap2_process.stdout.close()
+    view_process.communicate()

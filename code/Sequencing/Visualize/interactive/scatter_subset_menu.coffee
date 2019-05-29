@@ -9,4 +9,4 @@ if query != ''
     selection = subset_indices[query]
 
 models['scatter_source'].selected.indices = selection
-models['scatter_selection_callback'].func(models['scatter_source'], 'from_subset', require, exports)
+#models['scatter_selection_callback'].func(models['scatter_source'], 'from_subset', require, exports)

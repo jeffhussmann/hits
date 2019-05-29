@@ -4,7 +4,8 @@ import itertools
 import sys
 import pysam
 import argparse
-from collections import Counter
+import copy
+from collections import Counter, defaultdict
 
 from . import utilities
 from . import fastq
@@ -143,78 +144,87 @@ def generate_alignments(query,
                         indel_penalty=-5,
                         max_alignments=1,
                         min_score=-np.inf,
+                        N_matches=True,
+                        insertion_penalty=None,
+                        deletion_penalty=None,
                        ):
+
+    force_query_start = False
+    force_target_start = False
+    force_either_start = False
+
+    force_query_end = False
+    force_target_end = False
+    force_edge_end = False
+
     if alignment_type == 'local':
-        force_query_start = False
-        force_target_start = False
-        force_either_start = False
-        force_query_end = False
-        force_edge_end = False
+        # no forces need to be set to True
+        pass
 
     elif alignment_type == 'edge':
-        force_query_start = False
-        force_target_start = False
-        force_either_start = False
-        force_query_end = False
         force_edge_end = True
 
     elif alignment_type == 'barcode':
         force_query_start = True
         force_target_start = True
-        force_either_start = False
-        force_query_end = False
         force_edge_end = True
 
     elif alignment_type == 'overlap':
-        force_query_start = False
-        force_target_start = False
         force_either_start = True
-        force_query_end = False
         force_edge_end = True
     
     elif alignment_type == 'query_end':
-        force_query_start = False
-        force_target_start = False
         force_either_start = True
         force_query_end = True
-        force_edge_end = False
 
     elif alignment_type == 'unpaired_adapter':
         force_query_start = True
-        force_target_start = False
-        force_either_start = False
-        force_query_end = False
         force_edge_end = True
 
     elif alignment_type == 'IVT':
         force_query_start = True
-        force_target_start = False
-        force_either_start = False
-        force_query_end = False
-        force_edge_end = False
 
     elif alignment_type == 'global':
         force_query_start = True
         force_target_start = True
-        force_either_start = False
-        force_query_end = False
         force_edge_end = True
+
+    elif alignment_type == 'whole_query':
+        force_query_start = True
+        force_query_end = True
+
+    elif alignment_type == 'fixed_start':
+        force_query_start = True
+        force_target_start = True
+
+    elif alignment_type == 'fixed_end':
+        force_query_end = True
+        force_target_end = True
 
     query_bytes = query.encode()
     target_bytes = target.encode()
+
+    if indel_penalty is not None:
+        insertion_penalty = indel_penalty
+        deletion_penalty = indel_penalty
 
     matrices = generate_matrices(query_bytes,
                                  target_bytes,
                                  match_bonus,
                                  mismatch_penalty,
-                                 indel_penalty,
+                                 insertion_penalty,
+                                 deletion_penalty,
                                  force_query_start,
                                  force_target_start,
                                  force_either_start,
+                                 N_matches,
                                 )
     
     cells_seen = set()
-    if force_edge_end:
+
+    if force_query_end and force_target_end:
+        possible_ends = propose_bottom_right_corner(matrices['scores'])
+    elif force_edge_end:
         possible_ends = propose_edge_ends(matrices['scores'], cells_seen, min_score, max_alignments=max_alignments)
     elif force_query_end:
         possible_ends = propose_query_edge_ends(matrices['scores'], cells_seen, min_score, max_alignments=max_alignments)
@@ -244,6 +254,10 @@ def generate_alignments(query,
             pass
 
     return alignments
+
+def propose_bottom_right_corner(score_matrix):
+    num_rows, num_cols = score_matrix.shape
+    yield (num_rows - 1, num_cols - 1)
 
 def propose_edge_ends(score_matrix,
                       cells_seen,
@@ -320,7 +334,7 @@ def global_alignment(query, target, **kwargs):
     al, = generate_alignments(query, target, 'global', **kwargs)
     return al
 
-def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
+def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=False):
     ''' Infer the length of the insert represented by R1 and R2 by performing
         a semi-local alignment of R1 and the reverse complement of R2 with
         the expected adapter sequences prepended to each read.
@@ -332,10 +346,12 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
                                       'overlap',
                                       2,
                                       -1,
-                                      -5,
+                                      indel_penalty,
                                       1,
                                       0,
                                      )
+
+    results = {'alignment': alignment}
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
@@ -357,10 +373,16 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         illegal_deletion = any(d <= R2_start for d in alignment['deletions'])
     
     if illegal_insertion or illegal_deletion:
-        return 'illegal', len(R1) + len(R2), -1
+        if illegal_insertion:
+            results['failed'] = 'illegal insertion'
+        elif illegal_deletion:
+            results['failed'] = 'illegal insertion'
+
+        return results
 
     if len(alignment['path']) == 0:
-        return 'illegal', len(R1) + len(R2), -1
+        results['failed'] = 'no alignment'
+        return results
 
     if R1_start_in_R2 != SOFT_CLIPPED and R2_start_in_R1 != SOFT_CLIPPED:
         length_from_R1 = R2_start_in_R1 - R1_start + 1
@@ -387,33 +409,28 @@ def infer_insert_length(R1, R2, before_R1, before_R2, solid=False):
         length_from_R2 = (R2_start - last_R2_index + 1) + (len(R1.seq) - 1)
         
         if first_R1_index == 0 or last_R2_index == 0:
-            return 'illegal', 500, -1 
+            results['failed'] = 'only adapters'
+            return results
 
     if length_from_R1 < -1 or length_from_R2 < -1:
         # Negative insert lengths are non-physical. Even though I don't
         # understand it, -1 is relatively common so is tolerated.
-        return 'illegal', 500, -1
+        results['failed'] = 'negative insert length'
+        return results
 
-    insert_length = length_from_R1
-
-    if 2 * len(alignment['path']) - alignment['score'] > .2 * len(alignment['path']):
-        status = 'bad'
+    if alignment['score_ratio'] < 0.7:
+        results['failed'] = 'bad score'
     else:
-        status = 'good'
-    
-    if status == 'good' and (length_from_R1 != length_from_R2):
-        if solid and not(alignment['insertions'] or alignment['deletions']):
-            pass
+        if length_from_R1 != length_from_R2:
+            if solid and not(alignment['insertions'] or alignment['deletions']):
+                pass
+            else:
+                # This shouldn't be possible without an illegal indel.
+                results['failed'] = 'length mismatch'
         else:
-            # This shouldn't be possible without an illegal indel.
-            #print('length from R1', length_from_R1)
-            #print('length from R2', length_from_R2)
-            #print(diagnostic(R1, R2, before_R1, before_R2, alignment)
-            return 'illegal', 500, -1
+            results['length'] = length_from_R1
     
-    #print_diagnostic(R1, R2, before_R1, before_R2, alignment)
-
-    return status, insert_length, alignment
+    return results
 
 def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     extended_R1 = (before_R1.lower() + R1.seq).decode()
@@ -561,8 +578,13 @@ def align_reads(target_fasta_fn,
         for _ in generator():
             pass
 
-def stitch_read_pair(R1, R2, before_R1='', before_R2=''):    
-    status, insert_length, alignment = infer_insert_length(R1, R2, before_R1, before_R2)
+def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
+    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty)
+    if 'failed' in results:
+        insert_length = len(R1) + len(R2)
+    else:
+        insert_length = results['length']
+
     R2_rc = R2.reverse_complement()
 
     overlap_start = max(0, insert_length - len(R1))
@@ -593,3 +615,205 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2=''):
     stitched = just_R1 + overlap + just_R2
 
     return stitched
+
+class SeedAndExtender():
+    def __init__(self, target_seq_bytes, max_seed_length, header, target_name):
+        if not isinstance(target_seq_bytes, bytes):
+            target_seq_bytes = target_seq_bytes.encode()
+            
+        self.target_seq_bytes = target_seq_bytes
+        self.max_seed_length = max_seed_length
+        self.header = header
+        self.target_name = target_name
+        
+        seed_locations = defaultdict(set)
+        
+        for k in range(1, max_seed_length + 1):
+            for start in range(len(target_seq_bytes) - k + 1):
+                k_mer = target_seq_bytes[start:start + k]
+                seed_locations[k_mer].add(start)
+                
+        self.seed_locations = seed_locations
+
+    def seed_and_extend(self, query_seq_bytes, true_query_start, true_query_end, query_name):
+        ''' true_query_end should point one past the end of the seed '''
+        if not isinstance(query_seq_bytes, bytes):
+            query_seq_bytes = query_seq_bytes.encode()
+
+        # If the requested seed is longer than max_seed_length, truncate it, then check if
+        # the extended truncated seed at least covers the original seed.
+        seed_length = true_query_end - true_query_start
+        if seed_length > self.max_seed_length:
+            initial_true_query_end = true_query_end
+            true_query_end = true_query_start + self.max_seed_length
+        else:
+            initial_true_query_end = true_query_end
+
+        als = []
+        for is_reverse in [True, False]:
+            if is_reverse:
+                seed_query_start = len(query_seq_bytes) - true_query_end
+                seed_query_end = len(query_seq_bytes) - true_query_start
+                possibly_RCd_query_seq = utilities.reverse_complement(query_seq_bytes)
+
+                def covers_original_seed(query_start, query_end):
+                    return query_start <= (len(query_seq_bytes) - initial_true_query_end)
+
+            else:
+                seed_query_start = true_query_start
+                seed_query_end = true_query_end
+                possibly_RCd_query_seq = query_seq_bytes
+
+                def covers_original_seed(query_start, query_end):
+                    return query_end >= initial_true_query_end
+
+            seed = possibly_RCd_query_seq[seed_query_start:seed_query_end]
+
+            for target_start in self.seed_locations[seed]:
+                query_start, query_end, target_start = extend_perfect_seed(possibly_RCd_query_seq,
+                                                                           self.target_seq_bytes,
+                                                                           seed_query_start,
+                                                                           seed_query_end,
+                                                                           target_start,
+                                                                           target_start + len(seed),
+                                                                          )
+                if not covers_original_seed(query_start, query_end):
+                    continue
+
+                cigar = [(sam.BAM_CMATCH, query_end - query_start)]
+                if query_start > 0:
+                    cigar = [(sam.BAM_CSOFT_CLIP, query_start)] + cigar
+                if query_end < len(query_seq_bytes):
+                    cigar = cigar + [(sam.BAM_CSOFT_CLIP, len(query_seq_bytes) - query_end)]
+
+                al = pysam.AlignedSegment(self.header)
+                al.cigartuples = cigar
+                al.is_reverse = is_reverse
+                al.is_unmapped = False
+                al.reference_name = self.target_name
+                al.query_sequence = possibly_RCd_query_seq
+                al.query_qualities = [41] * len(query_seq_bytes)
+                al.query_name = query_name
+
+                al.reference_start = target_start
+
+                als.append(al)
+
+        return als
+
+def extend_alignment(initial_al, target_seq_bytes):
+    query_seq_bytes = initial_al.query_sequence.encode()
+    
+    if not isinstance(target_seq_bytes, bytes):
+        target_seq_bytes = target_seq_bytes.encode()
+
+    new_query_start, new_query_end, new_target_start = extend_perfect_seed(query_seq_bytes, target_seq_bytes, initial_al.query_alignment_start, initial_al.query_alignment_end, initial_al.reference_start, initial_al.reference_end)
+    added_to_start = initial_al.query_alignment_start - new_query_start
+    added_to_end = new_query_end - initial_al.query_alignment_end
+    cigar = initial_al.cigar
+    
+    if added_to_start > 0:
+        # Remove from starting soft clip...
+        kind, length = cigar[0]
+        if kind != sam.BAM_CSOFT_CLIP:
+            raise ValueError('expected soft-clip, got {}'.format(kind))
+        
+        cigar[0] = (kind, length - added_to_start)
+        
+        # ... and add to subsequent match.
+        kind, length = cigar[1]
+        if kind != sam.BAM_CMATCH:
+            raise ValueError('expected match, got {}'.format(kind))
+            
+        cigar[1] = (kind, length + added_to_start)
+        
+    if added_to_end > 0:
+        # Remove from ending soft clip...
+        kind, length = cigar[-1]
+        if kind != sam.BAM_CSOFT_CLIP:
+            raise ValueError('expected soft-clip, got {}'.format(kind))
+        
+        cigar[-1] = (kind, length - added_to_end)
+        
+        # ... and add to subsequent match.
+        kind, length = cigar[-2]
+        if kind != sam.BAM_CMATCH:
+            raise ValueError('expected match, got {}'.format(kind))
+            
+        cigar[-2] = (kind, length + added_to_end)
+
+    if added_to_start > 0 or added_to_end > 0:
+        new_al = copy.deepcopy(initial_al)
+        new_al.cigar = cigar
+        new_al.reference_start = new_target_start
+    else:
+        new_al = initial_al
+    
+    return new_al
+
+def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_before=True, extend_after=True):
+    query_seq_bytes = initial_al.query_sequence.encode()
+    
+    if not isinstance(target_seq_bytes, bytes):
+        target_seq_bytes = target_seq_bytes.encode()
+
+    gained_before, gained_after = extend_perfect_seed_with_one_nt_deletion(query_seq_bytes, target_seq_bytes, initial_al.query_alignment_start, initial_al.query_alignment_end, initial_al.reference_start, initial_al.reference_end)
+    cigar = initial_al.cigar
+    
+    if gained_before > 0 and extend_before:
+        # Remove from starting soft clip...
+        kind, length = cigar[0]
+        if kind != sam.BAM_CSOFT_CLIP:
+            raise ValueError('expected soft-clip, got {}'.format(kind))
+        
+        soft_clip_length = length - gained_before
+        if soft_clip_length > 0:
+            soft_clip = [(kind, soft_clip_length)]
+        else:
+            soft_clip = []
+        
+        # ... and add match and deletion.
+        new_match = (sam.BAM_CMATCH, gained_before)
+        deletion = (sam.BAM_CDEL, 1)
+
+        cigar = soft_clip + [new_match, deletion] + cigar[1:]
+            
+    if gained_after > 0 and extend_after:
+        # Remove from ending soft clip...
+        kind, length = cigar[-1]
+        if kind != sam.BAM_CSOFT_CLIP:
+            raise ValueError('expected soft-clip, got {}'.format(kind))
+        
+        soft_clip_length = length - gained_after
+        if soft_clip_length > 0:
+            soft_clip = [(kind, soft_clip_length)]
+        else:
+            soft_clip = []
+        
+        # ... and add match and deletion
+        new_match = (sam.BAM_CMATCH, gained_after)
+        deletion = (sam.BAM_CDEL, 1)
+
+        cigar = cigar[:-1] + [deletion, new_match] + soft_clip
+        
+    if (gained_before > 0 and extend_before) or (gained_after > 0 and extend_after):
+        new_al = copy.deepcopy(initial_al)
+        new_al.cigar = cigar
+        if (gained_before > 0 and extend_before):
+            # reference_start changes by 1 for deletion plus gained_before
+            new_al.reference_start = initial_al.reference_start - 1 - gained_before
+    else:
+        new_al = initial_al
+    
+    return new_al
+
+def extend_repeatedly(initial_al, target_seq_bytes, extend_before=True, extend_after=True):
+    ''' extend with 1 nt deletions until doing so doesn't change the alignment '''
+    
+    extended = initial_al # Confusing to call this 'extended' but helps make the while loop simpler.
+    previous = None
+    while extended is not previous:
+        previous = extended
+        extended = extend_alignment_with_one_nt_deletion(previous, target_seq_bytes, extend_before, extend_after)
+
+    return extended

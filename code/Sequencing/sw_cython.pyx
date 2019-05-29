@@ -11,10 +11,12 @@ def generate_matrices(char* query,
                       char* target,
                       int match_bonus,
                       int mismatch_penalty,
-                      int indel_penalty,
-                      force_query_start,
-                      force_target_start,
-                      force_either_start,
+                      int insertion_penalty,
+                      int deletion_penalty,
+                      bint force_query_start,
+                      bint force_target_start,
+                      bint force_either_start,
+                      bint N_matches,
                      ):
     cdef unsigned int row, col, next_col, next_row
     cdef int match_or_mismatch, diagonal, from_left, from_above, new_score, unconstrained_start
@@ -27,32 +29,36 @@ def generate_matrices(char* query,
     cdef long[:, ::1] col_directions_view = col_directions
 
     # If the alignment is constrained to include the start of the query,
-    # indel penalties need to be applied to cells in the first row.
+    # insertion penalties need to be applied to cells in the first column.
     if force_query_start: 
         for row in range(1, len(query) + 1):
-            scores_view[row, 0] = scores_view[row - 1, 0] + indel_penalty
+            scores_view[row, 0] = scores_view[row - 1, 0] + insertion_penalty
             row_directions_view[row, 0] = -1
 
     # If the alignment is constrained to include the start of the target,
-    # indel penalties need to be applied to cells in the first column.
+    # deletion penalties need to be applied to cells in the first row.
     if force_target_start:
         for col in range(1, len(target) + 1):
-            scores_view[0, col] = scores_view[0, col - 1] + indel_penalty
+            scores_view[0, col] = scores_view[0, col - 1] + deletion_penalty
             col_directions_view[0, col] = -1
 
     unconstrained_start = not (force_query_start or force_target_start or force_either_start)
 
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
-            if query[row - 1] == 'N' or target[col - 1] == 'N':
+            if N_matches and (query[row - 1] == 'N' or target[col - 1] == 'N'):
                 match_or_mismatch = match_bonus
             elif query[row - 1] == target[col - 1]:
                 match_or_mismatch = match_bonus
             else:
                 match_or_mismatch = mismatch_penalty
             diagonal = scores_view[row - 1, col - 1] + match_or_mismatch
-            from_left = scores_view[row, col - 1] + indel_penalty
-            from_above = scores_view[row - 1, col] + indel_penalty
+
+            # moving left to right is a deletion
+            from_left = scores_view[row, col - 1] + deletion_penalty
+            # moving top to bottom is an insertion
+            from_above = scores_view[row - 1, col] + insertion_penalty
+
             new_score = max(diagonal, from_left, from_above)
             if unconstrained_start:
                 new_score = max(0, new_score)
@@ -174,3 +180,34 @@ def backtrack_cython(char* query,
                 }
 
     return alignment
+
+def extend_perfect_seed(char* query_seq, char* target_seq, int query_start, int query_end, int target_start, int target_end):
+    while query_start > 0 and target_start > 0 and (query_seq[query_start - 1] == target_seq[target_start - 1]):
+        query_start -= 1
+        target_start -= 1
+
+    while query_end < len(query_seq) and target_end < len(target_seq) and (query_seq[query_end] == target_seq[target_end]):
+        query_end += 1
+        target_end += 1
+
+    return query_start, query_end, target_start
+
+def extend_perfect_seed_with_one_nt_deletion(char* query_seq, char* target_seq, int query_start, int query_end, int target_start, int target_end):
+    cdef gained_before = 0
+    cdef gained_after = 0
+    
+    target_start -= 1
+    
+    while query_start > 0 and target_start > 0 and (query_seq[query_start - 1] == target_seq[target_start - 1]):
+        gained_before += 1
+        query_start -= 1
+        target_start -= 1
+
+    target_end += 1
+    
+    while query_end < len(query_seq) and target_end < len(target_seq) and (query_seq[query_end] == target_seq[target_end]):
+        gained_after += 1
+        query_end += 1
+        target_end += 1
+
+    return gained_before, gained_after

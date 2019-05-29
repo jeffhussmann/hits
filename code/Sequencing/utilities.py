@@ -143,7 +143,7 @@ def all_consecutive(s):
 def empirical_cdf(values):
     ''' From stackoverflow. '''
     sorted_values = np.sort(values)
-    cumulative = np.true_divide(np.arange(len(sorted_values)), len(sorted_values))
+    cumulative = np.true_divide(np.arange(len(sorted_values)) + 1, len(sorted_values))
     return sorted_values, cumulative
 
 def mers(k, include_N=False):
@@ -184,6 +184,24 @@ def memoized_property(f):
     
     return memoized_f
 
+def memoized_with_key(f):
+    @functools.wraps(f)
+    def memoized_f(self, key):
+        attr_name = '_' + f.__name__
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, {})
+
+        already_computed = getattr(self, attr_name)
+        if key in already_computed:
+            value = already_computed[key]
+        else:
+            value = f(self, key)
+            already_computed[key] = value
+
+        return value
+
+    return memoized_f
+
 def reservoir_sample(iterable, n):
     sample = []
     for i, item in enumerate(iterable):
@@ -206,6 +224,12 @@ def chunks(iterable, n):
         first = next(iterable)
         rest = islice(iterable, n - 1)
         yield chain([first], rest)
+
+def list_chunks(full_list, n):
+    starts = np.arange(0, len(full_list), n)
+    ends = starts + n
+    chunks = [full_list[start:end] for start, end in zip(starts, ends)]
+    return chunks
 
 @contextlib.contextmanager
 def possibly_fn(fn=None):

@@ -3,7 +3,10 @@ from numbers import Number
 from . import sam
 
 def are_disjoint(first, second):
-    return first.start > second.end or second.start > first.end
+    if first.is_empty or second.is_empty:
+        return True
+    else:
+        return first.start > second.end or second.start > first.end
 
 def are_adjacent(first, second):
     return first.start == second.end + 1 or second.start == first.end + 1
@@ -12,6 +15,30 @@ class Interval(object):
     def __init__(self, start, end):
         self.start = start
         self.end = end
+        self.is_empty = (end < start)
+
+    @classmethod
+    def from_feature(self, feature):
+        ''' only really necessary to set is_empty '''
+        return Interval(feature.start, feature.end)
+
+    @classmethod
+    def empty(self):
+        return Interval(-1, -2)
+    
+    @classmethod
+    def from_slice(self, sl):
+        if sl.start == None:
+            start = 0
+        else:
+            start = sl.start
+
+        if sl.stop == None:
+            end = np.inf
+        else:
+            end = sl.stop - 1 # Note the -1
+
+        return Interval(start, end)
 
     def __or__(self, other):
         if are_disjoint(self, other):
@@ -26,7 +53,10 @@ class Interval(object):
         return DisjointIntervals(intervals)
     
     def __and__(self, other):
-        if are_disjoint(self, other):
+        if isinstance(other, DisjointIntervals):
+            # Defer to definition in DisjointIntervals
+            return other & self
+        elif are_disjoint(self, other):
             return []
         else:
             return Interval(max(self.start, other.start), min(self.end, other.end))
@@ -43,6 +73,10 @@ class Interval(object):
     @property    
     def comparison_key(self):
         return self.start, self.end
+
+    @property
+    def total_length(self):
+        return len(self)
     
     def __lt__(self, other):
         return self.comparison_key < other.comparison_key
@@ -63,7 +97,10 @@ class Interval(object):
         return not self == other
 
     def __len__(self):
-        return self.end - self.start + 1
+        if self.is_empty:
+            return 0
+        else:
+            return self.end - self.start + 1
 
     def __sub__(self, other):
         if isinstance(other, DisjointIntervals):
@@ -88,17 +125,24 @@ class Interval(object):
 class DisjointIntervals(object):
     def __init__(self, intervals):
         self.intervals = sorted([i for i in intervals if i.end >= i.start])
+        self.is_empty = (len(self.intervals) == 0)
         
     def __len__(self):
         return len(self.intervals)
     
     @property
     def start(self):
-        return min(interval.start for interval in self.intervals)
+        if len(self.intervals) == 0:
+            return None
+        else:
+            return min(interval.start for interval in self.intervals)
     
     @property
     def end(self):
-        return max(interval.end for interval in self.intervals)
+        if len(self.intervals) == 0:
+            return None
+        else:
+            return max(interval.end for interval in self.intervals)
     
     def __repr__(self):
         return '{{{}}}'.format(', '.join(map(str, self.intervals)))
@@ -168,11 +212,19 @@ class DisjointIntervals(object):
         if isinstance(other, DisjointIntervals):
             raise NotImplementedError
         else:
-            return DisjointIntervals([interval - other for interval in self.intervals])
+            pieces = []
+            for interval in self.intervals:
+                piece = interval - other
+                if isinstance(piece, Interval):
+                    pieces.append(piece)
+                elif isinstance(piece, DisjointIntervals):
+                    pieces.extend(piece)
+
+            return DisjointIntervals(pieces)
 
 def get_covered(alignment):
-    if alignment.is_unmapped:
-        return Interval(-1, -1)
+    if alignment is None or alignment.is_unmapped:
+        return Interval(-1, -2)
     else:
         return Interval(*sam.query_interval(alignment))
 
