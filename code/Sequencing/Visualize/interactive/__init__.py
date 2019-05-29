@@ -590,10 +590,10 @@ def scatter(df=None,
     
     hover = bokeh.models.HoverTool(renderers=[scatter])
     hover.tooltips = [
-        (df.index.name, '@{0}'.format(df.index.name)),
+        (df.index.name, '@{{{0}}}'.format(df.index.name)),
     ]
     for key in hover_keys:
-        hover.tooltips.append((key, '@{0}'.format(key)))
+        hover.tooltips.append((key, '@{{{0}}}'.format(key)))
     fig.add_tools(hover)
 
     # Set up the table.
