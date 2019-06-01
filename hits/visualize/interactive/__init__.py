@@ -13,7 +13,6 @@ import bokeh.plotting
 import pandas as pd
 import matplotlib.colors
 import matplotlib.cm
-import six
 import IPython.display
 
 from .external_coffeescript import build_callback
@@ -301,7 +300,7 @@ def scatter(df=None,
     else:
         show_color_by_menu = True
 
-        if isinstance(color_by, six.string_types):
+        if isinstance(color_by, str):
             color_options = ['', color_by]
         else:
             color_options = [''] + list(color_by)
@@ -312,7 +311,7 @@ def scatter(df=None,
     if label_by is None:
         label_by = df.index.name
 
-    if isinstance(label_by, six.string_types):
+    if isinstance(label_by, str):
         show_label_by_menu = False
         label_options = [label_by]
     else:
@@ -324,7 +323,7 @@ def scatter(df=None,
     if isinstance(marker_size, numbers.Number):
         size_widget_type = 'slider'
     else:
-        if isinstance(marker_size, six.string_types):
+        if isinstance(marker_size, str):
             size_options = ['', marker_size]
         else:
             size_options = [''] + list(marker_size)

@@ -12,7 +12,7 @@ import numpy as np
 import ipywidgets
 import yaml
 
-from sequencing import utilities
+from .. import utilities
 
 def load_image(image_fn):
     return matplotlib.image.imread(image_fn)

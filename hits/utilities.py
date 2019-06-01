@@ -1,13 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from itertools import islice, groupby, cycle, product, chain
-from six.moves import zip
 import contextlib
 import sys
 import functools
 import subprocess
 from collections import defaultdict
+from itertools import islice, groupby, cycle, product, chain
 
 import numpy as np
 import pandas as pd
@@ -21,15 +17,9 @@ for uppercase in list(mapping):
     mapping[uppercase.lower()] = mapping[uppercase].lower()
 order = ''.join(mapping)
 
-try:
-    from_bytes = order.encode()
-    to_bytes = ''.join(mapping[f] for f in order).encode()
-    complement_table = bytes.maketrans(from_bytes, to_bytes)
-except AttributeError:
-    # python2 compatibility
-    import string
-    to = ''.join(mapping[f] for f in order)
-    complement_table = string.maketrans(order, to)
+from_bytes = order.encode()
+to_bytes = ''.join(mapping[f] for f in order).encode()
+complement_table = bytes.maketrans(from_bytes, to_bytes)
 
 def complement(seq):
     return seq.translate(complement_table)

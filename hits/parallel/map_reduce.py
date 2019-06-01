@@ -15,7 +15,7 @@ import yaml
 from . import split_file
 from . import split_sra_file
 from . import launcher
-from .. import Serialize, fastq, utilities
+from .. import serialize, fastq, utilities
 
 def extend_stages(whole_stages, specific_stages):
     for whole_stage, specific_stage in zip(whole_stages, specific_stages):

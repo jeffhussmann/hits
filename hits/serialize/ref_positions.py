@@ -1,5 +1,4 @@
-from Sequencing import utilities
-from Circles import variants
+from hits import utilities, variants
 
 extension = 'txt'
 

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from numbers import Number
+
 from . import sam
 
 def are_disjoint(first, second):

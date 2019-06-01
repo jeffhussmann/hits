@@ -1,11 +1,11 @@
-import numpy as np
 import array
 import itertools
 import sys
-import pysam
-import argparse
 import copy
 from collections import Counter, defaultdict
+
+import numpy as np
+import pysam
 
 from . import utilities
 from . import fastq

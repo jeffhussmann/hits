@@ -1,7 +1,8 @@
-import pysam
 import glob
 import os
 from collections import namedtuple
+
+import pysam
 import Bio.SeqIO
 
 def get_all_fasta_file_names(genome_dir):

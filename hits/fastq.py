@@ -8,7 +8,6 @@ from itertools import chain
 from collections import namedtuple
 
 import numpy as np
-from six.moves import zip
 
 from . import utilities
 from .fastq_cython import *
