@@ -1,5 +1,6 @@
-import Bio.Data.CodonTable
 import copy
+
+import Bio.Data.CodonTable
 
 nucleotide_order = 'TCAG'
 nucleotide_to_index = {b: i for i, b in enumerate(nucleotide_order)}

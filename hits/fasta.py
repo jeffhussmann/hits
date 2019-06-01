@@ -1,4 +1,4 @@
-from collections import namedtuple, OrderedDict
+from collections import OrderedDict
 from pathlib import Path
 
 import Bio.SeqIO

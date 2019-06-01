@@ -1,7 +1,10 @@
+import logging
+import copy
+from collections import Counter
+
 import numpy as np
 import pysam
-import logging
-from collections import Counter
+
 from . import sam
 from . import utilities
 from . import fastq
@@ -100,6 +103,9 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     combines them into one mapping, (ab)using BAM_CREF_SKIP to bridge the gap
     (if any) between them.
     '''
+    R1_mapping = copy.deepcopy(R1_mapping)
+    R2_mapping = copy.deepcopy(R2_mapping)
+
     R1_strand = sam.get_strand(R1_mapping)
 
     if R1_strand == '+':
@@ -110,13 +116,17 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     # Soft-clipping at the 3' end of a read should only happen if this is
     # read-through into soft-clipping at the 5' end of the other read.
     # If there is non-physical soft-clipping in this pair, give up now.
+    # Specifically, check if any pairing of read position to ref position
+    # isn't the same.
 
-    if left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP and \
-       left_mapping.reference_end != right_mapping.reference_end:
-        return False
-    if right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP and \
-       right_mapping.reference_start != left_mapping.reference_start:
-        return False
+    if (left_mapping.cigar[-1][0] == sam.BAM_CSOFT_CLIP) or \
+       (right_mapping.cigar[0][0] == sam.BAM_CSOFT_CLIP):
+
+        left_pairs = left_mapping.get_aligned_pairs(matches_only=True)
+        right_pairs = right_mapping.get_aligned_pairs(matches_only=True)
+
+        if left_pairs != right_pairs:
+            return False
 
     # Otherwise, remove all soft-clipping from the mappings, storing the 5'
     # soft-clipped seq and quals from both reads to add back at the end.
@@ -312,8 +322,10 @@ def combine_paired_mappings(R1_mapping, R2_mapping, verbose=False):
     qual = combined_mapping.qual
     seq = combined_mapping.seq
     cigar = combined_mapping.cigar
+
     before = left_clipped['from_start']
     after = right_clipped['from_end']
+
     combined_mapping.cigar = before['cigar'] + cigar + after['cigar']
     combined_mapping.seq = before['seq'] + seq + after['seq']
     combined_mapping.qual = before['qual'] + qual + after['qual']

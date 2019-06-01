@@ -1,12 +1,10 @@
-try:
-    import subprocess32 as subprocess
-except ImportError:
-    import subprocess
+import subprocess
 import os
 import contextlib
-import sequencing.Parallel
-import yaml
 import sys
+
+import yaml
+import hits.parallel
 
 def piece(srr_fn, num_pieces, which_piece, paired=False):
     root, _ = os.path.splitext(srr_fn)
@@ -20,7 +18,7 @@ def piece(srr_fn, num_pieces, which_piece, paired=False):
 
     total_spots = info['total_spots']
 
-    bounds = sequencing.Parallel.get_bounds(total_spots, num_pieces)
+    bounds = hits.parallel.get_bounds(total_spots, num_pieces)
     first = bounds[which_piece] + 1
     last = bounds[which_piece + 1]
 

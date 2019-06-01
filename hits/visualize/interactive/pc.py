@@ -21,7 +21,10 @@ def pc(df):
     fig.add_tools(box_select)
     fig.toolbar.active_drag = box_select
 
-    names = ['{0}: {1}'.format(gn, en) for gn, en in df.columns.values]
+    if df.columns.nlevels == 2:
+        names = ['{0}: {1}'.format(gn, en) for gn, en in df.columns.values]
+    else:
+        names = df.columns
 
     lines = []
     for y, ((row_name, row), color) in enumerate(zip(df.iterrows(), cycle(color_list))):

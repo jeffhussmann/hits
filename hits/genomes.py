@@ -1,12 +1,15 @@
-import pysam
 import glob
 import os
 from collections import namedtuple
+
+import pysam
 import Bio.SeqIO
 
 def get_all_fasta_file_names(genome_dir):
-    fasta_file_names = [fn for fn in glob.glob('{0}/*.fa*'.format(genome_dir))
-                        if not fn.endswith('.fai')]
+    fasta_file_names = [
+        fn for fn in glob.glob('{0}/*.fa*'.format(genome_dir))
+        if not fn.endswith('.fai') and not 'fastq' in fn
+    ]
     return fasta_file_names
 
 def get_all_fai_file_names(genome_dir):
@@ -51,6 +54,9 @@ def build_base_lookup(genome_dir):
     references = {}
 
     def base_lookup(rname, position):
+        if position < 0:
+            raise IndexError
+
         if rname not in references:
             fasta_file_name = genome_index[rname].file_name
             with pysam.Fastafile(fasta_file_name) as fasta_file:
@@ -61,15 +67,13 @@ def build_base_lookup(genome_dir):
 
     return base_lookup
 
-def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
+def build_region_fetcher(genome_dir, load_references=False):
     ''' Returns a function for fetching regions from the genome in genome_dir.
         If load_references == True, loads entire reference sequences into memory
         the first time they are fetched from.
         If the returned function is given a negative start or an end that is
         longer than the seq_name's sequence, the region returned will be
         padded with -.
-        If sam_file is given, use sam_file.getrname to transform tids into
-        RNAMEs.
     '''
     genome_index = get_genome_index(genome_dir)
 
@@ -82,12 +86,6 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
         seq_name: fasta_files[genome_index[seq_name].file_name]
         for seq_name in genome_index
     }
-
-    def possibly_transform_tid(seq_name):
-        ''' pysam AlignedRead's gives ints. ''' 
-        if isinstance(seq_name, int):
-            seq_name = sam_file.getrname(seq_name)
-        return seq_name
 
     references = {}
     def lookup_loaded(seq_name, start, end):
@@ -107,7 +105,6 @@ def build_region_fetcher(genome_dir, load_references=False, sam_file=None):
         lookup = lookup_unloaded
 
     def region_fetcher(seq_name, start, end):
-        seq_name = possibly_transform_tid(seq_name)
         if end < 0:
             return '-'*(end - start)
         if start < 0:

@@ -1,8 +1,9 @@
 import unittest
-import Sequencing.Parallel
-import Sequencing.Parallel.split_file as split_file
-import Sequencing.fastq as fastq
 from collections import defaultdict
+
+from hits import parallel
+from hits.parallel import split_file as split_file
+from hits import fastq as fastq
 
 class TestSplit(unittest.TestCase):
 
@@ -10,7 +11,6 @@ class TestSplit(unittest.TestCase):
         ''' Tests whether joining all which_pieces from piece_of_list recreates
             the original list.
         '''
-        piece_of_list = Sequencing.Parallel.piece_of_list
         list_sizes = range(1000, 1100)
         for size in list_sizes:
             original_list = list(range(size))
@@ -18,10 +18,10 @@ class TestSplit(unittest.TestCase):
             pieces = []
             pieces_joined = []
             for which_piece in range(num_pieces):
-                piece = piece_of_list(original_list,
-                                      num_pieces,
-                                      which_piece,
-                                     )
+                piece = parallel.piece_of_list(original_list,
+                                               num_pieces,
+                                               which_piece,
+                                              )
                 pieces.append(piece)
                 pieces_joined.extend(piece)
 

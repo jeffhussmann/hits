@@ -1,11 +1,11 @@
-import numpy as np
 import array
 import itertools
 import sys
-import pysam
-import argparse
 import copy
 from collections import Counter, defaultdict
+
+import numpy as np
+import pysam
 
 from . import utilities
 from . import fastq
@@ -477,7 +477,7 @@ def align_read(read, targets, min_path_length, header,
                 seq = forward_seq
                 qual = forward_qual
 
-            for alignment in generate_alignments(seq, target_seq, max_alignments=max_alignments_per_target, **kwargs):
+            for alignment in generate_alignments(seq, target_seq, alignment_type, max_alignments=max_alignments, **kwargs):
                 path = alignment['path']
 
                 if len(path) >= min_path_length and alignment['score_ratio'] >= min_score_ratio:

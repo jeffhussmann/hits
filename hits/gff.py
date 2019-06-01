@@ -1,7 +1,4 @@
-from __future__ import print_function
-
 import pprint
-from six.moves import urllib
 
 class Feature(object):
     def __init__(self, line=None):

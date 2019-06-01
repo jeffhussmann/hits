@@ -15,8 +15,7 @@ import yaml
 from . import split_file
 from . import split_sra_file
 from . import launcher
-from .. import Serialize
-from .. import fastq
+from .. import serialize, fastq, utilities
 
 def extend_stages(whole_stages, specific_stages):
     for whole_stage, specific_stage in zip(whole_stages, specific_stages):
@@ -35,6 +34,8 @@ class MapReduceExperiment(object):
     def __init__(self, **kwargs):
         self.group = kwargs.get('group', '')
         self.name = kwargs['name']
+        
+        self.data_dir = Path(kwargs.get('data_dir', '/dev/null'))
 
         home = Path.home()
 
@@ -239,6 +240,61 @@ class MapReduceExperiment(object):
 
         return fn_groups
 
+    @utilities.memoized_property
+    def data_fns(self):
+        data_fns = []
+        for extension in ['fastq', 'fq', 'sra', 'fastq.gz']:
+            data_fns.extend(glob.glob('{0}/*.{1}'.format(self.data_dir, extension)))
+        return data_fns
+    
+    def get_reads(self, max_reads_per_file=None, quiet=False):
+        ''' A generator over the reads in a piece of each data file.
+            Can handle a mixture of different fastq encodings across (but not
+            within) files.
+        '''
+        total_reads = 0
+        for file_name in self.data_fns:
+            total_reads_from_file = 0
+
+            if file_name.endswith('sra'):
+                file_piece = split_sra_file.piece(file_name,
+                                                  self.num_pieces,
+                                                  self.which_piece,
+                                                 )
+            else:
+                if self.which_piece == -1:
+                    file_piece = file_name
+                else:
+                    file_piece = split_file.piece(file_name,
+                                                  self.num_pieces,
+                                                  self.which_piece,
+                                                  'fastq',
+                                                 )
+
+            reads = fastq.reads(file_piece,
+                                standardize_names=self.standardize_names,
+                                ensure_sanger_encoding=self.standardize_names,
+                               )
+            for read in reads:
+                yield read
+                
+                total_reads += 1
+                total_reads_from_file += 1
+
+                if not quiet and total_reads % 100000 == 0:
+                    logging.info('{0:,} reads processed'.format(total_reads))
+
+                if max_reads_per_file and total_reads_from_file >= max_reads_per_file:
+                    break
+            
+            head, tail = os.path.split(file_name)
+            if not quiet:
+                self.summary.append(('Reads in {0}'.format(tail), total_reads_from_file))
+            
+        if not quiet:
+            logging.info('{0:,} total reads processed'.format(total_reads))
+            self.summary.append(('Total reads', total_reads))
+    
     def get_read_pairs(self, max_pairs_per_group=None, quiet=False):
         fn_groups = self.get_fn_groups()
 
@@ -475,8 +531,8 @@ def launch(args, script_path, num_stages, **override):
                  )
         os.chdir(starting_path)
     else:
-        #for stage in range(num_stages):
-        for stage in [1]:
+        for stage in range(num_stages):
+        #for stage in [1]:
             print('\tLaunched stage {0} with parallel'.format(stage))
             subprocess.check_call('parallel < {0}'.format(process_file_names[stage]), shell=True)
             subprocess.check_call('bash {0}'.format(finish_file_names[stage]), shell=True)

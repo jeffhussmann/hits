@@ -6,10 +6,8 @@ import argparse
 import subprocess
 from itertools import izip, product
 from struct import unpack
-try:
-    import tqdm
-except ImportError:
-    tqdm = None
+
+import tqdm
 
 def line_count(file_name):
     ''' Returns the number of lines in file_name by calling wc. '''

@@ -1,15 +1,18 @@
+import os
+import glob
+from collections import defaultdict
+from pathlib import Path
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.image
-import os
-import glob
 import scipy.signal
 import scipy.interpolate
 import numpy as np
 import ipywidgets
 import yaml
-import Sequencing.utilities as utilities
-from collections import defaultdict
+
+from .. import utilities
 
 def load_image(image_fn):
     return matplotlib.image.imread(image_fn)
@@ -38,13 +41,13 @@ def save_annotations(image_fn, annotations):
     with open(annotation_fn, 'w') as annotation_fh:
         yaml.dump(annotations, annotation_fh, default_flow_style=False)
 
-def identify_lane_boundaries(image, num_lanes=None):
+def identify_lane_boundaries(image, num_lanes=None, window_size=10):
     ''' Finds lane boundaries by summing image columns, identifying peaks in
     window-summed column sums, then determining widths around peaks at which
     signal has returned to background.
     '''
     cols = image.sum(axis=0)
-    window_sums = sum_over_window(cols, 20)
+    window_sums = sum_over_window(cols, window_size)
     peaks, = scipy.signal.argrelmax(window_sums, order=16)
 
     if num_lanes is not None:
@@ -159,7 +162,7 @@ def compute_peak_to_troughs(ys, peaks):
     ratios = [ys[p] / trough_mean for p, trough_mean in zip(peaks, trough_means)]
     return ratios
 
-def get_ladder10_peaks(ys, ladder100_peaks):
+def get_ladder10_peaks(ys, ladder100_peaks=None):
     # Strategy: identify the 100 bp beak by finding the relative max closest
     # to the 100 bp peak in the 100bp ladder.
     # March up and down relative maxes from there to assign 10 bp peaks.
@@ -175,7 +178,11 @@ def get_ladder10_peaks(ys, ladder100_peaks):
         return xs
 
     big_peak_xs = get_relative_max_xs(50)
-    peaks[100] = min(big_peak_xs, key=lambda x: abs(ladder100_peaks[100] - x))
+
+    if ladder100_peaks is not None:
+        peaks[100] = min(big_peak_xs, key=lambda x: abs(ladder100_peaks[100] - x))
+    else:
+        peaks[100] = sorted(big_peak_xs, key=lambda x: ys[x])[-2]
     
     # below 100
     xs = get_relative_max_xs(10)
@@ -213,7 +220,7 @@ def make_conversion_functions(lanes):
 
     return length_to_x, x_to_length
 
-def analyze_image(image, annotations):
+def analyze_image(image, annotations, window_size):
     def contain_overlap(boundaries):
         overlapping = False
         for (_, end), (start, _) in utilities.pairwise(boundaries):
@@ -231,12 +238,12 @@ def analyze_image(image, annotations):
     else:
         num_lanes = len(labels)
 
-    boundaries = identify_lane_boundaries(image, num_lanes=num_lanes)
+    boundaries = identify_lane_boundaries(image, num_lanes=num_lanes, window_size=window_size)
     profiles = extract_profiles(image, boundaries)
     
     if labels is None:
         labels = range(1, len(boundaries) + 1)
-    labels = map(str, labels)
+    labels = [str(l) for l in labels]
 
     #if invalid(boundaries, labels):
     #    labels = map(str, range(1, len(boundaries) + 1))
@@ -251,11 +258,12 @@ def plot_gel(image_fn,
              contrast=1.0,
              show_expected='both',
              invert=False,
+             window_size=10,
             ):
     image = load_image(image_fn)
     annotations = load_annotations(image_fn)
 
-    labels, boundaries, profiles, lanes = analyze_image(image, annotations)
+    labels, boundaries, profiles, lanes = analyze_image(image, annotations, window_size)
 
     fig_height = 8.
     plot_width = 12.
@@ -308,6 +316,9 @@ def plot_gel(image_fn,
             copy['color'] = color
             label_to_kwargs[kind][label] = copy
     
+    max_y = 0
+    min_y = 1e99
+
     for i, label in enumerate(labels):
         if 'ladder' in label and not label in highlight:
             continue
@@ -317,15 +328,28 @@ def plot_gel(image_fn,
 
         line_ax.plot(xs, ys, 'o-', label=label, markersize=0.3, **label_to_kwargs['line'][label])
 
+        max_y = max(max_y, max(ys))
+        min_y = min(min_y, min(ys))
+
+    peaks = None
     if 'ladder100' in lanes:
         ladder100_peaks = get_ladder100_peaks(lanes['ladder100'])
-        ladder10_peaks = get_ladder10_peaks(lanes['ladder10'], ladder100_peaks)
+
+        if 'ladder10' in lanes:
+            ladder10_peaks = get_ladder10_peaks(lanes['ladder10'], ladder100_peaks)
     
-        # Only include the 100 bp peak from the 10 bp ladder.
-        ladder100_peaks.pop(100)
+            # Only include the 100 bp peak from the 10 bp ladder.
+            ladder100_peaks.pop(100)
 
-        peaks = ladder100_peaks.items() + ladder10_peaks.items()
+            peaks = list(ladder100_peaks.items()) + list(ladder10_peaks.items())
+        else:
+            peaks = list(ladder100_peaks.items())
 
+    elif 'ladder10' in lanes:
+        ladder10_peaks = get_ladder10_peaks(lanes['ladder10'])
+        peaks = list(ladder10_peaks.items())
+    
+    if peaks is not None:
         major_peaks = [
             100,
             200,
@@ -417,6 +441,8 @@ def plot_gel(image_fn,
    
     x_min, x_max = map(int, np.asarray(vertical_range) * len(xs))
     line_ax.set_xlim(x_min, x_max)
+    y_range = max_y - min_y
+    line_ax.set_ylim(min_y - y_range * 0.02, max_y + y_range * 0.02)
     
     im_ax.autoscale(False)
 
@@ -447,19 +473,31 @@ def plot_gel(image_fn,
 def plot_gels_interactive(image_fns, **kwargs):
 
     def make_tab(image_fn):
-        def generate_figure(highlight, vertical_range, contrast, invert, show_expected):
+        def generate_figure(highlight, vertical_range, contrast, invert, show_expected, window_size, notes):
             fig = plot_gel(image_fn,
                            highlight=highlight,
                            vertical_range=vertical_range,
                            contrast=contrast,
                            invert=invert,
                            show_expected=show_expected,
+                           window_size=window_size,
                            **kwargs)
+            fig.axes[1].annotate(notes,
+                                 xy=(0, 1),
+                                 xycoords='axes fraction',
+                                 xytext=(5, 2),
+                                 textcoords='offset points',
+                                 ha='left',
+                                 va='bottom',
+                                 size=8,
+                                )
             plt.show()
             return fig
 
         annotations = load_annotations(image_fn)
         labels = annotations.get('labels', [])
+    
+        default_filename = str(Path.home() / Path(image_fn).with_suffix('.png').name)
 
         widgets = {
             'vertical_range': ipywidgets.FloatRangeSlider(
@@ -470,6 +508,17 @@ def plot_gels_interactive(image_fns, **kwargs):
                 step=0.01,
                 layout=ipywidgets.Layout(height='200px'),
                 description='Vertical range:',
+                style={'description_width': 'initial'},
+                orientation='vertical',
+            ),
+            'window_size': ipywidgets.IntSlider(
+                value=10,
+                continuous_update=False,
+                min=1,
+                max=30,
+                step=1,
+                layout=ipywidgets.Layout(height='200px'),
+                description='Window size:',
                 style={'description_width': 'initial'},
                 orientation='vertical',
             ),
@@ -508,7 +557,7 @@ def plot_gels_interactive(image_fns, **kwargs):
                 description='Save snapshot',
             ),
             'file_name': ipywidgets.Text(
-                value=os.environ['HOME'] + '/name.png',
+                value=default_filename,
             ),
             'close': ipywidgets.Button(
                 description='Close tab',
@@ -551,6 +600,7 @@ def plot_gels_interactive(image_fns, **kwargs):
 
         widgets['invert'].value = annotations.get('invert', False)
         widgets['contrast'].value = annotations.get('contrast', 1.0)
+        widgets['window_size'].value = annotations.get('window_size', 10)
         widgets['notes'].value = annotations.get('notes', '')
         widgets['labels'].value = '\n'.join(annotations.get('labels', []))
         expected = annotations.get('expected', {})
@@ -559,7 +609,7 @@ def plot_gels_interactive(image_fns, **kwargs):
 
         def update_annotations(_):
             def get_lines(key):
-                lines = map(str, widgets[key].value.split('\n'))
+                lines = [str(v) for v in widgets[key].value.split('\n')]
                 if lines == ['']:
                     lines = []
                 return lines
@@ -574,11 +624,12 @@ def plot_gels_interactive(image_fns, **kwargs):
                 length, name = line.split(': ')
                 length = int(length)
                 expected[length] = name
-
+            
             annotations['expected'] = expected
             annotations['labels'] = labels
             annotations['invert'] = widgets['invert'].value
             annotations['contrast'] = widgets['contrast'].value
+            annotations['window_size'] = widgets['window_size'].value
 
             save_annotations(image_fn, annotations)
             interactive.update()
@@ -603,6 +654,7 @@ def plot_gels_interactive(image_fns, **kwargs):
             make_row(['highlight',
                       'vertical_range',
                       'contrast',
+                      'window_size',
                       make_col([
                           'invert',
                       ]),
