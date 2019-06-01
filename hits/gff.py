@@ -1,4 +1,5 @@
 import pprint
+import urllib
 
 class Feature(object):
     def __init__(self, line=None):
