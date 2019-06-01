@@ -2,7 +2,6 @@
 
 from cpython cimport array
 cimport cython
-import numpy as np
 import array
 
 cdef int SANGER_OFFSET_typed = 33

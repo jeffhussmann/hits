@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 import numpy as np
 cimport cython
 
@@ -46,7 +48,7 @@ def generate_matrices(char* query,
 
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
-            if N_matches and (query[row - 1] == 'N' or target[col - 1] == 'N'):
+            if N_matches and (query[row - 1] == b'N' or target[col - 1] == b'N'):
                 match_or_mismatch = match_bonus
             elif query[row - 1] == target[col - 1]:
                 match_or_mismatch = match_bonus
@@ -142,7 +144,7 @@ def backtrack_cython(char* query,
             target_mappings_view[target_index] = query_index
         if query_index != GAP_typed:
             query_mappings_view[query_index] = target_index
-        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != 'N' and target[target_index] != 'N' and query[query_index] != target[target_index]:
+        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != b'N' and target[target_index] != b'N' and query[query_index] != target[target_index]:
             mismatches.add((query_index, target_index))
 
         path.append((query_index, target_index))
