@@ -9,6 +9,7 @@ import logging
 import heapq
 import contextlib
 import copy
+import functools
 
 from collections import Counter
 from itertools import chain
@@ -1084,6 +1085,11 @@ def query_interval(alignment):
         start, end = true_query_position(end, alignment), true_query_position(start, alignment)
 
     return start, end
+
+def merge_multiple_adjacent_alignments(als, ref_seqs):
+    merger = functools.partial(merge_adjacent_alignments, ref_seqs=ref_seqs)
+    als = sorted(als, key=query_interval)
+    return functools.reduce(merger, als)
 
 def merge_adjacent_alignments(first, second, ref_seqs):
     ''' If first and second are alignments to the same reference name and strand
