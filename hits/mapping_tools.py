@@ -596,6 +596,10 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     if Path(R1_fn).suffix == '.gz':
         STAR_command.extend(['--readFilesCommand', 'zcat'])
+    elif Path(R1_fn).suffix == '.bam':
+        STAR_command.extend(['--readFilesCommand', 'samtools view',
+                             '--readFilesType', 'SAM SE',
+                            ])
 
     subprocess.run(STAR_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
