@@ -56,7 +56,7 @@ def load_fai(fasta_fn):
         'LINEWIDTH',
     ]
 
-    fai = pd.read_table(fai_fn, index_col=0, header=None, names=column_names)
+    fai = pd.read_csv(fai_fn, setp='\t', index_col=0, header=None, names=column_names)
 
     return fai
 

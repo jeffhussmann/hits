@@ -2,10 +2,12 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.0.1',
+    version='0.0.3',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
+    url='https://github.com/jeffhussmann/hits',
+    description='utilities for processing high-throughput sequencing experiments',
 
     setup_requires=['cython'],
 
