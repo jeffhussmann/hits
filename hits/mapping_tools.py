@@ -612,7 +612,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         shutil.move(str(initial_bam_fn), str(bam_fn))
 
     if sort:
-        pysam.index(bam_fn)
+        pysam.index(str(bam_fn))
 
     return bam_fn
 
