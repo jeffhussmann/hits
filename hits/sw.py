@@ -501,6 +501,7 @@ def align_read(read, targets, min_path_length, header,
                         raise ValueError('CIGAR implies different query length - {0}: {1}, {2}'.format(al.query_name, al.query_length, al.infer_query_length()))
 
                     read_aligned, ref_aligned = zip(*char_pairs)
+                    # NOTE: some evidence this might mess up if alignment ends in an indel.
                     md = sam.alignment_to_MD_string(ref_aligned, read_aligned)
                     al.set_tag('MD', md)
 

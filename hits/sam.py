@@ -1399,7 +1399,8 @@ def split_at_deletions(alignment, min_length, exempt_if_overlaps=None):
                 overlaps = len(del_interval & exempt_if_overlaps) > 0
 
             if length >= min_length and not overlaps:
-                split_at.append(i)
+                if i != 0 and i != len(alignment.cigar) - 1:
+                    split_at.append(i)
         
         if kind in read_consuming_ops:
             read_consumed = length
