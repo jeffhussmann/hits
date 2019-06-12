@@ -704,3 +704,12 @@ def map_minimap2(fastq_fn, index, bam_fn):
 
     minimap2_process.stdout.close()
     view_process.communicate()
+
+def build_minimap2_index(fasta_fn, index_fn):
+    minimap2_command = [
+        'minimap2',
+        '-H',
+        '-d', str(index_fn),
+        str(fasta_fn),
+    ]
+    subprocess.run(minimap2_command, check=True)
