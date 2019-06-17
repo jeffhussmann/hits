@@ -692,9 +692,9 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
                             ])
 
     try:
-        subprocess.check_call(samtools_command)
-    except:
-        print(' '.join(samtools_command))
+        subprocess.run(samtools_command, check=True, stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        print(e.stderr)
         raise
 
     if not by_name:
