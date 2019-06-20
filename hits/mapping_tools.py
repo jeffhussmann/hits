@@ -587,6 +587,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     elif mode == 'guide_alignment':
         STAR_command.extend([
             '--alignEndsType', 'EndToEnd',
+            '--genomeLoad', 'LoadAndKeep',
         ])
 
     else:
