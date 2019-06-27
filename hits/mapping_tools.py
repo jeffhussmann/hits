@@ -542,6 +542,18 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     else:
         unmapped_option = 'None'
 
+    def make_string(possibly_list):
+        if isinstance(possibly_list, list):
+            string = ','.join(map(str, possibly_list))
+            first_fn = Path(possibly_list[0])
+        else:
+            string = str(possibly_list)
+            first_fn = Path(possibly_list)
+
+        return string, first_fn.suffix
+
+    R1_fn_string, R1_suffix = make_string(R1_fn)
+
     STAR_command = [
         'STAR',
         '--genomeDir', str(index_dir),
@@ -553,7 +565,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
-        '--readFilesIn', str(R1_fn),
     ]
 
     if mode == 'stringent':
@@ -588,17 +599,23 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         STAR_command.extend([
             '--alignEndsType', 'EndToEnd',
             '--genomeLoad', 'LoadAndKeep',
+            '--outFilterMultimapNmax', '1000',
         ])
 
     else:
         raise ValueError(mode)
 
-    if R2_fn is not None:
-        STAR_command.append(str(R2_fn))
+    STAR_command.extend([
+        '--readFilesIn', R1_fn_string,
+    ])
 
-    if Path(R1_fn).suffix == '.gz':
+    if R2_fn is not None:
+        R2_fn_string, R2_suffix = make_string(R2_fn)
+        STAR_command.append(R2_fn_string)
+
+    if R1_suffix == '.gz':
         STAR_command.extend(['--readFilesCommand', 'zcat'])
-    elif Path(R1_fn).suffix == '.bam':
+    elif R1_suffix == '.bam':
         STAR_command.extend(['--readFilesCommand', 'samtools view',
                              '--readFilesType', 'SAM SE',
                             ])
