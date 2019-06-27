@@ -5,7 +5,7 @@ import Bio.SeqIO
 import pandas as pd
 import pysam
 
-class Read(object):
+class Record(object):
     def __init__(self, name, seq):
         self.name = name
         self.seq = seq
@@ -30,13 +30,16 @@ class Read(object):
     def __add__(self, other):
         return Read(self.name, self.seq + other.seq)
 
+
 make_record = '>{0}\n{1}\n'.format
 
-def reads(file_name):
+def records(file_name):
     ''' Yields the name and sequence lines from a fasta file. '''
     for record in Bio.SeqIO.parse(str(file_name), 'fasta'):
-        read = Read(record.name, str(record.seq).upper())
-        yield read
+        yield Record(record.name, str(record.seq).upper())
+
+Read = Record # for backwards compatibility
+reads = records
 
 def to_dict(file_name):
     return OrderedDict((r.name, r.seq) for r in reads(file_name))
