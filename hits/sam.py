@@ -796,19 +796,31 @@ class AlignmentSorter(object):
     '''
     def __init__(self, output_file_name, header, by_name=False):
         self.header = header
-        self.output_file_name = str(output_file_name)
+        self.output_file_name = Path(output_file_name)
         self.by_name = by_name
         self.fifo = mapping_tools.TemporaryFifo(name='unsorted_fifo.bam')
 
+    def remove_temporary_files(self):
+        ''' Find any temporary files that might have been left behind by a
+        previous call with the same output_file_name.
+        '''
+        pattern = f'{self.output_file_name.name}\.ALIGNMENTSORTER_TEMP\.\d\d\d\d\.bam'
+        for fn in self.output_file_name.parent.iterdir():
+            if re.match(pattern, fn.name):
+                fn.unlink()
+
     def __enter__(self):
         self.fifo.__enter__()
+
+        self.remove_temporary_files()
+
         sort_command = ['samtools', 'sort']
         if self.by_name:
             sort_command.append('-n')
 
         self.dev_null = open(os.devnull, 'w')
-        sort_command.extend(['-T', self.output_file_name,
-                             '-o', self.output_file_name,
+        sort_command.extend(['-T', str(self.output_file_name) + '.ALIGNMENTSORTER_TEMP',
+                             '-o', str(self.output_file_name),
                              self.fifo.file_name,
                             ])
         self.sort_process = subprocess.Popen(sort_command,
@@ -825,11 +837,13 @@ class AlignmentSorter(object):
         self.dev_null.close()
         self.fifo.__exit__(exception_type, exception_value, exception_traceback)
         
+        self.remove_temporary_files()
+
         if self.sort_process.returncode:
             raise RuntimeError(err_output)
 
         if not self.by_name:
-            pysam.index(self.output_file_name)
+            pysam.index(str(self.output_file_name))
 
     def write(self, alignment):
         self.sam_file.write(alignment)
