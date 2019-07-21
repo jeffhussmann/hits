@@ -211,8 +211,13 @@ def chunks(iterable, n):
     '''
     iterable = iter(iterable)
     while True:
-        first = next(iterable)
+        try:
+            first = next(iterable)
+        except StopIteration:
+            return
+
         rest = islice(iterable, n - 1)
+
         yield chain([first], rest)
 
 def list_chunks(full_list, n):
