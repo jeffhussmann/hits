@@ -680,15 +680,25 @@ def alignment_to_MD_string(ref_aligned, read_aligned):
     return MD_string
 
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
-    input_file_name = str(input_file_name)
-    output_file_name = str(output_file_name)
+    output_file_name = Path(output_file_name)
 
     samtools_command = ['samtools', 'sort']
     if by_name:
         samtools_command.append('-n')
+
+    # For unambiguously marking temp files from this function.
+    tail = 'SORT_TEMP'
+
+    # Clean up any temporary files left behind by previous attempts to sort.
+    pattern = f'{output_file_name.name}\.{tail}\.\d\d\d\d\.bam'
+    for fn in output_file_name.parent.iterdir():
+        if re.match(pattern, fn.name):
+            fn.unlink()
+
     samtools_command.extend(['-@', str(num_threads),
-                             '-o', output_file_name,
-                             input_file_name,
+                             '-T', str(output_file_name) + f'.{tail}',
+                             '-o', str(output_file_name),
+                             str(input_file_name),
                             ])
 
     try:
@@ -698,7 +708,7 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
         raise
 
     if not by_name:
-        pysam.index(output_file_name)
+        pysam.index(str(output_file_name))
 
 def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False, make_index=True):
     # To avoid running into max open file limits, split into groups of 500.
@@ -794,6 +804,8 @@ class AlignmentSorter(object):
     ''' Context manager that handles writing AlignedSegments into a samtools
     sort process.
     '''
+    temp_prefix_tail = 'ALIGNMENTSORTER_TEMP'
+
     def __init__(self, output_file_name, header, by_name=False):
         self.header = header
         self.output_file_name = Path(output_file_name)
@@ -804,7 +816,7 @@ class AlignmentSorter(object):
         ''' Find any temporary files that might have been left behind by a
         previous call with the same output_file_name.
         '''
-        pattern = f'{self.output_file_name.name}\.ALIGNMENTSORTER_TEMP\.\d\d\d\d\.bam'
+        pattern = f'{self.output_file_name.name}\.{AlignmentSorter.temp_prefix_tail}\.\d\d\d\d\.bam'
         for fn in self.output_file_name.parent.iterdir():
             if re.match(pattern, fn.name):
                 fn.unlink()
@@ -819,7 +831,7 @@ class AlignmentSorter(object):
             sort_command.append('-n')
 
         self.dev_null = open(os.devnull, 'w')
-        sort_command.extend(['-T', str(self.output_file_name) + '.ALIGNMENTSORTER_TEMP',
+        sort_command.extend(['-T', str(self.output_file_name) + f'.{AlignmentSorter.temp_prefix_tail}',
                              '-o', str(self.output_file_name),
                              self.fifo.file_name,
                             ])
