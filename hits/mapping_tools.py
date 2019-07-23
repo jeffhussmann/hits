@@ -698,7 +698,7 @@ def map_bwa_mem(reads,
         for mapping in fh:
             yield mapping
 
-def map_minimap2(fastq_fn, index, bam_fn):
+def map_minimap2(fastq_fn, index, bam_fn, num_threads=1):
     minimap2_command = [
         'minimap2',
         '-a', # sam output
@@ -706,6 +706,7 @@ def map_minimap2(fastq_fn, index, bam_fn):
         '-P', # (roughly equivalent to?) report all
         '--MD', # populate MD tags
         '-r', '20', # max bandwidth
+        '-t', str(num_threads),
         str(index),
         str(fastq_fn),
     ]
