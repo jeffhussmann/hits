@@ -355,8 +355,10 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
-    R1_start_in_R2 = alignment['query_mappings'][len(before_R1)]
-    R2_start_in_R1 = alignment['target_mappings'][len(R2.seq) - 1]
+    R1_start_in_R2 = alignment['query_mappings'][R1_start]
+    R2_start_in_R1 = alignment['target_mappings'][R2_start]
+    R1_end_in_R2 = alignment['query_mappings'][len(extended_R1) - 1]
+    R2_end_in_R1 = alignment['target_mappings'][0]
     
     # Since R1 is the query and R2 is the target, bases in R1 that aren't in
     # R2 are called insertions, and bases in R2 that aren't in R1 are called
@@ -387,6 +389,16 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
     if R1_start_in_R2 != SOFT_CLIPPED and R2_start_in_R1 != SOFT_CLIPPED:
         length_from_R1 = R2_start_in_R1 - R1_start + 1
         length_from_R2 = R2_start - R1_start_in_R2 + 1
+    elif R1_start_in_R2 != SOFT_CLIPPED and R1_end_in_R2 != SOFT_CLIPPED:
+        # R1 entirely contained in R2
+        length_from_R2 = len(R2) - R1_start_in_R2
+        length_from_R1 = length_from_R2
+    elif R2_start_in_R1 != SOFT_CLIPPED and R2_end_in_R1 != SOFT_CLIPPED:
+        # R2 entirely contained in R1
+        # untested
+        raise NotImplementedError
+        length_from_R1 = R2_start_in_R1 - R1_start + 1
+        length_from_R2 = length_from_R1
     else:
         # overlap alignment forces the alignment to start with either the
         # beginning of R1 or R2 and end with either the end of R1 or R2. 
@@ -581,6 +593,7 @@ def align_reads(target_fasta_fn,
 
 def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
     results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty)
+
     if 'failed' in results:
         insert_length = len(R1) + len(R2)
     else:
@@ -588,7 +601,7 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
 
     R2_rc = R2.reverse_complement()
 
-    overlap_start = max(0, insert_length - len(R1))
+    overlap_start = max(0, insert_length - len(R2))
     just_R1 = R1[:overlap_start]
     overlap_R1 = R1[overlap_start:insert_length]
 
