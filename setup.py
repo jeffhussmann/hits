@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.0.6',
+    version='0.0.7',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
@@ -34,6 +34,7 @@ setup(
     python_requires='>=3.6',
 
     install_requires=[
+        'bokeh',
         'biopython',
         'matplotlib',
         'numpy',
