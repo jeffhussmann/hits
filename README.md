@@ -1,1 +1,1 @@
-utilties for processing high-throughput sequencing experiments
+utilities for processing high-throughput sequencing experiments
