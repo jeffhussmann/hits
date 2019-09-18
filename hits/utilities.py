@@ -248,7 +248,7 @@ def possibly_fn(fn=None):
 
     if fn != None: writer.close()
 
-def clopper_pearson(x, n, alpha=0.05):
+def clopper_pearson(x, n, alpha=0.05, return_format='delta'):
     if n == 0:
         return 0., 0.
 
@@ -271,7 +271,12 @@ def clopper_pearson(x, n, alpha=0.05):
         l = scipy.optimize.brentq(sf, 0, 1)
         mle = float(x) / n
 
-    return mle - l, u - mle
+    if return_format == 'delta':
+        return mle - l, u - mle
+    elif return_format == 'absolute':
+        return l, u
+    else:
+        raise ValueError(return_format)
 
 def homopolymer_lengths(seq, b):
     locations = []
