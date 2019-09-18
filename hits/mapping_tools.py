@@ -620,7 +620,17 @@ def map_STAR(R1_fn, index_dir, output_prefix,
                              '--readFilesType', 'SAM SE',
                             ])
 
-    subprocess.run(STAR_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(STAR_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT,
+                      )
+    except subprocess.CalledProcessError as e:
+        print('STAR command returned code {0}'.format(e.returncode))
+        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
+        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
+        raise
 
     initial_bam_fn = str(output_prefix) + bam_suffix
 
@@ -634,7 +644,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     return bam_fn
 
-def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1):
+def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RAM_limit=None):
     total_length = 0
     for fasta_file in fasta_files:
         for name, entry in genomes.parse_fai(str(fasta_file) + '.fai').items():
@@ -651,7 +661,21 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1):
         '--genomeSAindexNbases', str(wonky_param),
         '--runThreadN', str(num_threads),
     ]
-    subprocess.check_output(STAR_command)
+
+    if RAM_limit is not None:
+        STAR_command.extend(['--limitGenomeGenerateRAM', str(RAM_limit)])
+
+    try:
+        subprocess.run(STAR_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT,
+                      )
+    except subprocess.CalledProcessError as e:
+        print('STAR command returned code {0}'.format(e.returncode))
+        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
+        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
+        raise
 
 def _map_STAR(reads,
               index_prefix,
