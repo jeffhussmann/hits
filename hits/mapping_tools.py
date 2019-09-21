@@ -737,16 +737,22 @@ def map_minimap2(fastq_fn, index, bam_fn, num_threads=1):
 
     minimap2_process = subprocess.Popen(minimap2_command,
                                         stdout=subprocess.PIPE,
-                                        stderr=subprocess.DEVNULL,
+                                        stderr=subprocess.PIPE,
                                        )
 
     view_command = ['samtools', 'view', '-b', '-o', str(bam_fn)]
     view_process = subprocess.Popen(view_command,
                                     stdin=minimap2_process.stdout,
+                                    stdout=subprocess.PIPE,
                                    )
 
     minimap2_process.stdout.close()
-    view_process.communicate()
+    view_out, view_err = view_process.communicate()
+
+    minimap2_process.wait()
+
+    if minimap2_process.returncode != 0:
+        raise subprocess.CalledProcessError(minimap2_process.returncode, minimap2_process.args)
 
 def build_minimap2_index(fasta_fn, index_fn):
     minimap2_command = [
