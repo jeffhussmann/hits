@@ -1169,8 +1169,8 @@ def merge_adjacent_alignments(first, second, ref_seqs):
 
     else:
         overlap = left_covered & right_covered
-        left_ceds = cumulative_edit_distances(left_query, ref_seq, overlap, False)
-        right_ceds = cumulative_edit_distances(right_query, ref_seq, overlap, True)
+        left_ceds = cumulative_edit_distances(left_query, overlap, False, ref_seq=ref_seq)
+        right_ceds = cumulative_edit_distances(right_query, overlap, True, ref_seq=ref_seq)
 
         switch_after_edits = {
             overlap.start - 1 : right_ceds[overlap.start],
@@ -1203,12 +1203,12 @@ def merge_adjacent_alignments(first, second, ref_seqs):
 
     return merged
 
-def cumulative_edit_distances(mapping, ref_seq, query_interval, from_end):
+def cumulative_edit_distances(mapping, query_interval, from_end, ref_seq=None):
     ''' Returns a dictionary of how many cumulatives edits are involved
     in mapping from the beginning (or end, if from_end is True) of query_interval
     to each query position in query_interval.
     '''
-    tuples = aligned_tuples(mapping, ref_seq)
+    tuples = aligned_tuples(mapping, ref_seq=ref_seq)
     
     if get_strand(mapping) == '-':    
         tuples = tuples[::-1]
@@ -1253,8 +1253,8 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
         gap_interval = interval.Interval(left_covered.end + 1, right_covered.start - 1)
 
     if overlap:
-        left_ceds = cumulative_edit_distances(left_al, left_ref_seq, overlap, False)
-        right_ceds = cumulative_edit_distances(right_al, right_ref_seq, overlap, True)
+        left_ceds = cumulative_edit_distances(left_al, overlap, False, ref_seq=left_ref_seq)
+        right_ceds = cumulative_edit_distances(right_al, overlap, True, ref_seq=right_ref_seq)
 
         switch_after_edits = {
             overlap.start - 1 : right_ceds[overlap.start],
