@@ -5,7 +5,7 @@ column_names = {column_names}
 case_sensitive = models['case_sensitive'].active.length > 0
 if not case_sensitive
     query = cb_obj.value.toLowerCase()
-    possibly_lowercase = (t) -> t.toLowerCase()
+    possibly_lowercase = (t) -> t.toString().toLowerCase()
 else
     query = cb_obj.value
     possibly_lowercase = (t) -> t
