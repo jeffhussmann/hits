@@ -542,6 +542,18 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     else:
         unmapped_option = 'None'
 
+    def make_string(possibly_list):
+        if isinstance(possibly_list, list):
+            string = ','.join(map(str, possibly_list))
+            first_fn = Path(possibly_list[0])
+        else:
+            string = str(possibly_list)
+            first_fn = Path(possibly_list)
+
+        return string, first_fn.suffix
+
+    R1_fn_string, R1_suffix = make_string(R1_fn)
+
     STAR_command = [
         'STAR',
         '--genomeDir', str(index_dir),
@@ -553,7 +565,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
-        '--readFilesIn', str(R1_fn),
     ]
 
     if mode == 'stringent':
@@ -587,18 +598,39 @@ def map_STAR(R1_fn, index_dir, output_prefix,
     elif mode == 'guide_alignment':
         STAR_command.extend([
             '--alignEndsType', 'EndToEnd',
+            '--genomeLoad', 'LoadAndKeep',
+            '--outFilterMultimapNmax', '1000',
         ])
 
     else:
         raise ValueError(mode)
 
+    STAR_command.extend([
+        '--readFilesIn', R1_fn_string,
+    ])
+
     if R2_fn is not None:
-        STAR_command.append(str(R2_fn))
+        R2_fn_string, R2_suffix = make_string(R2_fn)
+        STAR_command.append(R2_fn_string)
 
-    if Path(R1_fn).suffix == '.gz':
+    if R1_suffix == '.gz':
         STAR_command.extend(['--readFilesCommand', 'zcat'])
+    elif R1_suffix == '.bam':
+        STAR_command.extend(['--readFilesCommand', 'samtools view',
+                             '--readFilesType', 'SAM SE',
+                            ])
 
-    subprocess.run(STAR_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(STAR_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT,
+                      )
+    except subprocess.CalledProcessError as e:
+        print('STAR command returned code {0}'.format(e.returncode))
+        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
+        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
+        raise
 
     initial_bam_fn = str(output_prefix) + bam_suffix
 
@@ -608,11 +640,11 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         shutil.move(str(initial_bam_fn), str(bam_fn))
 
     if sort:
-        pysam.index(bam_fn)
+        pysam.index(str(bam_fn))
 
     return bam_fn
 
-def build_STAR_index(fasta_files, index_dir, wonky_param=None):
+def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RAM_limit=None):
     total_length = 0
     for fasta_file in fasta_files:
         for name, entry in genomes.parse_fai(str(fasta_file) + '.fai').items():
@@ -627,8 +659,23 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None):
         '--genomeDir', str(index_dir),
         '--genomeFastaFiles', ' '.join(map(str, fasta_files)),
         '--genomeSAindexNbases', str(wonky_param),
+        '--runThreadN', str(num_threads),
     ]
-    subprocess.check_output(STAR_command)
+
+    if RAM_limit is not None:
+        STAR_command.extend(['--limitGenomeGenerateRAM', str(RAM_limit)])
+
+    try:
+        subprocess.run(STAR_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT,
+                      )
+    except subprocess.CalledProcessError as e:
+        print('STAR command returned code {0}'.format(e.returncode))
+        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
+        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
+        raise
 
 def _map_STAR(reads,
               index_prefix,
@@ -675,7 +722,7 @@ def map_bwa_mem(reads,
         for mapping in fh:
             yield mapping
 
-def map_minimap2(fastq_fn, index, bam_fn):
+def map_minimap2(fastq_fn, index, bam_fn, num_threads=1):
     minimap2_command = [
         'minimap2',
         '-a', # sam output
@@ -683,19 +730,35 @@ def map_minimap2(fastq_fn, index, bam_fn):
         '-P', # (roughly equivalent to?) report all
         '--MD', # populate MD tags
         '-r', '20', # max bandwidth
+        '-t', str(num_threads),
         str(index),
         str(fastq_fn),
     ]
 
     minimap2_process = subprocess.Popen(minimap2_command,
                                         stdout=subprocess.PIPE,
-                                        stderr=subprocess.DEVNULL,
+                                        stderr=subprocess.PIPE,
                                        )
 
     view_command = ['samtools', 'view', '-b', '-o', str(bam_fn)]
     view_process = subprocess.Popen(view_command,
                                     stdin=minimap2_process.stdout,
+                                    stdout=subprocess.PIPE,
                                    )
 
     minimap2_process.stdout.close()
-    view_process.communicate()
+    view_out, view_err = view_process.communicate()
+
+    minimap2_process.wait()
+
+    if minimap2_process.returncode != 0:
+        raise subprocess.CalledProcessError(minimap2_process.returncode, minimap2_process.args)
+
+def build_minimap2_index(fasta_fn, index_fn):
+    minimap2_command = [
+        'minimap2',
+        '-H',
+        '-d', str(index_fn),
+        str(fasta_fn),
+    ]
+    subprocess.run(minimap2_command, check=True)

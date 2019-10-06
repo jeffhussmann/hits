@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 cpdef int adapter_hamming_distance(char *seq,
                                    char *adapter,
                                    int seq_length,

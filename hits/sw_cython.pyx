@@ -1,3 +1,5 @@
+# cython: language_level=3
+
 import numpy as np
 cimport cython
 
@@ -46,7 +48,7 @@ def generate_matrices(char* query,
 
     for row in range(1, len(query) + 1):
         for col in range(1, len(target) + 1):
-            if N_matches and (query[row - 1] == 'N' or target[col - 1] == 'N'):
+            if N_matches and (query[row - 1] == b'N' or target[col - 1] == b'N'):
                 match_or_mismatch = match_bonus
             elif query[row - 1] == target[col - 1]:
                 match_or_mismatch = match_bonus
@@ -142,7 +144,7 @@ def backtrack_cython(char* query,
             target_mappings_view[target_index] = query_index
         if query_index != GAP_typed:
             query_mappings_view[query_index] = target_index
-        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != 'N' and target[target_index] != 'N' and query[query_index] != target[target_index]:
+        if target_index != GAP_typed and query_index != GAP_typed and query[query_index] != b'N' and target[target_index] != b'N' and query[query_index] != target[target_index]:
             mismatches.add((query_index, target_index))
 
         path.append((query_index, target_index))
@@ -211,3 +213,18 @@ def extend_perfect_seed_with_one_nt_deletion(char* query_seq, char* target_seq, 
         target_end += 1
 
     return gained_before, gained_after
+
+@cython.boundscheck(False)
+def mismatches_at_offset(char* donor, char* target):
+    ''' Number of mismatches if donor is aligned to target at each possible offset. '''
+    mismatches = np.zeros((len(donor), len(target) - len(donor)), int)
+    cdef long [:, ::1] mismatches_view = mismatches
+    cdef unsigned int row, col
+    
+    for col in range(len(target) - len(donor)):
+        for row in range(len(donor)):
+            if donor[row] != target[col + row]:
+                mismatches_view[row, col] += 1
+                
+    total_mismatches = mismatches.sum(axis=0)
+    return total_mismatches

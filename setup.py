@@ -2,10 +2,12 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.0.1',
+    version='0.0.7',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
+    url='https://github.com/jeffhussmann/hits',
+    description='utilities for processing high-throughput sequencing experiments',
 
     setup_requires=['cython'],
 
@@ -32,15 +34,16 @@ setup(
     python_requires='>=3.6',
 
     install_requires=[
-        'biopython',
-        'matplotlib',
-        'numpy',
-        'ipython',
-        'ipywidgets',
-        'pandas',
-        'pillow',
-        'pysam',
-        'PyYAML',
-        'scipy',
+        'biopython>=1.72',
+        'bokeh>=1.0.4',
+        'ipython>=7.8.0',
+        'ipywidgets>=7.4.2',
+        'matplotlib>=3.0.2',
+        'numpy>=1.15.4',
+        'pandas>=0.23.4',
+        'pillow>=5.3.0',
+        'pysam>=0.15.1',
+        'pyyaml>=3.13',
+        'scipy>=1.2.1',
     ],
 )

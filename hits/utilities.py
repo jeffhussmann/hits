@@ -193,16 +193,26 @@ def memoized_with_key(f):
     return memoized_f
 
 def reservoir_sample(iterable, n):
-    sample = []
-    for i, item in enumerate(iterable):
-        if i < n:
-            sample.append(item)
+    sampler = ReservoirSampler(n)
+    for item in iterable:
+        sampler.add(item)
+    return sampler.sample
+
+class ReservoirSampler():
+    def __init__(self, sample_size):
+        self.sample = []
+        self.sample_size = sample_size
+        self.num_items_seen = 0
+
+    def add(self, item):
+        if self.num_items_seen < self.sample_size:
+            self.sample.append(item)
         else:
-            j = np.random.randint(i + 1)
-            if j < n:
-                sample[j] = item
-    
-    return sample
+            j = np.random.randint(self.num_items_seen + 1)
+            if j < self.sample_size:
+                self.sample[j] = item
+
+        self.num_items_seen += 1
 
 def chunks(iterable, n):
     '''from https://stackoverflow.com/a/29524877
@@ -211,8 +221,13 @@ def chunks(iterable, n):
     '''
     iterable = iter(iterable)
     while True:
-        first = next(iterable)
+        try:
+            first = next(iterable)
+        except StopIteration:
+            return
+
         rest = islice(iterable, n - 1)
+
         yield chain([first], rest)
 
 def list_chunks(full_list, n):
@@ -233,7 +248,7 @@ def possibly_fn(fn=None):
 
     if fn != None: writer.close()
 
-def clopper_pearson(x, n, alpha=0.05):
+def clopper_pearson(x, n, alpha=0.05, return_format='delta'):
     if n == 0:
         return 0., 0.
 
@@ -256,7 +271,12 @@ def clopper_pearson(x, n, alpha=0.05):
         l = scipy.optimize.brentq(sf, 0, 1)
         mle = float(x) / n
 
-    return mle - l, u - mle
+    if return_format == 'delta':
+        return mle - l, u - mle
+    elif return_format == 'absolute':
+        return l, u
+    else:
+        raise ValueError(return_format)
 
 def homopolymer_lengths(seq, b):
     locations = []
