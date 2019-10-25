@@ -761,4 +761,16 @@ def build_minimap2_index(fasta_fn, index_fn):
         '-d', str(index_fn),
         str(fasta_fn),
     ]
-    subprocess.run(minimap2_command, check=True)
+
+    try:
+        subprocess.run(minimap2_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE,
+                      )
+    except subprocess.CalledProcessError as e:
+        print('minimap2 command returned code {0}'.format(e.returncode))
+        print('full command was:\n\n{0}\n'.format(' '.join(minimap2_command)))
+        print('stdout from minimap2 was:\n\n{0}\n'.format(e.stdout.decode()))
+        print('stderr from minimap2 was:\n\n{0}\n'.format(e.stdout.decode()))
+        raise
