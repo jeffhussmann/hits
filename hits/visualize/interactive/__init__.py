@@ -96,7 +96,7 @@ def scatter(df=None,
             clustering on (correlations of) numerical columns and draws a
             dendrogram.
 
-        grid: Draw a 'grid', 'diagonal' lines, or 'none' as guide lines.
+        grid: Draw a 'grid', 'diagonal' lines, 'diagonal+axes', or 'none' as guide lines.
 
         volcano: If True, make some tweaks suitable for volcano plots.
 
@@ -409,7 +409,7 @@ def scatter(df=None,
         initial = data_lims
         bounds = data_lims
 
-    diagonals_visible = (grid == 'diagonal')
+    diagonals_visible = ('diagonal' in grid)
 
     if log_scale:
         upper_ys = np.array(bounds) * 10
@@ -440,7 +440,7 @@ def scatter(df=None,
     ]
 
     for line in axes_lines:
-        line.visible = show_axes_lines
+        line.visible = show_axes_lines or ('axes' in grid)
     
     if volcano:
         fig.y_range = bokeh.models.Range1d(-0.1, 8)
