@@ -1,9 +1,11 @@
+import io
 from collections import Counter
 
 import scipy.stats
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import PIL
 
 from .. import utilities
 from . import define_igv_colors
@@ -504,3 +506,29 @@ def plot_counts(l, ax=None, log_scales=None, normalize=False, **kwargs):
         ax.set_yscale('log')
     else:
         ax.set_ylim(0)
+
+def make_stacked_Image(figs):
+    ims = []
+
+    for fig in figs:
+        with io.BytesIO() as buffer:
+            fig.savefig(buffer, format='png', bbox_inches='tight')
+            im = PIL.Image.open(buffer)
+            im.load()
+            ims.append(im)
+
+        plt.close(fig)
+        
+    if not ims:
+        return None
+
+    total_height = sum(im.height for im in ims)
+    max_width = max(im.width for im in ims)
+
+    stacked_im = PIL.Image.new('RGBA', size=(max_width, total_height), color='white')
+    y_start = 0
+    for im in ims:
+        stacked_im.paste(im, (max_width - im.width, y_start))
+        y_start += im.height
+
+    return stacked_im
