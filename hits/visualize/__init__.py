@@ -394,7 +394,9 @@ def label_scatter_plot(ax, xs, ys, labels,
                            va=va,
                            color=color,
                            **text_kwargs)
-        ax.figure.canvas.draw()
+
+        if avoid:
+            ax.figure.canvas.draw()
 
         return text, text.get_window_extent(), (x, y, x_offset, y_offset)
 
