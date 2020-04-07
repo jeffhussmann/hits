@@ -1534,6 +1534,23 @@ def soft_clip_terminal_insertions(al):
     
     return new_al
 
+def remove_terminal_deletions(al):
+    al = copy.deepcopy(al)
+    
+    last_block_type, last_block_length = al.cigar[-1]
+    if last_block_type == BAM_CDEL:
+        al.cigar = al.cigar[:-1]
+        if al.is_reverse:
+            al.reference_start = al.reference_start + last_block_length
+            
+    first_block_type, first_block_length = al.cigar[0]
+    if first_block_type == BAM_CDEL:
+        al.cigar = al.cigar[1:]
+        if not al.is_reverse:
+            al.reference_start = al.reference_start + first_block_length
+    
+    return al
+
 def grouped_by_name(als):
     if isinstance(als, (str, Path)):
         als = pysam.AlignmentFile(als)
