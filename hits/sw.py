@@ -397,8 +397,6 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
         length_from_R1 = length_from_R2
     elif R2_start_in_R1 != SOFT_CLIPPED and R2_end_in_R1 != SOFT_CLIPPED:
         # R2 entirely contained in R1
-        # untested
-        raise NotImplementedError
         length_from_R1 = R2_start_in_R1 - R1_start + 1
         length_from_R2 = length_from_R1
     else:
@@ -603,13 +601,13 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
 
     R2_rc = R2.reverse_complement()
 
-    overlap_start = max(0, insert_length - len(R2))
-    just_R1 = R1[:overlap_start]
-    overlap_R1 = R1[overlap_start:insert_length]
+    R1_overlap_start = max(0, insert_length - len(R2))
+    just_R1 = R1[:R1_overlap_start]
+    overlap_R1 = R1[R1_overlap_start:insert_length]
 
-    overlap_start = max(0, len(R2) - insert_length)
-    overlap_R2 = R2_rc[overlap_start:overlap_start + len(overlap_R1)]
-    just_R2 = R2_rc[overlap_start + len(overlap_R1):]
+    R2_overlap_start = max(0, len(R2) - insert_length)
+    overlap_R2 = R2_rc[R2_overlap_start:R2_overlap_start + len(overlap_R1)]
+    just_R2 = R2_rc[R2_overlap_start + len(overlap_R1):]
 
     overlap_seq = []
     overlap_qual = []
