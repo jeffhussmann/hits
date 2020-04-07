@@ -1594,7 +1594,7 @@ def overlaps_feature(alignment, feature, require_same_strand=True):
         return False
 
     same_reference = alignment.reference_name == feature.seqname
-    num_overlapping_bases = alignment.get_overlap(feature.start, feature.end)
+    num_overlapping_bases = alignment.get_overlap(feature.start, feature.end + 1)
 
     if require_same_strand:
         same_strand = (get_strand(alignment) == feature.strand)
