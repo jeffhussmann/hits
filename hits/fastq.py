@@ -194,6 +194,10 @@ class Read(object):
     @utilities.memoized_property
     def query_qualities(self):
         return array.array('B', decode_sanger(self.qual))
+
+    @utilities.memoized_property
+    def Q30_fraction(self):
+        return np.mean(np.array(self.query_qualities) >= 30)
     
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
