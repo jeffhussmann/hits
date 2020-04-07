@@ -1161,7 +1161,7 @@ def merge_adjacent_alignments(first, second, ref_seqs):
     strand = get_strand(first)
     if strand == '+':
         left_cropped = crop_al_to_query_int(left_query, 0, right_covered.start - 1)
-        if left_cropped is None:
+        if left_cropped is None or left_cropped.is_unmapped:
             # left alignment doesn't cover any query not covered by right
             return None
 
@@ -1170,7 +1170,7 @@ def merge_adjacent_alignments(first, second, ref_seqs):
 
     elif strand == '-':
         right_cropped = crop_al_to_query_int(right_query, left_covered.end + 1, np.inf)
-        if right_cropped is None:
+        if right_cropped is None or right_cropped.is_unmapped:
            # right alignment doesn't cover any query not covered by left
            return None
 
