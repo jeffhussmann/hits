@@ -176,17 +176,17 @@ def memoized_property(f):
 
 def memoized_with_key(f):
     @functools.wraps(f)
-    def memoized_f(self, key):
+    def memoized_f(self, *args):
         attr_name = '_' + f.__name__
         if not hasattr(self, attr_name):
             setattr(self, attr_name, {})
 
         already_computed = getattr(self, attr_name)
-        if key in already_computed:
-            value = already_computed[key]
+        if args in already_computed:
+            value = already_computed[args]
         else:
-            value = f(self, key)
-            already_computed[key] = value
+            value = f(self, *args)
+            already_computed[args] = value
 
         return value
 
