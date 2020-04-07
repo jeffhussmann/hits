@@ -320,10 +320,6 @@ def get_one_mismatch_resolver(sample_indices):
             for one_mismatch_seq in get_all_one_mismatch(seq):
                 resolver[one_mismatch_seq].append(name)
             
-    for seq, names in resolver.items():
-        if len(names) > 1:
-            print('warning: {} within hamming distance 1 of {}'.format(seq, names))
-            
-    resolver = {seq: names[0] for seq, names in resolver.items()}
+    resolver = {seq: set(names) for seq, names in resolver.items()}
             
     return resolver
