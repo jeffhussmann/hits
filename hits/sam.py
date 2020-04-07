@@ -1039,6 +1039,7 @@ def crop_al_to_ref_int(alignment, start, end):
     outside the interval [start, end] are soft-clipped. If no bases are left,
     sets alignment.is_unmapped to true.
     '''
+    original_alignment = alignment
     alignment = copy.deepcopy(alignment)
 
     if alignment.reference_start > end or alignment.reference_end - 1 < start:
@@ -1087,6 +1088,18 @@ def crop_al_to_ref_int(alignment, start, end):
     else:
         alignment.is_unmapped = True
         alignment.cigar = []
+
+    if alignment.has_tag('MD'):
+        MD = alignment.get_tag('MD')
+
+        total_ref_nucs = total_reference_nucs_except_splicing(original_alignment.cigar)
+        removed_from_start = total_reference_nucs_except_splicing(aligned_pairs_to_cigar(aligned_pairs[:start_i]))
+        removed_from_end = total_reference_nucs_except_splicing(aligned_pairs_to_cigar(aligned_pairs[end_i + 1:]))
+
+        MD = truncate_md_string_up_to(MD, total_ref_nucs - removed_from_end)
+        MD = truncate_md_string_from_beginning(MD, total_ref_nucs - removed_from_end - removed_from_start)
+
+        alignment.set_tag('MD', MD)
     
     return alignment
 
