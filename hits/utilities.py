@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import Bio.Data.IUPACData
 import scipy.optimize
+import statsmodels.stats.proportion
 
 identity = lambda x: x
 
@@ -277,6 +278,13 @@ def clopper_pearson(x, n, alpha=0.05, return_format='delta'):
         return l, u
     else:
         raise ValueError(return_format)
+
+def clopper_pearson_fast(xs, ns, alpha=0.05):
+    alphas = np.full(len(xs), alpha)
+    #alphas[(xs == 0) | (xs == ns)] = 2 * alpha
+    lowers, uppers = statsmodels.stats.proportion.proportion_confint(xs, ns, alpha=alphas, method='beta')
+
+    return lowers, uppers
 
 def homopolymer_lengths(seq, b):
     locations = []
