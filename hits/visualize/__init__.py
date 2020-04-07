@@ -37,6 +37,7 @@ reds = matplotlib.colors.LinearSegmentedColormap('reds', reds_cdict, 10000)
 reds.set_over('black')
 
 def optional_ax(original_function):
+    @functools.wraps(original_function)
     def possibly_new_ax(*args, **kwargs):
         ax_given = kwargs.get('ax')
         if not ax_given:
