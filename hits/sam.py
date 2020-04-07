@@ -1112,6 +1112,9 @@ def query_interval(alignment):
 
     return start, end
 
+def ref_interval(alignment):
+    return alignment.reference_start, alignment.reference_end - 1
+
 def merge_multiple_adjacent_alignments(als, ref_seqs):
     merger = functools.partial(merge_adjacent_alignments, ref_seqs=ref_seqs)
     als = sorted(als, key=query_interval)

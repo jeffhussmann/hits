@@ -229,6 +229,12 @@ def get_covered(alignment):
     else:
         return Interval(*sam.query_interval(alignment))
 
+def get_covered_on_ref(alignment):
+    if alignment is None or alignment.is_unmapped:
+        return Interval(-1, -2)
+    else:
+        return Interval(*sam.ref_interval(alignment))
+
 def make_disjoint(intervals):
     disjoint = DisjointIntervals([])
     for interval in intervals:
