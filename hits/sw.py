@@ -174,8 +174,10 @@ def generate_alignments(query,
         force_edge_end = True
     
     elif alignment_type == 'query_end':
-        force_either_start = True
         force_query_end = True
+
+    elif alignment_type == 'query_start':
+        force_query_start = True
 
     elif alignment_type == 'unpaired_adapter':
         force_query_start = True
