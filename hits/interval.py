@@ -12,7 +12,7 @@ def are_disjoint(first, second):
 def are_adjacent(first, second):
     return first.start == second.end + 1 or second.start == first.end + 1
 
-class Interval(object):
+class Interval:
     def __init__(self, start, end):
         self.start = start
         self.end = end
@@ -123,7 +123,7 @@ class Interval(object):
             else:
                 return disjoint
     
-class DisjointIntervals(object):
+class DisjointIntervals:
     def __init__(self, intervals):
         self.intervals = sorted([i for i in intervals if i.end >= i.start])
         self.is_empty = (len(self.intervals) == 0)
