@@ -730,14 +730,14 @@ def extend_alignment(initial_al, target_seq_bytes):
         # Remove from starting soft clip...
         kind, length = cigar[0]
         if kind != sam.BAM_CSOFT_CLIP:
-            raise ValueError('expected soft-clip, got {}'.format(kind))
+            raise ValueError(f'expected soft-clip, got {kind}')
         
         cigar[0] = (kind, length - added_to_start)
         
         # ... and add to subsequent match.
         kind, length = cigar[1]
         if kind != sam.BAM_CMATCH:
-            raise ValueError('expected match, got {}'.format(kind))
+            raise ValueError(f'expected match, got {kind}')
             
         cigar[1] = (kind, length + added_to_start)
         
@@ -745,14 +745,14 @@ def extend_alignment(initial_al, target_seq_bytes):
         # Remove from ending soft clip...
         kind, length = cigar[-1]
         if kind != sam.BAM_CSOFT_CLIP:
-            raise ValueError('expected soft-clip, got {}'.format(kind))
+            raise ValueError(f'expected soft-clip, got {kind}')
         
         cigar[-1] = (kind, length - added_to_end)
         
         # ... and add to subsequent match.
         kind, length = cigar[-2]
         if kind != sam.BAM_CMATCH:
-            raise ValueError('expected match, got {}'.format(kind))
+            raise ValueError(f'expected match, got {kind}')
             
         cigar[-2] = (kind, length + added_to_end)
 
@@ -778,7 +778,7 @@ def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_b
         # Remove from starting soft clip...
         kind, length = cigar[0]
         if kind != sam.BAM_CSOFT_CLIP:
-            raise ValueError('expected soft-clip, got {}'.format(kind))
+            raise ValueError(f'expected soft-clip, got {kind}')
         
         soft_clip_length = length - gained_before
         if soft_clip_length > 0:
@@ -796,7 +796,7 @@ def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_b
         # Remove from ending soft clip...
         kind, length = cigar[-1]
         if kind != sam.BAM_CSOFT_CLIP:
-            raise ValueError('expected soft-clip, got {}'.format(kind))
+            raise ValueError(f'expected soft-clip, got {kind}')
         
         soft_clip_length = length - gained_after
         if soft_clip_length > 0:
