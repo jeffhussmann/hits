@@ -13,6 +13,7 @@ from . import fasta
 from . import adapters
 from . import annotation
 from . import sam
+from . import interval
 from .sw_cython import *
 
 empty_alignment = {
@@ -463,13 +464,38 @@ def align_read(read, targets, min_path_length, header,
                min_score_ratio=0.8,
                max_alignments_per_target=1,
                both_directions=True,
+               read_interval=None,
+               ref_intervals=None,
                **kwargs):
+
+    if read_interval is None:
+        read_interval = interval.Interval(0, len(read) - 1)
+
+    if ref_intervals is None:
+        ref_intervals = {}
+
+    for target_name, target_seq in targets:
+        if target_name not in ref_intervals:
+            ref_intervals[target_name] = interval.Interval(0, len(target_seq) - 1)
+
+    skipped_at_start = read_interval.start
+    skipped_at_end = len(read) - 1 - read_interval.end
+
+    # Register full seq and quals before possibly trimming read
+    original_forward_seq = read.seq
+    original_forward_qual = array.array('B', fastq.decode_sanger(read.qual))
+
+    rc_read = read.reverse_complement()
+    original_rc_seq = rc_read.seq
+    original_rc_qual = array.array('B', fastq.decode_sanger(rc_read.qual))
+
+    # Trim read to read interval
+    read = read[read_interval.start:read_interval.end + 1]
+
     forward_seq = read.seq
-    forward_qual = array.array('B', fastq.decode_sanger(read.qual))
 
     rc_read = read.reverse_complement()
     rc_seq = rc_read.seq
-    rc_qual = array.array('B', fastq.decode_sanger(rc_read.qual))
 
     alignments = []
 
@@ -479,34 +505,51 @@ def align_read(read, targets, min_path_length, header,
         directions = [False]
 
     for target_name, target_seq in targets:
+        ref_interval = ref_intervals[target_name]
+        target_seq = target_seq[ref_interval.start:ref_interval.end + 1]
+
         target_alignments = []
 
         for is_reverse in directions:
             if is_reverse:
                 seq = rc_seq
-                qual = rc_qual
+
+                original_seq = original_rc_seq
+                original_qual = original_rc_qual
+
+                extra_soft_clip_start = skipped_at_end
+                extra_soft_clip_end = skipped_at_start
+
             else:
                 seq = forward_seq
-                qual = forward_qual
+
+                original_seq = original_forward_seq
+                original_qual = original_forward_qual
+
+                extra_soft_clip_start = skipped_at_start
+                extra_soft_clip_end = skipped_at_end
 
             for alignment in generate_alignments(seq, target_seq, max_alignments=max_alignments_per_target, **kwargs):
                 path = alignment['path']
 
                 if len(path) >= min_path_length and alignment['score_ratio'] >= min_score_ratio:
                     al = pysam.AlignedSegment(header)
-                    al.seq = seq
-                    al.query_qualities = qual
+                    al.seq = original_seq
+                    al.query_qualities = original_qual
                     al.is_reverse = is_reverse
 
                     char_pairs = make_char_pairs(path, seq, target_seq)
 
                     cigar = sam.aligned_pairs_to_cigar(char_pairs)
-                    clip_from_start = first_query_index(path)
+
+                    clip_from_start = first_query_index(path) + extra_soft_clip_start
                     if clip_from_start > 0:
                         cigar = [(sam.BAM_CSOFT_CLIP, clip_from_start)] + cigar
-                    clip_from_end = len(seq) - 1 - last_query_index(path)
+
+                    clip_from_end = len(seq) - 1 - last_query_index(path) + extra_soft_clip_end
                     if clip_from_end > 0:
                         cigar = cigar + [(sam.BAM_CSOFT_CLIP, clip_from_end)]
+
                     al.cigar = cigar
                     
                     if al.query_length != al.infer_query_length():
@@ -521,7 +564,9 @@ def align_read(read, targets, min_path_length, header,
                     al.reference_name = target_name
                     al.query_name = read.name
                     al.next_reference_id = -1
-                    al.reference_start = first_target_index(path)
+
+                    # Add back target seq that was ignored
+                    al.reference_start = first_target_index(path) + ref_interval.start
 
                     target_alignments.append(al)
 
