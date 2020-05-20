@@ -72,6 +72,7 @@ def enhanced_scatter(xs, ys,
                      data=None,
                      colors=None,
                      do_fit=False,
+                     show_correlation=False,
                      show_p_value=False,
                      show_beta=True,
                      hists_location=None,
@@ -92,6 +93,7 @@ def enhanced_scatter(xs, ys,
                      colorbar=False,
                      remove_y_hist=False,
                      remove_x_hist=False,
+                     label=None,
                     ):
 
     if data is not None:
@@ -138,11 +140,12 @@ def enhanced_scatter(xs, ys,
     if same_lists:
         do_fit = False
 
-    kwargs = {'cmap': matplotlib.cm.jet,
-              's': marker_size,
-              #'linewidths' : (0.1,),
-              'linewidths' : (0,),
-             }
+    kwargs = {
+        'cmap': matplotlib.cm.jet,
+        's': marker_size,
+        'linewidths' : (0,),
+        'label': label,
+    }
 
     scatter = ax.scatter(xs, ys, c=colors, **kwargs)
     ax.set_xlabel(x_label, size=16)
@@ -251,9 +254,11 @@ def enhanced_scatter(xs, ys,
     if color_by_correlation:
         text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
 
-    ax.annotate(text,
-                xytext=(x_sign * x_offset, y_sign * y_offset),
-                **text_kwargs)
+    if show_correlation:
+        ax.annotate(text,
+                    xytext=(x_sign * x_offset, y_sign * y_offset),
+                    **text_kwargs,
+        )
 
     original_xlims = ax.get_xlim()
     original_ylims = ax.get_ylim()
