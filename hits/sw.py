@@ -778,13 +778,16 @@ def extend_alignment(initial_al, target_seq_bytes):
             raise ValueError(f'expected soft-clip, got {kind}')
         
         cigar[0] = (kind, length - added_to_start)
-        
+
         # ... and add to subsequent match.
         kind, length = cigar[1]
         if kind != sam.BAM_CMATCH:
             raise ValueError(f'expected match, got {kind}')
             
         cigar[1] = (kind, length + added_to_start)
+
+        if cigar[0][1] == 0:
+            cigar = cigar[1:]
         
     if added_to_end > 0:
         # Remove from ending soft clip...
@@ -800,6 +803,9 @@ def extend_alignment(initial_al, target_seq_bytes):
             raise ValueError(f'expected match, got {kind}')
             
         cigar[-2] = (kind, length + added_to_end)
+
+        if cigar[-1][1] == 0:
+            cigar = cigar[:-1]
 
     if added_to_start > 0 or added_to_end > 0:
         new_al = copy.deepcopy(initial_al)
