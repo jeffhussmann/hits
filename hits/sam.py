@@ -800,7 +800,7 @@ def sam_to_fastq(sam_file_name):
 
 bam_to_fastq = sam_to_fastq
 
-class AlignmentSorter(object):
+class AlignmentSorter:
     ''' Context manager that handles writing AlignedSegments into a samtools
     sort process.
     '''
@@ -1039,6 +1039,9 @@ def crop_al_to_ref_int(alignment, start, end):
     outside the interval [start, end] are soft-clipped. If no bases are left,
     sets alignment.is_unmapped to true.
     '''
+    if alignment is None:
+        return None
+
     original_alignment = alignment
     alignment = copy.deepcopy(alignment)
 
@@ -1310,6 +1313,7 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     else:
         min_edits = 0
         switch_after = left_covered.end
+        best_switch_points = [switch_after]
 
     if gap_interval.is_empty:
         gap_length = 0
@@ -1319,6 +1323,7 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     
     results = {
         'switch_after': switch_after,
+        'best_switch_points': best_switch_points,
         'min_edits': min_edits,
         'gap_interval': gap_interval,
         'gap_length': gap_length,
@@ -1745,6 +1750,8 @@ def get_header(bam_fn):
     return header
 
 def flip_alignment(alignment):
+    # Changing the is_reverse flag is functionally equivalent to the read having been
+    # reverse complemented before alignment.
     flipped_alignment = copy.deepcopy(alignment)
     flipped_alignment.is_reverse = not alignment.is_reverse
     return flipped_alignment
