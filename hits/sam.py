@@ -1407,36 +1407,44 @@ def get_ref_pos_to_block(alignment):
 
     return ref_pos_to_block
 
-def split_at_first_large_insertion(alignment, min_length):
+def split_at_first_large_insertion(alignment, min_length, exempt_if_overlaps=None):
     q = 0
 
-    # Using cigar blocks, march from beginning of the read to the (possible)
-    # insertion point to determine the query interval to crop to.
     # If the alignment is reversed, alignment.cigar is reversed relative to
     # true query positions.
     cigar = alignment.cigar
     if alignment.is_reverse:
         cigar = cigar[::-1]
 
+    # Using cigar blocks, march from beginning of the read to the (possible)
+    # insertion point to determine the query interval to crop to.
     for kind, length in cigar:
         if kind == BAM_CINS and length >= min_length:
             before = crop_al_to_query_int(alignment, 0, q - 1)
             after = crop_al_to_query_int(alignment, q + length, alignment.query_length)
-            return [before, after]
-        else:
-            if kind in read_consuming_ops:
-                q += length
+            
+            if get_strand(alignment) == '+':
+                inserted_at = after.reference_start - 0.5
+            else:
+                inserted_at = before.reference_start - 0.5
+
+            if exempt_if_overlaps is None or inserted_at not in exempt_if_overlaps:
+                return [before, after]
+
+        if kind in read_consuming_ops:
+            q += length
 
     return [alignment]
 
-def split_at_large_insertions(alignment, min_length):
+def split_at_large_insertions(alignment, min_length, exempt_if_overlaps=None):
+    ''' O(n^2) behavior can be bad for pacbio alignments. '''
     all_split = []
     
     to_split = [alignment]
 
     while len(to_split) > 0:
         candidate = to_split.pop()
-        split = split_at_first_large_insertion(candidate, min_length)
+        split = split_at_first_large_insertion(candidate, min_length, exempt_if_overlaps=exempt_if_overlaps)
         if len(split) > 1:
             to_split.extend(split)
         else:
