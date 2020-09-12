@@ -515,7 +515,7 @@ def plot_counts(l, ax=None, log_scales=None, normalize=False, **kwargs):
     else:
         ax.set_ylim(0)
 
-def make_stacked_Image(figs):
+def make_stacked_Image(figs, orientation='vertical'):
     ims = []
 
     for fig in figs:
@@ -530,13 +530,24 @@ def make_stacked_Image(figs):
     if not ims:
         return None
 
-    total_height = sum(im.height for im in ims)
-    max_width = max(im.width for im in ims)
+    if orientation == 'vertical':
+        total_height = sum(im.height for im in ims)
+        max_width = max(im.width for im in ims)
 
-    stacked_im = PIL.Image.new('RGBA', size=(max_width, total_height), color='white')
-    y_start = 0
-    for im in ims:
-        stacked_im.paste(im, (max_width - im.width, y_start))
-        y_start += im.height
+        stacked_im = PIL.Image.new('RGBA', size=(max_width, total_height), color='white')
+        y_start = 0
+        for im in ims:
+            stacked_im.paste(im, (max_width - im.width, y_start))
+            y_start += im.height
+
+    else:
+        max_height = max(im.height for im in ims)
+        total_width = sum(im.width for im in ims)
+
+        stacked_im = PIL.Image.new('RGBA', size=(total_width, max_height), color='white')
+        x_start = 0
+        for im in ims:
+            stacked_im.paste(im, (x_start, max_height - im.height))
+            x_start += im.width
 
     return stacked_im
