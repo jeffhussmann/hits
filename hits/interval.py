@@ -1,3 +1,5 @@
+import functools
+import operator
 from collections import defaultdict
 from numbers import Number
 
@@ -211,7 +213,7 @@ class DisjointIntervals:
     
     def __sub__(self, other):
         if isinstance(other, DisjointIntervals):
-            raise NotImplementedError
+            return functools.reduce(operator.and_, [self - other_int for other_int in other.intervals])
         else:
             pieces = []
             for interval in self.intervals:
