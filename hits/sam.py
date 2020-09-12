@@ -1229,13 +1229,17 @@ def merge_adjacent_alignments(first, second, ref_seqs):
 
     left_ref, right_ref = sorted([left_cropped, right_cropped], key=lambda al: al.reference_start)
 
-    if left_ref.reference_end >= right_ref.reference_start:
+    if left_ref.reference_end > right_ref.reference_start:
         return None
 
     deletion_length = right_ref.reference_start - left_ref.reference_end
+    if deletion_length > 0:
+        deletion_cigar = [(BAM_CDEL, deletion_length)]
+    else:
+        deletion_cigar = []
 
     merged = copy.deepcopy(left_ref)
-    merged.cigar = left_ref.cigar[:-1] + [(BAM_CDEL, deletion_length)] + right_ref.cigar[1:]
+    merged.cigar = left_ref.cigar[:-1] + deletion_cigar + right_ref.cigar[1:]
 
     return merged
 
