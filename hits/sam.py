@@ -1133,6 +1133,26 @@ def merge_multiple_adjacent_alignments(als, ref_seqs):
     als = sorted(als, key=query_interval)
     return functools.reduce(merger, als)
 
+def merge_any_adjacent_pairs(als, ref_seqs):
+    als = sorted(als, key=lambda al: interval.get_covered(al))
+
+    if len(als) == 0:
+        return als
+    else:
+        merged_als = [als[0]]
+
+        while len(als) > 0:
+            left_al = merged_als.pop()
+            right_al = als.pop(0)
+            
+            merged = merge_adjacent_alignments(left_al, right_al, ref_seqs)
+            if merged is not None:
+                merged_als.append(merged)
+            else:
+                merged_als.extend([left_al, right_al])
+
+        return merged_als
+
 def merge_adjacent_alignments(first, second, ref_seqs):
     ''' If first and second are alignments to the same reference name and strand
     that are adjacent or partially overlap on the query, returns a single merged
