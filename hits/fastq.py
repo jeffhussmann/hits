@@ -73,7 +73,7 @@ def sanitize_qual(qual):
     sanitized = qual.translate(_sanitize_table)
     return sanitized
 
-def quality_and_complexity(reads, max_read_length, alignments=False, min_q=0):
+def quality_and_complexity(reads_iter, max_read_length, alignments=False, min_q=0):
     stats = {
         'q': np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int),
         'c': np.zeros((max_read_length, 256), int),
@@ -81,7 +81,10 @@ def quality_and_complexity(reads, max_read_length, alignments=False, min_q=0):
         'average_q': np.zeros((max_read_length, 256), int),
     }
 
-    for read in reads:
+    if isinstance(reads_iter, (str, Path)):
+        reads_iter = reads(reads_iter)
+
+    for read in reads_iter:
         if alignments:
             process_Alignment(read.query_sequence.encode(),
                               read.query_qualities,

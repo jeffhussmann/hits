@@ -147,7 +147,7 @@ def shade_background(start, sequence, ax=None, save_as=None):
                        start + p + 0.5,
                        ymax=1 - i * increment,
                        ymin=1 - (i + 1) * increment,
-                       facecolor=igv_colors.normalized_rgbs[base],
+                       facecolor=igv_colors[base],
                        alpha=0.3,
                        linewidth=0.7,
                       )

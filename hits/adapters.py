@@ -1,5 +1,6 @@
 import numpy as np
 from . import utilities
+from . import sw
 from .adapters_cython import *
 
 primers = {
@@ -120,3 +121,26 @@ def consistent_paired_position(R1_seq,
         return min(common_positions)
     else:
         return None
+
+def trim_by_local_alignment(adapter, seq):
+    ''' Try to find a near-exact match. If this fails, do a local alignment. '''
+    adapter_prefix_length = 15
+    adapter_prefix_bytes = adapter[:adapter_prefix_length].encode()
+    seq_bytes = seq.encode()
+    trim_at = find_adapter(adapter_prefix_bytes, 1, seq_bytes)
+
+    if trim_at > len(seq) - adapter_prefix_length:
+        alignments = sw.generate_alignments(adapter,
+                                            seq,
+                                            'unpaired_adapter',
+                                            max_alignments=1,
+                                           )
+        if len(alignments) == 1:
+            alignment = alignments[0]
+            score_diff = 2 * len(alignment['path']) - alignment['score']
+            adapter_start_in_seq = sw.first_target_index(alignment['path'])
+
+            if alignment['path'] and score_diff <= 0.5 * len(alignment['path']):
+                trim_at = adapter_start_in_seq
+
+    return trim_at

@@ -1,4 +1,5 @@
 import io
+import functools
 from collections import Counter
 
 import scipy.stats
@@ -36,6 +37,17 @@ reds_cdict = {
 reds = matplotlib.colors.LinearSegmentedColormap('reds', reds_cdict, 10000)
 reds.set_over('black')
 
+greens_cdict = {
+    'red':   ((0.0, 1.0, 1.0),
+              (1.0, 0.0, 0.0)),
+    'green': ((0.0, 1.0, 1.0),
+              (1.0, 1.0, 1.0)),
+    'blue':  ((0.0, 1.0, 1.0),
+              (1.0, 0.0, 0.0)),
+}
+
+greens = matplotlib.colors.LinearSegmentedColormap('greens', greens_cdict, 10000)
+
 def optional_ax(original_function):
     @functools.wraps(original_function)
     def possibly_new_ax(*args, **kwargs):
@@ -58,7 +70,8 @@ def optional_ax(original_function):
 
 def add_commas_to_ticks(ax, which='y'):
     def commas_formatter(x, pos):
-        return '{0:,}'.format(int(x))
+        return f'{x:,}'
+
     tick_formatter = matplotlib.ticker.FuncFormatter(commas_formatter)
     if which == 'y':
         axis = ax.yaxis
@@ -260,9 +273,6 @@ def enhanced_scatter(xs, ys,
                     **text_kwargs,
         )
 
-    original_xlims = ax.get_xlim()
-    original_ylims = ax.get_ylim()
-
     if hists_location is not None:
         if hists_location == 'inside':
             bottom = ax_position.y0
@@ -296,9 +306,6 @@ def enhanced_scatter(xs, ys,
         if remove_y_hist:
             fig.delaxes(ax_y)
 
-        #ax.set_xlim(original_xlims)
-        #ax.set_ylim(original_ylims)
-        
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
         xs, ys = [0, 1], [1, 0]

@@ -23,7 +23,7 @@ def extend_stages(whole_stages, specific_stages):
 
 class MapReduceExperiment(object):
     specific_results_files = [
-        ('summary', Serialize.log),
+        ('summary', serialize.log),
         ('log', '', 'log.txt'),
     ]
     specific_figure_files = []
@@ -88,7 +88,7 @@ class MapReduceExperiment(object):
             for kind in ['summary_stage', 'timing']:
                 key = '{0}_{1}'.format(kind, stage)
                 tail_template = '{{name}}_{0}_{1}.txt'.format(kind, stage)
-                self.results_files.append((key, Serialize.log, tail_template))
+                self.results_files.append((key, serialize.log, tail_template))
                 self.outputs[stage].append(key)
 
         self.cleanup[-1].append('consolidate_summaries')
@@ -158,7 +158,7 @@ class MapReduceExperiment(object):
     def consolidate_summaries(self):
         stage_file_names = [self.file_names['summary_stage_{0}'.format(stage)]
                             for stage in range(self.num_stages)]
-        Serialize.log.consolidate_stages(stage_file_names, self.file_names['summary'])
+        serialize.log.consolidate_stages(stage_file_names, self.file_names['summary'])
 
     def write_file(self, key, data):
         file_format, _ = self.file_types[key]
@@ -214,7 +214,7 @@ class MapReduceExperiment(object):
             end_time = time.time()
             times.append((function_name, end_time - start_time))
         
-        Serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
+        serialize.log.append(times, self.merged_file_names['timing_{0}'.format(stage)])
         logging.info('Done with cleanup for stage {0}'.format(stage))
 
     def get_fn_groups(self):
@@ -244,7 +244,7 @@ class MapReduceExperiment(object):
     def data_fns(self):
         data_fns = []
         for extension in ['fastq', 'fq', 'sra', 'fastq.gz']:
-            data_fns.extend(glob.glob('{0}/*.{1}'.format(self.data_dir, extension)))
+            data_fns.extend(glob.glob(f'{self.data_dir}/*.{extension}'))
         return data_fns
     
     def get_reads(self, max_reads_per_file=None, quiet=False):
@@ -566,7 +566,7 @@ def finish(args, ExperimentClass, **override):
 
         logging.info('Merging file {0} (fast_merge={1})'.format(key, fast_merge))
         start_time = time.time()
-        Serialize.merge_files(piece_file_names,
+        serialize.merge_files(piece_file_names,
                               merged_file_name,
                               file_type,
                               fast=fast_merge,
@@ -574,5 +574,5 @@ def finish(args, ExperimentClass, **override):
         end_time = time.time()
         merge_times.append(('Merging {}'.format(key), end_time - start_time))
 
-    Serialize.log.append(merge_times, merged.merged_file_names['timing_{0}'.format(args.stage)])
+    serialize.log.append(merge_times, merged.merged_file_names['timing_{0}'.format(args.stage)])
     merged.do_cleanup(args.stage)

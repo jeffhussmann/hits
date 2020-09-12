@@ -1,6 +1,6 @@
 import sys
 import os
-from sequencing import utilities
+from hits import utilities
 
 lonestar_template = '''\
 #!/bin/bash
