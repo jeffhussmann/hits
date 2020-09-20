@@ -228,3 +228,14 @@ def mismatches_at_offset(char* donor, char* target):
                 
     total_mismatches = mismatches.sum(axis=0)
     return total_mismatches
+
+def hamming_distance(char* first, char* second):
+    cdef int i
+    cdef int d = 0
+    cdef int length = len(first)
+    
+    for i in range(length):
+        if first[i] != second[i]:
+            d += 1
+            
+    return d

@@ -337,22 +337,46 @@ def global_alignment(query, target, **kwargs):
     al, = generate_alignments(query, target, 'global', **kwargs)
     return al
 
-def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=False):
+def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=False, in_R1_prefix=None, in_R2_prefix=None):
     ''' Infer the length of the insert represented by R1 and R2 by performing
         a semi-local alignment of R1 and the reverse complement of R2 with
         the expected adapter sequences prepended to each read.
     '''
+
+
+    # Attempt a fast approach - check if expected sequencing primers occur at the same offset
+    # in both reads and the implied insert in each read is close to identical.
+    fast_insert_length = None
+
+    if in_R1_prefix is not None and in_R2_prefix is not None:
+        if in_R1_prefix in R1.seq and in_R2_prefix in R2.seq:
+            R1_end = R1.seq.index(in_R1_prefix)
+            R2_end = R2.seq.index(in_R2_prefix)
+            if R1_end == R2_end:
+                insert_length = R1_end
+                R1_trimmed = R1.seq[:insert_length].encode()
+                R2_trimmed = utilities.reverse_complement(R2.seq[:insert_length]).encode()
+                
+                if hamming_distance(R1_trimmed, R2_trimmed) / max(insert_length, 1) < 0.05:
+                    fast_insert_length = insert_length
+
+    if fast_insert_length is not None:
+        results = {'length': fast_insert_length}
+        return results
+
+    # If not, fall back on dynamic programming.
+
     extended_R1 = before_R1 + R1.seq
     extended_R2 = utilities.reverse_complement(before_R2 + R2.seq)
-    alignment,  = generate_alignments(extended_R1,
-                                      extended_R2, 
-                                      'overlap',
-                                      2,
-                                      -1,
-                                      indel_penalty,
-                                      1,
-                                      0,
-                                     )
+    alignment, = generate_alignments(extended_R1,
+                                     extended_R2, 
+                                     'overlap',
+                                     2,
+                                     -1,
+                                     indel_penalty,
+                                     1,
+                                     0,
+                                    )
 
     results = {'alignment': alignment}
 
@@ -637,7 +661,14 @@ def align_reads(target_fasta_fn,
             pass
 
 def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
-    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty)
+    if len(before_R1) >= 10 and len(before_R2) >= 10:
+        in_R1_prefix = utilities.reverse_complement(before_R2)[:10]
+        in_R2_prefix = utilities.reverse_complement(before_R1)[:10]
+    else:
+        in_R1_prefix = None
+        in_R2_prefix = None
+
+    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty, in_R1_prefix=in_R1_prefix, in_R2_prefix=in_R2_prefix)
 
     if 'failed' in results:
         insert_length = len(R1) + len(R2)
