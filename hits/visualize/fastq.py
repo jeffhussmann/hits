@@ -86,6 +86,7 @@ def plot_composition(base_counts,
                      bracket_ranges=None,
                      ax=None,
                      save_as=None,
+                     match_threshold=0.95,
                     ):
     ''' Plot fractions of all base calls that are each base at each cycle.
     '''
@@ -115,7 +116,7 @@ def plot_composition(base_counts,
     
     if expected_seq:
         start, sequence = expected_seq
-        shade_background(start, sequence, ax=ax)
+        shade_background(start, sequence, observed_seq=base_counts, match_threshold=match_threshold, ax=ax)
 
     if bracket_ranges:
         for text, (start, end) in bracket_ranges:
@@ -136,11 +137,22 @@ def plot_composition(base_counts,
              )
 
 @optional_ax
-def shade_background(start, sequence, ax=None, save_as=None):
+def shade_background(start, sequence, observed_seq=None, match_threshold=0.95, ax=None, save_as=None):
     ''' Lightly shade the background according to the expected sequence.
     '''
     for p, expected_bases in enumerate(sequence):
         expected_bases = [k for k, _ in utilities.group_by(expected_bases)]
+
+        alpha = 0.2
+
+        if len(expected_bases) == 1:
+            expected_base = expected_bases[0]
+            observed_frac = observed_seq[p][utilities.base_to_index[expected_base]] / max(observed_seq[p].sum(), 1)
+            if observed_frac > match_threshold:
+                alpha = 0.05
+            else:
+                alpha = 0.4
+
         increment = 1. / len(expected_bases)
         for i, base in enumerate(expected_bases):
             ax.axvspan(start + p - 0.5,
@@ -148,9 +160,10 @@ def shade_background(start, sequence, ax=None, save_as=None):
                        ymax=1 - i * increment,
                        ymin=1 - (i + 1) * increment,
                        facecolor=igv_colors[base],
-                       alpha=0.3,
+                       alpha=alpha,
                        linewidth=0.7,
                       )
+
 
 @optional_ax
 def plot_adapter_composition(base_counts,
