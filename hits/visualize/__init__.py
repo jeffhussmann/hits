@@ -107,6 +107,7 @@ def enhanced_scatter(xs, ys,
                      remove_y_hist=False,
                      remove_x_hist=False,
                      label=None,
+                     alpha=None,
                     ):
 
     if data is not None:
@@ -158,6 +159,7 @@ def enhanced_scatter(xs, ys,
         's': marker_size,
         'linewidths' : (0,),
         'label': label,
+        'alpha': alpha,
     }
 
     scatter = ax.scatter(xs, ys, c=colors, **kwargs)
@@ -392,6 +394,14 @@ def label_scatter_plot(ax, xs, ys, labels,
             x_offset = distance
             y_offset = 0
             ha, va = 'left', 'center'
+        elif vector == 'right':
+            x_offset = distance
+            y_offset = 0
+            ha, va = 'left', 'center'
+        elif vector == 'left':
+            x_offset = -distance
+            y_offset = 0
+            ha, va = 'right', 'center'
         elif vector == 'manual':
             x_ratio, y_ratio = manual_ratios
             ha, va = manual_alignments
