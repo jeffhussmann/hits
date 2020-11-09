@@ -76,6 +76,13 @@ def get_strand(mapping):
         strand = '+'
     return strand
 
+def get_opposite_strand(mapping):
+    if mapping.is_reverse:
+        strand = '+'
+    else:
+        strand = '-'
+    return strand
+
 def get_original_seq(mapping):
     if mapping.is_reverse:
         original_seq = utilities.reverse_complement(mapping.query_sequence)
