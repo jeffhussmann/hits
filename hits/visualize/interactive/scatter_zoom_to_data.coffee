@@ -1,4 +1,4 @@
-models = cb_obj.document._all_models_by_name._dict
+models = cb_obj.origin.document._all_models_by_name._dict
 
 log_scale = {log_scale}
 identical_bins = {identical_bins}

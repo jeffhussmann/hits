@@ -4,6 +4,7 @@ import numbers
 import base64
 import re
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import scipy.cluster.hierarchy
@@ -15,12 +16,31 @@ import matplotlib.colors
 import matplotlib.cm
 import IPython.display
 
-from .external_coffeescript import build_callback
-
 bokeh.io.output_notebook()
 
 def bool_to_js(b):
     return 'true' if b else 'false'
+
+def load_js_template(key):
+    fn = Path(__file__).parent / f'{key}.js'
+    return fn.read_text()
+
+def build_js_callback(key, format_kwargs=None, args=None):
+    if args is None:
+        args = {}
+    if format_kwargs is None:
+        format_kwargs = {}
+
+    code = load_js_template(key)
+    for format_kwarg, value in format_kwargs.items():
+        to_replace = '{' + format_kwarg + '}'
+        code = code.replace(to_replace, str(value))
+
+    name = f'{key}_callback'
+    callback = bokeh.models.CustomJS(code=code, args=args)
+    callback.name = name
+
+    return callback
 
 def scatter(df=None,
             numerical_cols=None,
@@ -462,8 +482,8 @@ def scatter(df=None,
     lower_bound, upper_bound = bounds
     range_kwargs = dict(lower_bound=lower_bound, upper_bound=upper_bound)
     
-    fig.x_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
-    fig.y_range.callback = build_callback('scatter_range', format_kwargs=range_kwargs)
+    fig.x_range.callback = build_js_callback('scatter_range', format_kwargs=range_kwargs)
+    fig.y_range.callback = build_js_callback('scatter_range', format_kwargs=range_kwargs)
     
     fig.outline_line_color = 'black'
 
@@ -656,7 +676,7 @@ def scatter(df=None,
                                           )
     
     # Callback to filter the table when selection changes.
-    scatter_source.selected.js_on_change('indices', build_callback('scatter_selection'))
+    scatter_source.selected.js_on_change('indices', build_js_callback('scatter_selection'))
     
     labels = bokeh.models.LabelSet(x='x',
                                    y='y',
@@ -778,7 +798,7 @@ def scatter(df=None,
         name_pairs = list(zip(heatmap_source.data['x_name'], heatmap_source.data['y_name']))
         initial_index = name_pairs.index((x_name, y_name))
         heatmap_source.selected = bokeh.models.Selection(indices=[initial_index])
-        heatmap_source.selected.js_on_change('indices', build_callback('scatter_heatmap'))
+        heatmap_source.selected.js_on_change('indices', build_js_callback('scatter_heatmap'))
 
         heatmap_fig.min_border = 1
         
@@ -815,11 +835,11 @@ def scatter(df=None,
             'clustered_formatter': '"{}"'.format(make_tick_formatter(orders['clustered'])),
             'original_formatter': '"{}"'.format(make_tick_formatter(orders['original'])),
         }
-        callback = build_callback('scatter_cluster_button', format_kwargs=format_kwargs)
+        callback = build_js_callback('scatter_cluster_button', format_kwargs=format_kwargs)
         cluster_button.js_on_click(callback)
 
     elif two_level_index:
-        menu_callback = build_callback('scatter_two_level_menu')
+        menu_callback = build_js_callback('scatter_two_level_menu')
 
         menus = {}
         for level in (0, 1):
@@ -853,7 +873,7 @@ def scatter(df=None,
                                                   name='y_menu',
                                                  )
         
-        menu_callback = build_callback('scatter_menu')
+        menu_callback = build_js_callback('scatter_menu')
         x_menu.js_on_change('value', menu_callback)
         y_menu.js_on_change('value', menu_callback)
 
@@ -867,7 +887,7 @@ def scatter(df=None,
                                                active=True,
                                                name='label_button',
                                               )
-    label_button.js_on_click(build_callback('scatter_label_button'))
+    label_button.js_on_click(build_js_callback('scatter_label_button'))
     
     # Button to zoom to current data limits.
     zoom_to_data_button = bokeh.models.widgets.Button(label='zoom to data limits',
@@ -877,7 +897,7 @@ def scatter(df=None,
     format_kwargs = dict(log_scale=bool_to_js(log_scale),
                          identical_bins=bool_to_js(identical_bins),
                         )
-    callback = build_callback('scatter_zoom_to_data', format_kwargs=format_kwargs)
+    callback = build_js_callback('scatter_zoom_to_data', format_kwargs=format_kwargs)
     zoom_to_data_button.js_on_click(callback)
 
     # Menu to choose label source.
@@ -886,7 +906,7 @@ def scatter(df=None,
                                              value=label_options[0],
                                              name='label_menu',
                                             )
-    label_menu.js_on_change('value', build_callback('scatter_label'))
+    label_menu.js_on_change('value', build_js_callback('scatter_label'))
 
     # Menu to choose color source.
     color_menu = bokeh.models.widgets.MultiSelect(title='Color by:',
@@ -894,7 +914,7 @@ def scatter(df=None,
                                              value=[color_options[-1]],
                                              name='color_menu',
                                             )
-    color_menu.js_on_change('value', build_callback('scatter_color'))
+    color_menu.js_on_change('value', build_js_callback('scatter_color'))
 
     # Radio group to choose whether to draw a vertical/horizontal grid or
     # diagonal guide lines. 
@@ -904,19 +924,19 @@ def scatter(df=None,
                                                    active=active,
                                                    name='grid_radio_buttons',
                                                   )
-    grid_options.js_on_change('active', build_callback('scatter_grid'))
+    grid_options.js_on_change('active', build_js_callback('scatter_grid'))
 
     text_input = bokeh.models.widgets.TextInput(title='Search:', name='search')
 
     columns_to_search = [c for c in object_cols if c not in color_options]
-    callback = build_callback('scatter_search', format_kwargs=dict(column_names=str(columns_to_search)))
+    callback = build_js_callback('scatter_search', format_kwargs=dict(column_names=str(columns_to_search)))
     text_input.js_on_change('value', callback)
 
     case_sensitive = bokeh.models.widgets.CheckboxGroup(labels=['Case sensitive'],
                                                         active=[],
                                                         name='case_sensitive',
                                                        )
-    case_sensitive.js_on_change('active', build_callback('scatter_case_sensitive'))
+    case_sensitive.js_on_change('active', build_js_callback('scatter_case_sensitive'))
 
     # Menu to select a subset of points from a columns of bools.
     subset_options = [''] + bool_cols
@@ -925,7 +945,7 @@ def scatter(df=None,
                                               value='',
                                               name='subset_menu',
                                              )
-    callback = build_callback('scatter_subset_menu', format_kwargs=dict(subset_indices=str(subset_indices)))
+    callback = build_js_callback('scatter_subset_menu', format_kwargs=dict(subset_indices=str(subset_indices)))
     subset_menu.js_on_change('value', callback)
 
     # button to dump table to file.
@@ -933,7 +953,7 @@ def scatter(df=None,
                                               width=50,
                                               name='save_button',
                                              )
-    callback = build_callback('scatter_save_button', format_kwargs=dict(column_names=str(table_col_names)))
+    callback = build_js_callback('scatter_save_button', format_kwargs=dict(column_names=str(table_col_names)))
     save_button.js_on_click(callback)
     
     # button to dump annotations to file.
@@ -941,7 +961,7 @@ def scatter(df=None,
                                                     width=50,
                                                     name='annotation_button',
                                                    )
-    callback = build_callback('scatter_annotation_button', format_kwargs=dict(column_names=str(table_col_names)))
+    callback = build_js_callback('scatter_annotation_button', format_kwargs=dict(column_names=str(table_col_names)))
     annotation_button.js_on_click(callback)
     
     if alpha_widget_type == 'slider':
@@ -957,7 +977,8 @@ def scatter(df=None,
     else:
         raise ValueError('{0} not a valid alpha_widget_type value'.format(alpha_widget_type))
 
-    alpha_widget.js_on_change('value', build_callback('scatter_alpha'))
+    callback = build_js_callback('scatter_alpha')
+    alpha_widget.js_on_change('value', callback)
     
     if size_widget_type == 'slider':
         size_widget = bokeh.models.Slider(start=1,
@@ -967,14 +988,14 @@ def scatter(df=None,
                                           title='marker size',
                                           name='marker_size',
                                          )
-        size_widget.js_on_change('value', build_callback('scatter_size'))
+        size_widget.js_on_change('value', build_js_callback('scatter_size'))
     else:
         size_widget = bokeh.models.widgets.Select(title='Size by:',
                                                   options=size_options,
                                                   value=size_options[1],
                                                   name='marker_size',
                                                  )
-        size_widget.js_on_change('value', build_callback('scatter_size_menu'))
+        size_widget.js_on_change('value', build_js_callback('scatter_size_menu'))
     
     rect_source = bokeh.models.ColumnDataSource(data={
         'x': [],

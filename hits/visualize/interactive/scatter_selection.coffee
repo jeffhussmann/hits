@@ -73,14 +73,14 @@ if not (window.requirejs?)
     return
 
 `
-requirejs.config({{
-    paths: {{
+requirejs.config({
+    paths: {
         d3: "https://d3js.org/d3-array.v1.min"
-    }}
-}});
+    }
+});
 
-requirejs(['d3'], function(d3) {{
+requirejs(['d3'], function(d3) {
     loaded['d3'] = d3;
     update_bins();
-}});
+});
 `

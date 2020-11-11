@@ -10,7 +10,7 @@ for name, circle_source of models when k.startsWith('source_by_x_')
 for label in models['labels']
     label.source.data['dq'] = (false for l in lines)
     
-models['constraints'].data = {{'x': [], 'width': [], 'top': [], 'bottom': []}}
+models['constraints'].data = {'x': [], 'width': [], 'top': [], 'bottom': []}
 models['constraints'].change.emit()
 
 models['hover_tool'].callback.func(models['hover_tool'], 'force_redraw', require, exports)

@@ -1,4 +1,4 @@
-models = cb_obj.document._all_models_by_name._dict
+models = cb_obj.origin.document._all_models_by_name._dict
 
 rect_data = models['rect_source'].data
 length = rect_data['x'].length

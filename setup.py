@@ -26,6 +26,7 @@ setup(
     package_data={
         'hits/visualize/interactive': [
             '*.coffee',
+            '*.js',
             'example_df.txt',
             '*.json',
         ],
