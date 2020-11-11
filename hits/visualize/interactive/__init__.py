@@ -186,7 +186,7 @@ def scatter(df=None,
 
     initial_indices = [i for i, n in enumerate(df.index) if n in initial_selection]
 
-    auto_numerical_cols = [n for n in df.columns if df[n].dtype in [np.float32, float, int]]
+    auto_numerical_cols = list(df.select_dtypes('number').columns)
     if numerical_cols is not None:
         for col in numerical_cols:
             if col not in auto_numerical_cols:
@@ -355,10 +355,10 @@ def scatter(df=None,
                          )
     
     if log_scale:
-        nonzero = df[df > 0]
+        nonzero = df[numerical_cols][df[numerical_cols] > 0]
 
-        overall_max = nonzero.max(numeric_only=True).max()
-        overall_min = nonzero.min(numeric_only=True).min()
+        overall_max = nonzero.max().max()
+        overall_min = nonzero.min().min()
         
         initial = (overall_min * 0.1, overall_max * 10)
         bounds = (overall_min * 0.001, overall_max * 1000)
