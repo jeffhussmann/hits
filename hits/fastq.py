@@ -233,7 +233,7 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_t
     line_groups = get_line_groups(file_name)
 
     if standardize_names:
-        name_standardizer, line_groups = detect_structure(line_groups, up_to_space=up_to_space)
+        name_standardizer, line_groups = detect_structure(line_groups)
     elif up_to_space:
         name_standardizer = lambda n: n.split(' ')[0]
     else:
@@ -255,12 +255,12 @@ def reverse_complement_reads(file_name, **kwargs):
     for read in reads(file_name, **kwargs):
         yield read.reverse_complement()
 
-def detect_structure(line_groups, up_to_space=False):
+def detect_structure(line_groups):
     ''' Look at the first read to figure out the read name structure. '''
     try:
         first_group = next(line_groups)
         first_read = line_group_to_read(first_group)
-        name_standardizer = get_read_name_standardizer(first_read.name, up_to_space=up_to_space)
+        name_standardizer = get_read_name_standardizer(first_read.name)
         line_groups = chain([first_group], line_groups)
     except StopIteration:
         name_standardizer = identity
@@ -317,9 +317,7 @@ def read_quartets(fns, **kwargs):
     all_reads = [reads(fn, **kwargs) for fn in fns]
     return (Quartet(*reads) for reads in zip(*all_reads))
 
-def get_read_name_parser(read_name, up_to_space=False):
-    if up_to_space:
-        read_name = read_name.split(' ')[0]
+def get_read_name_parser(read_name):
     if read_name.startswith('test'):
         # Simulated data sometimes needs read names to contain information
         # and can't use standard Illumina-formatted read names.
@@ -343,34 +341,31 @@ def get_read_name_parser(read_name, up_to_space=False):
             else:
                 parser = parse_standardized_name
         else:
-            raise ValueError('read name format not recognized - {}'.format(read_name))
+            raise ValueError(f'read name format not recognized - {read_name}')
     return parser
 
-def get_read_name_standardizer(read_name, up_to_space=False):
+def get_read_name_standardizer(read_name):
     ''' Looks at structure of read_name to determine the appropriate read name
         standardizer.
     '''
     parser = get_read_name_parser(read_name)
     if parser == parse_SRA_read_name or parser == parse_ERR_read_name:
+        standardize = templates['SRA'].format
         def standardizer(read_name):
-            if up_to_space:
-                read_name = read_name.split(' ')[0]
             accession, number = parser(read_name)
-            standardized = standardize('SRA', accession, number)
+            standardized = standardize(accession, number)
             return standardized
     elif parser == parse_paired_SRA_read_name:
+        standardize = templates['paired_SRA'].format
         def standardizer(read_name):
-            if up_to_space:
-                read_name = read_name.split(' ')[0]
             accession, number, member = parser(read_name)
-            standardized = standardize('paired_SRA', accession, number, member)
+            standardized = standardize(accession, number, member)
             return standardized
-    elif parser:
+    elif parser is not None:
+        standardize = templates['default'].format
         def standardizer(read_name):
-            if up_to_space:
-                read_name = read_name.split(' ')[0]
             lane, tile, x, y, member, index = parser(read_name)
-            standardized = standardize('default', lane, tile, x, y, member)
+            standardized = standardize(lane, tile, x, y)
             return standardized
     else:
         standardizer = identity
