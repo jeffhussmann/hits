@@ -1208,3 +1208,168 @@ link.click()\
     else:
         output = IPython.display.HTML(template_with_data)
     return output
+
+def heatmap(df, cmap, vmin, vmax, height=500):
+    normed = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)(df)
+    rgba_float = cmap(normed)
+    rgba_int = (rgba_float * 255).astype(np.uint8)[::-1] # flip row order for plotting
+    
+    num_rows, num_cols = df.shape
+    
+    width = int(np.floor(height * num_cols / num_rows))
+    fig = bokeh.plotting.figure(height=height, width=width, active_scroll='wheel_zoom')
+    
+    lower_bound = -0.5
+    x_upper_bound = lower_bound + num_cols
+    
+    lower_bound = -0.5
+    y_upper_bound = lower_bound + num_rows
+
+    fig.image_rgba(image=[rgba_int], x=lower_bound, y=lower_bound, dw=num_cols, dh=num_rows)
+
+    top_axis = bokeh.models.axes.LinearAxis()
+    right_axis = bokeh.models.axes.LinearAxis()
+    fig.add_layout(top_axis, 'above')
+    fig.add_layout(right_axis, 'right')
+
+    for axis in [fig.yaxis, fig.xaxis]:
+        axis.ticker = np.arange(len(df))
+        axis.major_label_text_font_size = '0pt'
+        
+    col_labels = [str(c) for i, c in enumerate(df.columns.values)]
+    row_labels = [str(r) for i, r in enumerate(df.index.values)]
+
+    fig.xaxis.major_label_overrides = {i: str(c) for i, c in enumerate(col_labels)}
+    fig.yaxis.major_label_overrides = {i: l for i, l in enumerate(row_labels[::-1])}
+
+    fig.xaxis.major_label_orientation = 'vertical'
+
+    fig.x_range = bokeh.models.Range1d(lower_bound, x_upper_bound, name='x_range', tags=[x_upper_bound - lower_bound])
+    fig.y_range = bokeh.models.Range1d(lower_bound, y_upper_bound, name='y_range')
+
+    fig.grid.visible = False
+
+    fig.x_range.callback = build_js_callback('heatmap_range', format_kwargs=dict(lower_bound=lower_bound, upper_bound=x_upper_bound))
+    fig.y_range.callback = build_js_callback('heatmap_range', format_kwargs=dict(lower_bound=lower_bound, upper_bound=y_upper_bound))
+
+    fig.axis.major_tick_line_color = None
+    fig.axis.major_tick_out = 0
+    fig.axis.major_tick_in = 0
+    
+    quad_source = bokeh.models.ColumnDataSource(data={
+        'left': [],
+        'right': [],
+        'bottom': [],
+        'top': [],
+    }, name='quad_source',
+    )
+    fig.quad('left', 'right', 'top', 'bottom',
+             fill_alpha=0,
+             line_color='black',
+             source=quad_source,
+            )
+    
+    search_format_kwargs = dict(row_labels=row_labels, col_labels=col_labels, lower_bound=lower_bound, x_upper_bound=x_upper_bound, y_upper_bound=y_upper_bound)
+    search_callback = build_js_callback('heatmap_search', format_kwargs=search_format_kwargs)
+    text_input = bokeh.models.TextInput(title='Search:', name='search')
+    text_input.js_on_change('value', search_callback)
+
+    label_fig_size = 200
+    label_figs = {
+        'left': bokeh.plotting.figure(width=label_fig_size, height=height, x_range=(-10, 10), y_range=fig.y_range),
+        'right': bokeh.plotting.figure(width=label_fig_size, height=height, x_range=(-10, 10), y_range=fig.y_range),
+        'top': bokeh.plotting.figure(height=label_fig_size, width=width, y_range=(-10, 10), x_range=fig.x_range),
+        'bottom': bokeh.plotting.figure(height=label_fig_size, width=width, y_range=(-10, 10), x_range=fig.x_range),
+    }
+
+    fig.min_border = 0
+    fig.outline_line_color = None
+    fig.axis.axis_line_color = None
+
+    for label_fig in label_figs.values():
+        label_fig.outline_line_color = None
+        label_fig.axis.visible = False
+        label_fig.grid.visible = False
+        label_fig.min_border = 0
+        label_fig.toolbar_location = None
+    
+    row_label_source = bokeh.models.ColumnDataSource(data={
+        'text': row_labels,
+        'smallest': [0]*len(row_labels),
+        'biggest': [label_fig_size]*len(row_labels),
+        'ascending': np.arange(len(row_labels)),
+        'descending': np.arange(len(row_labels))[::-1],
+        'alpha': [1]*len(row_labels),
+    }, name='row_label_source')
+    
+    col_label_source = bokeh.models.ColumnDataSource(data={
+        'text': col_labels,
+        'smallest': [0]*len(col_labels),
+        'biggest': [label_fig_size]*len(col_labels),
+        'ascending': np.arange(len(col_labels)),
+        'descending': np.arange(len(col_labels))[::-1],
+        'alpha': [1]*len(col_labels),
+    }, name='col_label_source')
+
+    common_kwargs = {
+        'text': 'text',
+        'text_alpha': 'alpha',
+        'text_font_size': f'{3000 // (max(x_upper_bound, y_upper_bound) - lower_bound)}%',
+        'text_baseline': 'middle',
+        'name': 'labels',
+    }
+    row_kwargs = {
+        'y': 'descending',
+        'x_units': 'screen',
+        'y_units': 'data',
+        'source': row_label_source, 
+        **common_kwargs,
+    }
+    col_kwargs = {
+        'x': 'ascending',
+        'x_units': 'data',
+        'y_units': 'screen',
+        'source': col_label_source, 
+        **common_kwargs,
+    }
+
+    labels = {
+        'left': bokeh.models.LabelSet(x='biggest',
+                                      text_align='right',
+                                      x_offset=-5,
+                                      **row_kwargs,
+                                     ),
+        'right': bokeh.models.LabelSet(x='smallest',
+                                       text_align='left',
+                                       x_offset=5,
+                                       **row_kwargs,
+                                      ),
+        'top': bokeh.models.LabelSet(y='smallest',
+                                     text_align='left',
+                                     angle=np.pi / 2,
+                                     y_offset=5,
+                                     **col_kwargs,
+                                    ),
+        'bottom': bokeh.models.LabelSet(y='biggest',
+                                        text_align='right',
+                                        angle=np.pi / 2,
+                                        y_offset=-5,
+                                        **col_kwargs,
+                                       ),
+    }
+
+    for which in labels:
+        label_figs[which].add_layout(labels[which])
+    
+    fig.toolbar_location = None
+    toolbar = bokeh.models.ToolbarBox(toolbar=fig.toolbar)
+
+    rows = [
+        [bokeh.layouts.Spacer(width=label_fig_size), label_figs['top'], bokeh.layouts.Spacer(width=label_fig_size)],
+        [label_figs['left'], fig, label_figs['right'], toolbar, text_input],
+        [bokeh.layouts.Spacer(width=label_fig_size), label_figs['bottom']],
+    ]
+
+    layout = bokeh.layouts.column([bokeh.layouts.row(row) for row in rows])
+
+    bokeh.io.show(layout)
