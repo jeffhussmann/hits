@@ -32,12 +32,20 @@ fai_entry = namedtuple('fai_entry', fai_entry_fields)
 
 def parse_fai(fai_file_name):
     fasta_file_name, _ = os.path.splitext(fai_file_name) 
+
     def parse_line(line):
         fields = line.strip().split()
         seq_name = fields[0]
         values = map(int, fields[1:])
         return seq_name, fai_entry(fasta_file_name, *values)
-    entries = dict(parse_line(line) for line in open(fai_file_name))
+
+    entries = {}
+
+    with open(fai_file_name) as fh:
+        for line in fh:
+            k, v = parse_line(line)
+            entries[k] = v
+
     return entries
 
 def get_genome_index(genome_dir):

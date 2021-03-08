@@ -1618,8 +1618,8 @@ def grouped_by_name(als):
 
 def header_from_STAR_index(index):
     index = Path(index)
-    names = [l.strip() for l in (index / 'chrName.txt').open()]
-    lengths = [int(l.strip()) for l in (index / 'chrLength.txt').open()]
+    names = (index / 'chrName.txt').read_text().splitlines()
+    lengths = [int(l) for l in (index / 'chrLength.txt').read_text().splitlines()]
     header = pysam.AlignmentHeader.from_references(names, lengths)
     return header
 
