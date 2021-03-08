@@ -1,7 +1,5 @@
-import sys
 import os
 import tempfile
-import logging
 import subprocess
 import threading
 import shutil
@@ -10,7 +8,7 @@ from pathlib import Path
 import pysam
 import numpy as np
 
-from . import genomes, fasta, fastq
+from . import genomes, fastq
 
 def build_bowtie2_index(index_prefix, sequence_file_names):
     bowtie2_build_command = ['bowtie2-build',
@@ -521,6 +519,19 @@ def map_tophat_paired(R1_fn,
     if not no_sort:
         pysam.index(accepted_hits_fn)
 
+def run_STAR_command(STAR_command):
+    try:
+        subprocess.run(STAR_command,
+                       check=True,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.STDOUT,
+                      )
+    except subprocess.CalledProcessError as e:
+        print(f'STAR command returned code {e.returncode}')
+        print(f'full command was:\n\n{" ".join(STAR_command)}')
+        print(f'output from STAR was:\n\n{e.output.decode()}\n')
+        raise
+
 def map_STAR(R1_fn, index_dir, output_prefix,
              R2_fn=None,
              num_threads=1,
@@ -565,6 +576,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
+        '--genomeLoad', 'LoadAndKeep',
     ]
 
     if mode == 'stringent':
@@ -572,7 +584,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
             '--outFilterScoreMinOverLread', '0.2',
             '--outFilterMatchNminOverLread', '0.2',
             '--outFilterMatchNmin', '50',
-            '--genomeLoad', 'LoadAndKeep',
         ])
 
     elif mode == 'permissive':
@@ -582,7 +593,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
             '--outFilterScoreMinOverLread', '0',
             '--outFilterMatchNminOverLread', '0',
             '--outFilterMatchNmin', '50',
-            '--genomeLoad', 'LoadAndKeep',
         ])
 
     elif mode == 'tcell':
@@ -591,14 +601,12 @@ def map_STAR(R1_fn, index_dir, output_prefix,
             '--outFilterScoreMinOverLread', '0',
             '--outFilterMatchNminOverLread', '0',
             '--outFilterMatchNmin', '50',
-            '--genomeLoad', 'LoadAndKeep',
             '--alignEndsType', 'Extend5pOfRead1',
         ])
 
     elif mode == 'guide_alignment':
         STAR_command.extend([
             '--alignEndsType', 'EndToEnd',
-            '--genomeLoad', 'LoadAndKeep',
             '--outFilterMultimapNmax', '1000',
         ])
 
@@ -620,17 +628,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
                              '--readFilesType', 'SAM SE',
                             ])
 
-    try:
-        subprocess.run(STAR_command,
-                       check=True,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT,
-                      )
-    except subprocess.CalledProcessError as e:
-        print('STAR command returned code {0}'.format(e.returncode))
-        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
-        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
-        raise
+    run_STAR_command(STAR_command)
 
     initial_bam_fn = str(output_prefix) + bam_suffix
 
@@ -643,6 +641,14 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         pysam.index(str(bam_fn))
 
     return bam_fn
+
+def load_STAR_index(index_dir):
+    STAR_command = [
+        'STAR',
+        '--genomeDir', str(index_dir),
+        '--genomeLoad', 'LoadAndExit',
+    ]
+    run_STAR_command(STAR_command)
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RAM_limit=None):
     total_length = 0
@@ -665,17 +671,7 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RA
     if RAM_limit is not None:
         STAR_command.extend(['--limitGenomeGenerateRAM', str(RAM_limit)])
 
-    try:
-        subprocess.run(STAR_command,
-                       check=True,
-                       stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT,
-                      )
-    except subprocess.CalledProcessError as e:
-        print('STAR command returned code {0}'.format(e.returncode))
-        print('full command was:\n\n{0}\n'.format(' '.join(STAR_command)))
-        print('output from STAR was:\n\n{0}\n'.format(e.output.decode()))
-        raise
+    run_STAR_command(STAR_command)
 
 def _map_STAR(reads,
               index_prefix,
