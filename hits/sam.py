@@ -723,7 +723,7 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False, ma
         chunks = utilities.list_chunks(input_file_names, 500)
         merged_chunk_fns = []
         for i, chunk in enumerate(chunks):
-            merged_chunk_fn = str(merged_file_name) + '.{:04d}'.format(i)
+            merged_chunk_fn = str(merged_file_name) + f'.{i:04d}'
             merged_chunk_fns.append(merged_chunk_fn)
             merge_sorted_bam_files(chunk, merged_chunk_fn, by_name=by_name, make_index=False)
 

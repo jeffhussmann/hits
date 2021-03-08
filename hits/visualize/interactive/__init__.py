@@ -71,6 +71,7 @@ def scatter(df=None,
             return_layout=False,
             title=None,
             two_level_index=False,
+            menu_width=200,
            ):
     ''' Makes an interactive scatter plot using bokeh. Call without any
     arguments for an example using data from Jan et al. Science 2014.
@@ -729,12 +730,12 @@ def scatter(df=None,
                     col = order[x]
 
                     r = correlations[row][col]
-                    data['r_{0}'.format(order_key)].append(r)
-                    data['x_{0}'.format(order_key)].append(x)
-                    data['x_name_{0}'.format(order_key)].append(col)
-                    data['y_{0}'.format(order_key)].append(y)
-                    data['y_name_{0}'.format(order_key)].append(row)
-                    data['color_{0}'.format(order_key)].append(r_to_color(r))
+                    data[f'r_{order_key}'].append(r)
+                    data[f'x_{order_key}'].append(x)
+                    data[f'x_name_{order_key}'].append(col)
+                    data[f'y_{order_key}'].append(y)
+                    data[f'y_name_{order_key}'].append(row)
+                    data[f'color_{order_key}'].append(r_to_color(r))
 
         if cluster:
             order_key = 'clustered'
@@ -742,7 +743,7 @@ def scatter(df=None,
             order_key = 'original'
 
         for k in ['r', 'x', 'x_name', 'y', 'y_name', 'color']:
-            data[k] = data['{0}_{1}'.format(k, order_key)]
+            data[k] = data[f'{k}_{order_key}']
 
         heatmap_source = bokeh.models.ColumnDataSource(data, name='heatmap_source')
         num_exps = len(numerical_cols)
@@ -850,12 +851,12 @@ def scatter(df=None,
             options = [v for v in original_df.columns.levels[level] if v != 'gene' and v != '']
 
             for names, axis in zip(initial_xy_names, ('x', 'y')):
-                menus[axis, level] = bokeh.models.widgets.MultiSelect(title='{} {}'.format(axis.upper(), level_name),
+                menus[axis, level] = bokeh.models.widgets.MultiSelect(title=f'{axis.upper()} {level_name}',
                                                                       options=options,
                                                                       value=[names[level]],
                                                                       size=min(10, len(options)),
-                                                                      name='{}_{}_menu'.format(axis, level),
-                                                                      width=400,
+                                                                      name=f'{axis}_{level}_menu',
+                                                                      width=menu_width,
                                                                      )
                 menus[axis, level].js_on_change('value', menu_callback)
 
