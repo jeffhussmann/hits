@@ -218,6 +218,10 @@ def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=id
 
     return Read(name, seq, qual)
 
+def get_read_length(file_name):
+    read = next(reads(file_name))
+    return len(read)
+
 def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_to_space=False):
     ''' Yields Read's from a file name or line iterator.
         If standardize_names == True, infers read name structure and
