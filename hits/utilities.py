@@ -82,6 +82,17 @@ def mean_from_histogram(histogram):
         mean = weighted_sum / num_items
     return mean
 
+def var_from_histogram(histogram):
+    if histogram.sum() == 0:
+        return 0
+    else:
+        weighted_sum = np.dot(histogram, np.arange(len(histogram))**2)
+        num_items = float(histogram.sum())
+        mean_of_squared = weighted_sum / num_items
+        square_of_mean = mean_from_histogram(histogram)**2
+        var = mean_of_squared - square_of_mean
+    return var
+
 def mean_from_counts(counts):
     weighted_sum = sum(count * value for value, count in counts.items())
     num_items = sum(counts.values())
