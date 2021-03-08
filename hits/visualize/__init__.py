@@ -1,8 +1,10 @@
+import colorsys
 import io
 import functools
 from collections import Counter
 
 import scipy.stats
+import seaborn as sns
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -70,13 +72,16 @@ def optional_ax(original_function):
 
 def add_commas_to_ticks(ax, which='y'):
     def commas_formatter(x, pos):
-        return f'{x:,}'
+        return f'{int(x):,}'
 
     tick_formatter = matplotlib.ticker.FuncFormatter(commas_formatter)
     if which == 'y':
         axis = ax.yaxis
     elif which == 'x':
         axis = ax.xaxis
+    else:
+        raise ValueError(which)
+
     axis.set_major_formatter(tick_formatter)
 
 @optional_ax
@@ -314,12 +319,17 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
     else:
         xs, ys = [0, 1], [0, 1]
         if ax.get_xlim() != ax.get_ylim():
-            raise ValueError('diagonal in non-equal axes')
+            print('warning: diagonal in non-equal axes')
     
     ax.plot(xs, ys,
             transform=ax.transAxes,
             color=color,
             **kwargs)
+
+def draw_zeros_and_diagonal(ax, color='black', alpha=0.5):
+    draw_diagonal(ax, color=color, alpha=alpha)
+    ax.axhline(0, color=color, alpha=alpha)
+    ax.axvline(0, color=color, alpha=alpha)
 
 def label_scatter_plot(ax, xs, ys, labels,
                        data=None,
@@ -507,8 +517,24 @@ def color_labels(labels, name_to_color):
         if color:
             label.set_color(color)
 
-def apply_alpha(color, alpha):
-    return matplotlib.colors.colorConverter.to_rgba(color, alpha=alpha)
+def apply_alpha(color, alpha, multiplicative=False):
+    r, g, b, a =  matplotlib.colors.colorConverter.to_rgba(color)
+    if multiplicative:
+        a *= alpha
+    else:
+        a = alpha
+    return (r, g, b, a)
+
+def scale_darkness(color, scale):
+    ''' Increases darkness of color by converting to hsl and dividing l value
+    by scale. adapted from https://stackoverflow.com/a/49601444
+    '''
+    rgb = matplotlib.colors.to_rgb(color)
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    scaled_rgb = colorsys.hls_to_rgb(h, max(0, min(1, l / scale)), s)
+    scaled_hex = matplotlib.colors.to_hex(scaled_rgb)
+    
+    return scaled_hex
 
 def force_integer_ticks(axis):
     axis.set_major_locator(matplotlib.ticker.MaxNLocator(interger=True))
@@ -575,3 +601,51 @@ def make_stacked_Image(figs, orientation='vertical'):
             x_start += im.width
 
     return stacked_im
+
+def assign_categorical_colors(series, palette=None):
+    if palette is None:
+        palette = sns.color_palette()
+
+    values = sorted(series.unique())
+    value_to_color = dict(zip(values, palette))
+    colors = series.map(value_to_color)
+
+    return colors, value_to_color
+
+def draw_categorical_legend(value_to_color, ax,
+                            font_size=12,
+                            legend_location='upper left',
+                           ):
+
+    if legend_location == 'upper left':
+        xy = (0.04, 0.96)
+        va = 'top'
+        ha  = 'left'
+    elif legend_location == 'middle left':
+        xy = (0.04, 0.5)
+        va = 'center'
+        ha = 'left'
+    elif legend_location == 'upper right':
+        xy = (0.96, 0.96)
+        va = 'top'
+        ha = 'right'
+    elif legend_location == 'lower right':
+        xy = (0.96, 0.4)
+        va = 'bottom'
+        ha = 'right'
+    elif legend_location == 'middle':
+        xy = (0.5, 0.5)
+        va = 'center'
+        ha = 'center'
+
+    for i, (category, color) in enumerate(sorted(value_to_color.items())):
+        ax.annotate(category,
+                    xy=xy,
+                    xycoords='axes fraction',
+                    xytext=(0, -(font_size + 2) * i),
+                    textcoords='offset points',
+                    color=color,
+                    va=va,
+                    ha=ha,
+                    size=font_size,
+                   )
