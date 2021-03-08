@@ -21,6 +21,8 @@ def plot_quality_histograms(quality_counts, ax=None):
     ax.set_xlabel('Cycle index')
     ax.set_ylabel('Quality score')
 
+    return ax.figure
+
 def plot_paired_quality_histograms(stats):
     num_cycles, num_q_scores = stats['R1_qs'].shape
     fig, (R1_ax, R2_ax) = plt.subplots(2, 1, figsize=(0.1 * num_cycles, 0.1 * (num_q_scores * 2 + 10)))
