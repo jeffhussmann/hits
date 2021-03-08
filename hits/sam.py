@@ -1330,7 +1330,7 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     
     results = {
         'switch_after': switch_after,
-        'best_switch_points': best_switch_points,
+        'best_switch_points': sorted(best_switch_points),
         'min_edits': min_edits,
         'gap_interval': gap_interval,
         'gap_length': gap_length,
@@ -1380,6 +1380,10 @@ def closest_ref_position(q, alignment, which_side='either'):
             qs = [other_q for other_q in q_to_r if other_q < q]
         elif which_side == 'after':
             qs = [other_q for other_q in q_to_r if other_q > q]
+        elif which_side == 'exact':
+            qs = []
+        else:
+            raise ValueError(which_side)
 
         if len(qs) == 0:
             r = None
