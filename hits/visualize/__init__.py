@@ -364,6 +364,11 @@ def label_scatter_plot(ax, xs, ys, labels,
             y_offset = distance
             ha = 'center'
             va = 'bottom'
+        elif vector == 'lower left':
+            x_offset = -distance
+            y_offset = -distance
+            ha = 'center'
+            va = 'top'
         elif vector == 'lower right':
             x_offset = distance
             y_offset = -distance
@@ -416,7 +421,8 @@ def label_scatter_plot(ax, xs, ys, labels,
                            ha=ha,
                            va=va,
                            color=color,
-                           **text_kwargs)
+                           **text_kwargs,
+                          )
 
         if avoid:
             ax.figure.canvas.draw()
@@ -451,23 +457,24 @@ def label_scatter_plot(ax, xs, ys, labels,
     if isinstance(color, str):
         color = np.array([color]*len(xs))
 
-    tuples = zip(xs[to_label],
-                 ys[to_label],
-                 labels[to_label],
-                 vector[to_label],
-                 color[to_label],
-                )
+    tuples = zip(
+        xs[to_label],
+        ys[to_label],
+        labels[to_label],
+        vector[to_label],
+        color[to_label],
+    )
 
     for x, y, label, vec, color in tuples:
         distance = initial_distance
         text, bbox, coords = attempt_text(x, y, label, distance, vec, color)
 
-        while avoid and any(bbox.fully_overlaps(other_bbox) for other_bbox in bboxes):
+        while avoid and any(bbox.overlaps(other_bbox) for other_bbox in bboxes):
             text.remove()
             distance += distance_increment
             text, bbox, coords = attempt_text(x, y, label, distance, vec, color)
             if distance >= distance_increment * 50:
-                print('gave up on {}'.format(label))
+                print(f'gave up on {label}')
                 break
         
         if distance >= min_arrow_distance:
