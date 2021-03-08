@@ -1,7 +1,9 @@
 import contextlib
-import sys
 import functools
+import numbers
 import subprocess
+import sys
+
 from collections import defaultdict
 from itertools import islice, groupby, cycle, product, chain
 
@@ -71,6 +73,9 @@ def counts_to_array(counts, dim=1):
                 array[key] = count
         else:
             array = np.array([[0]])
+    else:
+        raise ValueError(dim)
+
     return array
 
 def mean_from_histogram(histogram):
@@ -291,7 +296,10 @@ def clopper_pearson(x, n, alpha=0.05, return_format='delta'):
         raise ValueError(return_format)
 
 def clopper_pearson_fast(xs, ns, alpha=0.05):
-    alphas = np.full(len(xs), alpha)
+    if isinstance(xs, numbers.Number):
+        alphas = alpha
+    else:
+        alphas = np.full(len(xs), alpha)
     #alphas[(xs == 0) | (xs == ns)] = 2 * alpha
     lowers, uppers = statsmodels.stats.proportion.proportion_confint(xs, ns, alpha=alphas, method='beta')
 
