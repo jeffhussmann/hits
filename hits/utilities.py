@@ -182,7 +182,7 @@ def memoized_property(f):
     @property
     @functools.wraps(f)
     def memoized_f(self):
-        attr_name = '_' + (f.__name__)
+        attr_name = f'_memoized_{f.__name__}'
         
         if not hasattr(self, attr_name):
             setattr(self, attr_name, f(self))
@@ -194,7 +194,7 @@ def memoized_property(f):
 def memoized_with_key(f):
     @functools.wraps(f)
     def memoized_f(self, *args):
-        attr_name = '_' + f.__name__
+        attr_name = f'_memoized_{f.__name__}'
         if not hasattr(self, attr_name):
             setattr(self, attr_name, {})
 
