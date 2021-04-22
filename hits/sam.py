@@ -1767,14 +1767,18 @@ def flip_alignment(alignment):
     flipped_alignment.is_reverse = not alignment.is_reverse
     return flipped_alignment
 
+def fingerprint(al):
+    if al is None:
+        return None
+    else:
+        return tuple(al.cigar), al.reference_start, al.reference_name, al.is_reverse
+
 def make_nonredundant(alignments):
     ''' Two alignments of the same read are redundant if they pair the same read bases with the same
     reference bases. Given alignments of the same read, return alignments in which only one representative
     of each equivalent class of redundancy is retained.
     ''' 
-    def fingerprint(al):
-        return tuple(al.cigar), al.reference_start, al.reference_name, al.is_reverse
     
-    nonredundant = {fingerprint(al): al for al in alignments}
+    nonredundant = {fingerprint(al): al for al in alignments if al is not None}
     
     return list(nonredundant.values())
