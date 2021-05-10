@@ -318,7 +318,11 @@ quartet_order = ['I1', 'I2', 'R1', 'R2']
 Quartet = namedtuple('Quartet', quartet_order)
 
 def read_quartets(fns, **kwargs):
+    if isinstance(fns, dict):
+        fns = [fns[which] for which in quartet_order]
+
     all_reads = [reads(fn, **kwargs) for fn in fns]
+
     return (Quartet(*reads) for reads in zip(*all_reads))
 
 def get_read_name_parser(read_name):
