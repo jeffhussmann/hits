@@ -695,6 +695,23 @@ def _map_STAR(reads,
                                                 err_output,
                                                )
 
+def clean_up_STAR_output(output_prefix):
+    suffixes_to_clean_up = [
+        'Log.final.out',
+        'Log.out',
+        'Log.progress.out',
+        'SJ.out.tab',
+        '_STARtmp',
+    ]
+
+    for suffix in suffixes_to_clean_up:
+        full_fn = Path(str(output_prefix) + suffix)
+        if full_fn.exists():
+            if full_fn.is_dir():
+                shutil.rmtree(full_fn)
+            else:
+                full_fn.unlink()
+
 def map_bwa_mem(reads,
                 index_prefix,
                ):
