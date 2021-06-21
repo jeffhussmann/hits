@@ -22,7 +22,6 @@ for i in [0...length]
     y0 = ys[i] - heights[i] / 2
     y1 = ys[i] + heights[i] / 2
     line = [x0, x1, y0, y1, cross_xs[i], cross_ys[i]].join(',')
-    console.log line
     lines.push line
 
 csv_content += lines.join('\n')

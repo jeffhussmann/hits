@@ -31,7 +31,6 @@ for (i = j = 0, ref = length; (0 <= ref ? j < ref : j > ref); i = 0 <= ref ? ++j
   y0 = ys[i] - heights[i] / 2;
   y1 = ys[i] + heights[i] / 2;
   line = [x0, x1, y0, y1, cross_xs[i], cross_ys[i]].join(',');
-  console.log(line);
   lines.push(line);
 }
 
