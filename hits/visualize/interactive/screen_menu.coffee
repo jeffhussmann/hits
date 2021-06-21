@@ -18,6 +18,10 @@ models['nt_fraction'].location = nt_fraction_values[full_name]
 
 models['title'].text = dataset_name + '     ' + outcome_name
 
+max = Math.max(scatter_data['frequency']...)
+models['y_range'].end = max * 1.2
+models['y_range'].change.emit()
+
 models['title'].change.emit()
 models['nt_fraction'].change.emit()
 models['scatter_source'].change.emit()

@@ -1,4 +1,4 @@
-var dataset_name, full_name, i, key, label_data, len, models, nt_fraction_values, outcome_name, ref, scatter_data;
+var dataset_name, full_name, i, key, label_data, len, max, models, nt_fraction_values, outcome_name, ref, scatter_data;
 
 models = cb_obj.document._all_models_by_name._dict;
 
@@ -25,6 +25,12 @@ full_name = dataset_name + '_' + outcome_name;
 models['nt_fraction'].location = nt_fraction_values[full_name];
 
 models['title'].text = dataset_name + '     ' + outcome_name;
+
+max = Math.max(...scatter_data['frequency']);
+
+models['y_range'].end = max * 1.2;
+
+models['y_range'].change.emit();
 
 models['title'].change.emit();
 
