@@ -496,7 +496,7 @@ def label_scatter_plot(ax, xs, ys, labels,
                         textcoords=('offset points', 'offset points'),
                         arrowprops={'arrowstyle': '-',
                                     'alpha': arrow_alpha,
-                                    'color': arrow_color,
+                                    'color': color,
                                    },
                        )
 
@@ -621,6 +621,10 @@ def draw_categorical_legend(value_to_color, ax,
         xy = (0.04, 0.96)
         va = 'top'
         ha  = 'left'
+    elif legend_location == 'upper middle':
+        xy = (0.5, 0.96)
+        va = 'top'
+        ha = 'center'
     elif legend_location == 'middle left':
         xy = (0.04, 0.5)
         va = 'center'
@@ -633,6 +637,10 @@ def draw_categorical_legend(value_to_color, ax,
         xy = (0.96, 0.4)
         va = 'bottom'
         ha = 'right'
+    elif legend_location == 'lower left':
+        xy = (0.06, 0.4)
+        va = 'bottom'
+        ha = 'left'
     elif legend_location == 'middle':
         xy = (0.5, 0.5)
         va = 'center'

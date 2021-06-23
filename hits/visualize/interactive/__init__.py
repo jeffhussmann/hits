@@ -1199,15 +1199,10 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
     if save_as is not None:
         with open(save_as, 'w') as fh:
             fh.write(template_with_data)
-            js = '''\
-var link = document.createElement('a')
-link.setAttribute('href', '{0}')
-link.setAttribute('download', '{0}')
-link.click()\
-'''.format(save_as)
-        output = IPython.display.Javascript(js)
+        output = None
     else:
         output = IPython.display.HTML(template_with_data)
+
     return output
 
 def heatmap(df, cmap, vmin, vmax, height=500):
@@ -1228,17 +1223,12 @@ def heatmap(df, cmap, vmin, vmax, height=500):
 
     fig.image_rgba(image=[rgba_int], x=lower_bound, y=lower_bound, dw=num_cols, dh=num_rows)
 
-    top_axis = bokeh.models.axes.LinearAxis()
-    right_axis = bokeh.models.axes.LinearAxis()
-    fig.add_layout(top_axis, 'above')
-    fig.add_layout(right_axis, 'right')
-
     for axis in [fig.yaxis, fig.xaxis]:
         axis.ticker = np.arange(len(df))
         axis.major_label_text_font_size = '0pt'
         
-    col_labels = [str(c) for i, c in enumerate(df.columns.values)]
-    row_labels = [str(r) for i, r in enumerate(df.index.values)]
+    col_labels = [str(c) for c in df.columns.values]
+    row_labels = [str(r) for r in df.index.values]
 
     fig.xaxis.major_label_overrides = {i: str(c) for i, c in enumerate(col_labels)}
     fig.yaxis.major_label_overrides = {i: l for i, l in enumerate(row_labels[::-1])}
