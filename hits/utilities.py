@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import functools
 import numbers
 import subprocess
@@ -350,3 +351,6 @@ def get_one_mismatch_resolver(sample_indices):
     resolver = {seq: set(names) for seq, names in resolver.items()}
             
     return resolver
+
+def current_time_string():
+    return f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}'
