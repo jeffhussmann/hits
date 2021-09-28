@@ -339,7 +339,7 @@ def get_read_name_parser(read_name):
         parser = parse_ERR_read_name
     else:
         num_words = len(read_name.split())
-        if num_words == 2:
+        if num_words > 1:
             parser = parse_new_illumina_read_name
         elif num_words == 1:
             if '#' in read_name:
@@ -390,7 +390,7 @@ templates = {
 }
 
 def parse_new_illumina_read_name(read_name):
-    location_info, member_info = read_name.split()
+    location_info, member_info = read_name.split()[:2]
     lane, tile, x, y = location_info.split(':')[-4:]
     member, _, _, index = member_info.split(':')
     return lane, tile, x, y, member, index
