@@ -1158,12 +1158,17 @@ def parallel_coordinates(df=None, link_axes=True, log_scale=False, save_as=None,
     df = df.dropna().copy()
     
     # Collapse multiindex if present
-    df.columns = [' '.join(n) if isinstance(n, tuple) else n for n in df.columns]
+    df.columns = [' '.join(map(str, n)) if isinstance(n, tuple) else str(n) for n in df.columns]
 
-    if 'color' not in df:
+    # Collapsing multindex may mangle color column name.
+    color_columns = [c for c in df.columns if c.startswith('color')]
+
+    if len(color_columns) != 1:
         color_series = pd.Series('black', index=df.index)
     else:
-        color_series = df['color']
+        color_column = color_columns[0]
+        color_series = df[color_column]
+        df.drop(columns=color_column, inplace=True)
 
     def make_color_string(c):
         array = map(int, np.array(matplotlib.colors.to_rgb(c)) * 255)
