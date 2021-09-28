@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.2.1',
+    version='0.2.2',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
