@@ -89,19 +89,26 @@ def plot_composition(base_counts,
                      ax=None,
                      save_as=None,
                      match_threshold=0.95,
+                     as_percentage=False,
+                     bases_to_plot=utilities.base_order,
                     ):
     ''' Plot fractions of all base calls that are each base at each cycle.
     '''
     cycles, _ = base_counts.shape
     denominators = np.maximum(1, base_counts.sum(axis=1)).astype(float)
-    total = int(denominators[0])
 
     base_order = utilities.base_order
     
     xs = np.arange(-bases_before, cycles - bases_before)
     
     for i, base in enumerate(base_order):
+        if base not in bases_to_plot:
+            continue
+
         fractions = base_counts[:, i] / denominators
+        if as_percentage:
+            fractions *= 100
+
         line_style = {'linestyle': '-',
                       'linewidth': 0.5,
                       'alpha': 0.5,
@@ -112,7 +119,9 @@ def plot_composition(base_counts,
                         'label': base,
                         'linestyle': 'None',
                        }
+
         ax.plot(xs, fractions, **marker_style) 
+
         if not expected_seq:
             ax.plot(xs, fractions, **line_style) 
     
@@ -128,8 +137,15 @@ def plot_composition(base_counts,
             end = min(end, max(xs) + 1)
             draw_range_bracket(ax, start, end - 1, text)
     
-    ax.set_ylim(0, 1.01)
-    ax.axhline(y=1, color='black', alpha=0.5)
+    y_max = 1.01
+    y_line = 1
+
+    if as_percentage:
+        y_max *= 100
+        y_line *= 100
+
+    ax.set_ylim(0, y_max)
+    ax.axhline(y=y_line, color='black', alpha=0.5)
     ax.set_xlim(min(xs) - 0.5, max(xs) + 0.5)
 
     ax.legend(loc='center left',
@@ -147,13 +163,16 @@ def shade_background(start, sequence, observed_seq=None, match_threshold=0.95, a
 
         alpha = 0.2
 
-        if len(expected_bases) == 1:
-            expected_base = expected_bases[0]
-            observed_frac = observed_seq[p][utilities.base_to_index[expected_base]] / max(observed_seq[p].sum(), 1)
-            if observed_frac > match_threshold:
-                alpha = 0.05
-            else:
-                alpha = 0.4
+        if observed_seq is not None:
+            if len(expected_bases) == 1:
+                expected_base = expected_bases[0]
+                observed_frac = observed_seq[p][utilities.base_to_index[expected_base]] / max(observed_seq[p].sum(), 1)
+                if observed_frac > match_threshold:
+                    alpha = 0.1
+                else:
+                    alpha = 0.4
+        else:
+            alpha = 0.1
 
         increment = 1. / len(expected_bases)
         for i, base in enumerate(expected_bases):
@@ -214,13 +233,52 @@ def plot_mean_position_qs(position_type_counts, xs, ax):
     ax.set_ylabel('Average quality score')
     
 @optional_ax
-def plot_average_qualities(average_q_distribution, label=None, save_as=None, ax=None):
+def plot_average_qualities_by_basecall(average_q_distribution, label=None, save_as=None, ax=None, expected_seq=None):
     average_q_distribution = np.array(average_q_distribution, dtype=float)
-    average_q_distribution /= average_q_distribution.sum()
-    ax.plot(average_q_distribution, 'o-', label=label)
-    ax.set_xlim(0, len(average_q_distribution) - 1)
-    ax.set_xlabel('Average quality score')
-    ax.set_ylabel('Fraction of reads')
+    #average_q_distribution /= average_q_distribution.sum()
+
+    cycles, _ = average_q_distribution.shape
+    
+    xs = np.arange(cycles)
+
+    for i, base in enumerate(utilities.base_order):
+        fractions = average_q_distribution[:, i]
+        line_style = {'linestyle': '-',
+                      'linewidth': 0.5,
+                      'alpha': 0.5,
+                      'color': igv_colors[base],
+                     }
+        marker_style = {'marker': '.',
+                        'color': igv_colors[base],
+                        'label': base,
+                        'linestyle': 'None',
+                       }
+        ax.plot(xs, fractions, **marker_style) 
+        if not expected_seq:
+            ax.plot(xs, fractions, **line_style) 
+
+    if expected_seq:
+        start, sequence = expected_seq
+        shade_background(start, sequence, ax=ax)
+
+    ax.set_xlim(min(xs) - 0.5, max(xs) + 0.5)
+    ax.set_xlabel('Cycle')
+    ax.set_ylabel('Average q score')
+
+    ax.legend(loc='center left',
+              bbox_to_anchor=(1.04, 0.5),
+              framealpha=0.5,
+              numpoints=1,
+             )
+
+@optional_ax
+def plot_average_qualities(qs, label=None, save_as=None, ax=None):
+    mean_from_histogram = np.vectorize(utilities.mean_from_histogram, signature='(m)->()')
+    means = mean_from_histogram(qs)
+    ax.plot(means, '-', color='grey', label=label)
+    ax.set_xlim(0, len(means) - 1)
+    ax.set_xlabel('Cycle')
+    ax.set_ylabel('Average q score')
 
 @optional_ax
 def plot_paired_average_qualities(stats, name=None, save_as=None, ax=None):
