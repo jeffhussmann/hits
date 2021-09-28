@@ -1,6 +1,7 @@
 import contextlib
 import datetime
 import functools
+import inspect
 import numbers
 import subprocess
 import sys
@@ -138,11 +139,11 @@ def line_count(file_name):
     return count
 
 def pairwise(s):
-    """ Returns the elements of s in overlapping pairs. """
+    ''' Returns the elements of s in overlapping pairs. '''
     return [(s[i - 1], s[i]) for i in range(1, len(s))]
 
 def all_consecutive(s):
-    """ Returns True if the elements of s when sorted are consecutive integers. """
+    ''' Returns True if the elements of s when sorted are consecutive integers. '''
     for (x, y) in pairwise(sorted(s)):
         if y - x != 1:
             return False
