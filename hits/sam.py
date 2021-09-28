@@ -1614,7 +1614,9 @@ def remove_terminal_deletions(al):
 
 def grouped_by_name(als):
     if isinstance(als, (str, Path)):
+        saved_verbosity = pysam.set_verbosity(0)
         als = pysam.AlignmentFile(als)
+        pysam.set_verbosity(saved_verbosity)
 
     grouped = utilities.group_by(als, lambda al: al.query_name)
 
@@ -1756,8 +1758,10 @@ def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None
     return distance
 
 def get_header(bam_fn):
+    saved_verbosity = pysam.set_verbosity(0)
     with pysam.AlignmentFile(bam_fn) as bam_file:
         header = bam_file.header
+    pysam.set_verbosity(saved_verbosity)
     return header
 
 def flip_alignment(alignment):
