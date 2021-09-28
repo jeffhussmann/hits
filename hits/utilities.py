@@ -192,7 +192,7 @@ def memoized_property(f):
     
     return memoized_f
 
-def memoized_with_key(f):
+def memoized_with_args(f):
     @functools.wraps(f)
     def memoized_f(self, *args):
         attr_name = f'_memoized_{f.__name__}'
@@ -205,6 +205,37 @@ def memoized_with_key(f):
         else:
             value = f(self, *args)
             already_computed[args] = value
+
+        return value
+
+    return memoized_f
+
+def memoized_with_kwargs(f):
+    @functools.wraps(f)
+    def memoized_f(self, **kwargs):
+        argspec = inspect.getfullargspec(f)
+        if argspec.defaults is not None or len(argspec.args) != 1:
+            raise ValueError('all arguments must be keyword-only')
+
+        if argspec.args[0] != 'self':
+            raise ValueError('first arg name must be self')
+
+        if argspec.kwonlydefaults is not None:
+            for key, value in argspec.kwonlydefaults.items():
+                kwargs.setdefault(key, value)
+
+        all_args = tuple([(key, value) for key, value in sorted(kwargs.items())])
+
+        attr_name = f'_memoized_{f.__name__}'
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, {})
+
+        already_computed = getattr(self, attr_name)
+        if all_args in already_computed:
+            value = already_computed[all_args]
+        else:
+            value = f(self, **kwargs)
+            already_computed[all_args] = value
 
         return value
 
