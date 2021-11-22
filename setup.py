@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.2.2',
+    version='0.3.0',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
@@ -46,5 +46,6 @@ setup(
         'pysam>=0.15.1',
         'pyyaml>=3.13',
         'scipy>=1.2.1',
+        'statsmodels==0.12.1',
     ],
 )
