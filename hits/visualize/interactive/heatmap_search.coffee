@@ -1,6 +1,4 @@
-models = cb_obj.document._all_models_by_name._dict
-
-data = models['quad_source'].data
+data = quad_source.data
 
 row_labels = {row_labels}
 col_labels = {col_labels}
@@ -27,9 +25,9 @@ data['right'] = [({x_upper_bound} for i in row_matches)..., ({lower_bound} + i +
 data['bottom'] = [({y_upper_bound} - i - 1 for i in row_matches)..., ({lower_bound} for i in col_matches)...]
 data['top'] = [({y_upper_bound} - i for i in row_matches)..., ({y_upper_bound} for i in col_matches)...]
 
-models['row_label_source'].data['alpha'] = row_alphas
-models['col_label_source'].data['alpha'] = col_alphas
+row_label_source.data['alpha'] = row_alphas
+col_label_source.data['alpha'] = col_alphas
 
-models['quad_source'].change.emit()
-models['row_label_source'].change.emit()
-models['col_label_source'].change.emit()
+quad_source.change.emit()
+row_label_source.change.emit()
+col_label_source.change.emit()

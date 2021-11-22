@@ -1,7 +1,3 @@
-models = cb_obj.document._all_models_by_name._dict
-
-data = models['scatter_source'].data
-
 squeeze = (possibly_array) ->
     if Array.isArray(possibly_array)
         squeezed = possibly_array[0]
@@ -18,7 +14,7 @@ else
     main_key = choice
     selection_key = choice
 
-data['_color'] = data[main_key]
-data['_selection_color'] = data[selection_key]
+scatter_source.data['_color'] = scatter_source.data[main_key]
+scatter_source.data['_selection_color'] = scatter_source.data[selection_key]
 
-models['scatter_source'].change.emit()
+scatter_source.change.emit()

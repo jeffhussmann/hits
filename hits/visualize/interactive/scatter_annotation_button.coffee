@@ -1,13 +1,11 @@
-models = cb_obj.origin.document._all_models_by_name._dict
-
-rect_data = models['rect_source'].data
+rect_data = rect_source.data
 length = rect_data['x'].length
 xs = rect_data['x']
 ys = rect_data['y']
 widths = rect_data['width']
 heights = rect_data['height']
 
-cross_data = models['cross_source'].data
+cross_data = cross_source.data
 cross_xs = cross_data['x']
 cross_ys = cross_data['y']
 
@@ -29,5 +27,5 @@ csv_content += lines.join('\n')
 encoded = encodeURI(csv_content)
 link = document.createElement('a')
 link.setAttribute('href', encoded)
-link.setAttribute('download', 'rectangles_' + models['title'].text + '.txt')
+link.setAttribute('download', 'rectangles_{{title}}.txt')
 link.click()

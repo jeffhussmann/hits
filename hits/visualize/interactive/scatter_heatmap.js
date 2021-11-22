@@ -1,25 +1,20 @@
-var axis, heatmap_data, hist_data, i, index, j, k, label_data, len, len1, models, name, num_pairs, num_selected, ref, ref1, scatter_data, suffix, x_name, x_names, y_name, y_names;
-
-models = cb_obj.document._all_models_by_name._dict;
-
-scatter_data = models['scatter_source'].data;
-
-label_data = models['filtered_source'].data;
-
-hist_data = models['histogram_source'].data;
-
-heatmap_data = models['heatmap_source'].data;
+var axes, axis, i, index, j, k, len, len1, name, num_pairs, num_selected, ref, ref1, suffix, x_name, x_names, y_name, y_names;
 
 num_selected = cb_obj.indices.length;
+
+axes = {
+  'x': x_axis,
+  'y': y_axis
+};
 
 if (num_selected === 0) {
   // Selection was cleared with ESC. Recover the old selection from the axis
   // labels.
-  x_name = models['x_axis'].axis_label;
-  y_name = models['y_axis'].axis_label;
-  num_pairs = heatmap_data['x_name'].length;
-  x_names = heatmap_data['x_name'];
-  y_names = heatmap_data['y_name'];
+  x_name = axes['x'].axis_label;
+  y_name = axes['y'].axis_label;
+  num_pairs = heatmap_source.data['x_name'].length;
+  x_names = heatmap_source.data['x_name'];
+  y_names = heatmap_source.data['y_name'];
   index = ((function() {
     var j, ref, results;
     results = [];
@@ -40,22 +35,19 @@ cb_obj.indices = [index];
 ref = ['x', 'y'];
 for (j = 0, len = ref.length; j < len; j++) {
   axis = ref[j];
-  name = heatmap_data[axis + '_name'][index];
-  scatter_data[axis] = scatter_data[name];
-  label_data[axis] = label_data[name];
+  name = heatmap_source.data[axis + '_name'][index];
+  scatter_source.data[axis] = scatter_source.data[name];
+  filtered_source.data[axis] = filtered_source.data[name];
   ref1 = ['_all', '_bins_left', '_bins_right'];
   for (k = 0, len1 = ref1.length; k < len1; k++) {
     suffix = ref1[k];
-    hist_data[axis + suffix] = hist_data[name + suffix];
+    histogram_source.data[axis + suffix] = histogram_source.data[name + suffix];
   }
-  models[axis + '_axis'].axis_label = name;
+  axes[axis].axis_label = name;
 }
 
-// Call to recompute selection histograms.
-models['scatter_selection_callback'].func(models['scatter_source'].selected, 'from_heatmap', require, exports);
+scatter_source.change.emit();
 
-models['scatter_source'].change.emit();
+filtered_source.change.emit();
 
-models['filtered_source'].change.emit();
-
-models['histogram_source'].change.emit();
+histogram_source.change.emit();

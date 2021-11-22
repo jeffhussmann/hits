@@ -1,15 +1,13 @@
-var axis, cluster, data, formatters, i, index, j, k, l, len, len1, models, num_pairs, order_key, ref, ref1, x_name, x_names, y_name, y_names;
-
-models = cb_obj.document._all_models_by_name._dict;
+var axis, cluster, data, formatters, i, index, j, k, l, len, len1, num_pairs, order_key, ref, ref1, x_name, x_names, y_name, y_names;
 
 formatters = {
   'clustered': {clustered_formatter},
   'original': {original_formatter}
 };
 
-cluster = !models['dendrogram'].visible;
+cluster = !dendrogram_lines.visible;
 
-models['dendrogram'].visible = cluster;
+dendrogram_lines.visible = cluster;
 
 if (cluster) {
   order_key = 'clustered';
@@ -17,7 +15,7 @@ if (cluster) {
   order_key = 'original';
 }
 
-data = models['heatmap_source'].data;
+data = heatmap_source.data;
 
 ref = ['r', 'x', 'x_name', 'y', 'y_name', 'color'];
 for (j = 0, len = ref.length; j < len; j++) {
@@ -25,16 +23,18 @@ for (j = 0, len = ref.length; j < len; j++) {
   data[k] = data[k + '_' + order_key];
 }
 
-ref1 = models['heatmap_axis'];
+ref1 = [heatmap_x_axis, heatmap_y_axis];
 for (l = 0, len1 = ref1.length; l < len1; l++) {
   axis = ref1[l];
-  axis.formatter.code = formatters[order_key];
+  // Note: axis is a splattable list
+  axis[0].formatter.code = formatters[order_key];
 }
 
-// Determine the new selection from the scatte axis labels.
-x_name = models['x_axis'].axis_label;
+// Determine the new selection from the scatter axis labels.
+// Note: each axis is a splattable list
+x_name = x_axis[0].axis_label;
 
-y_name = models['y_axis'].axis_label;
+y_name = y_axis[0].axis_label;
 
 num_pairs = data['x_name'].length;
 
@@ -53,8 +53,6 @@ index = ((function() {
   return results;
 })())[0];
 
-models['heatmap_source'].selected.indices = [index];
+heatmap_source.selected.indices = [index];
 
-models['heatmap_source'].change.emit();
-
-models['heatmap_fig'].change.emit();
+heatmap_source.change.emit();

@@ -1,11 +1,9 @@
-var choice, models;
-
-models = cb_obj.document._all_models_by_name._dict;
+var choice;
 
 choice = cb_obj.value;
 
-models['scatter_source'].data['_label'] = models['scatter_source'].data[choice];
+scatter_source.data['_label'] = scatter_source.data[choice];
 
-models['filtered_source'].data['_label'] = models['filtered_source'].data[choice];
+filtered_source.data['_label'] = filtered_source.data[choice];
 
-models['filtered_source'].change.emit();
+filtered_source.change.emit();

@@ -1,8 +1,4 @@
-var choice, data, main_key, models, selection_key, squeeze;
-
-models = cb_obj.document._all_models_by_name._dict;
-
-data = models['scatter_source'].data;
+var choice, main_key, selection_key, squeeze;
 
 squeeze = function(possibly_array) {
   var squeezed;
@@ -24,8 +20,8 @@ if (choice === '') {
   selection_key = choice;
 }
 
-data['_color'] = data[main_key];
+scatter_source.data['_color'] = scatter_source.data[main_key];
 
-data['_selection_color'] = data[selection_key];
+scatter_source.data['_selection_color'] = scatter_source.data[selection_key];
 
-models['scatter_source'].change.emit();
+scatter_source.change.emit();

@@ -1,4 +1,6 @@
 <!doctype html>
+<!--INJECT:html_before-->
+
 <!-- SlickGrid -->
 <style>/*
 IMPORTANT:
@@ -566,8 +568,7 @@ classes should alter those!
     width: 200px; /*must have*/
     height: 200px; /*must have*/
 }</style>
-<style>@import url('slick-default-theme.css');
-
+<style>
 ul {
   margin-left: 0;
   padding: 0;
@@ -575,9 +576,6 @@ ul {
 }
 
 li {
-  background: url("../images/arrow_right_spearmint.png") no-repeat center left;
-  padding: 0 0 0 14px;
-
   list-style: none;
   margin: 0;
 }
@@ -5625,8 +5623,9 @@ if (typeof Slick === "undefined") {
   background-color: white;
 }
 </style>
-<style>body {
-  font-size: 14px;
+<style>
+#pc_container {
+  font-size: 12px;
   font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
   margin: 24px;
   background: #fcfcfc;
@@ -5644,9 +5643,6 @@ ul {
 }
 .dark {
   background: #222;
-}
-p {
-  width: 560px;
 }
 pre {
   color: #444;
@@ -5681,7 +5677,6 @@ body, html {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  font-size: 12px;
 }
 #grid * {
     box-sizing: content-box;
@@ -5693,6 +5688,7 @@ body, html {
 }
 #search_box {
   height: 40px;
+  font-size: 14px;
 }
 .slick-row:hover {
   font-weight: bold;
@@ -6470,6 +6466,8 @@ function zoom_wheel(d) {
         new_start = Math.exp(Math.log(data_y) - delta * (Math.log(data_y) - Math.log(start)));
         new_end = Math.exp(Math.log(data_y) + delta * (Math.log(end) - Math.log(data_y)));
     }
+    new_start = Math.max(new_start, /*INJECT:min_start*/);
+    new_end = Math.min(new_end, /*INJECT:max_end*/);
     __.dimensions[d].yscale.domain([new_start, new_end]);
     pc.updateAxes(0);
     pc.render();
@@ -6501,6 +6499,17 @@ pc.createAxes = function() {
       .each(function(d) {
         var axisElement = d3.select(this).call( pc.applyAxisConfig(axis, __.dimensions[d]) );
 
+        axisElement.append("svg:text")
+          .attr({
+            "text-anchor": "middle",
+            "font-size": 20,
+            "y": 0,
+            "transform": "translate(-60, " + (__.height - __.margin.top - __.margin.bottom) / 2 + ") rotate(-90)",
+            "x": 0,
+            "class": "y_axis_label"
+          })
+          .text("/*INJECT:y_axis_label*/");
+
         axisElement.selectAll("path")
             .style("fill", "none")
             .style("stroke", "#222")
@@ -6527,7 +6536,7 @@ pc.createAxes = function() {
       .attr({
         //"text-anchor": "middle",
         "text-anchor": "left",
-        "font-size": 10,
+        "font-size": 14,
         "y": 0,
         "transform": "translate(0,-5) rotate(" + __.dimensionTitleRotation + ")",
         "x": 0,
@@ -8393,34 +8402,51 @@ d3.divgrid = function(config) {
   return dg;
 };
 </script>
-<div id="parallel_coordinates" class="parcoords" style="height:800px;"></div>
-<div id="search_box">
-Search: <input type="text" id="search" value="">
-<button id="clear_constraints">Clear all constraints</button>
-Highlight on hover: <input type="checkBox" id="hover_checkbox" checked>
-Label by: <select id="label_by"></select>
-<button id="download_screenshot">Download screenshot</button>
-<button id="export_table">Export table</button>
+
+<!--INJECT:html_between-->
+
+<div class="container" style="width: /*INJECT:table_width*/px; margin-left: 50px;">
+  <div class="row">
+    <div id="parallel_coordinates" class="parcoords" style="height: /*INJECT:height*/px"></div>
+  </div>
+
+  <div class="row justify-content-center" id="search_box">
+    <div class="col-md-auto">
+      Search: <input type="text" id="search" value="" autocomplete="off">
+      <button id="clear_constraints">Clear all constraints</button>
+      Highlight on hover: <input type="checkBox" id="hover_checkbox" checked>
+      <!---Label by: <select id="label_by"></select>--->
+      <!---<button id="download_screenshot">Download screenshot</button>--->
+      <button id="export_table">Export table</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <div id="grid" style="width: /*INJECT:table_width*/px;"></div>
+  </div>
+
 </div>
-<div id="grid"></div>
-<script id="brushing">function color_from_alpha(alpha) {
-    return function(d) {
-        return d['_color'] + alpha + ")";
-    }
+
+<script id="brushing">
+  
+function color_from_alpha(alpha) {
+  return function(d) {
+      return d['_color'] + alpha + ")";
+  }
 }
 
 var parcoords = d3.parcoords()("#parallel_coordinates")
     .mode("queue") // progressive rendering
     .rate(500)
-    .color(color_from_alpha(0.1))
-    .brushedColor(color_from_alpha(0.5))
-    .highlightColor(color_from_alpha(0.7))
-    //.height(700)
+    .color(color_from_alpha(0.3))
+    .brushedColor(color_from_alpha(0.75))
+    .highlightColor(color_from_alpha(0.9))
+    .width(/*INJECT:table_width*/)
     .margin({
-        top: 150,
-        left: 40,
-        right: 200,
-        bottom: 16
+        top: 100,
+        left: 100,
+        right: 100,
+        bottom: 30,
     });
 
 var intersectionPoints;
@@ -8537,6 +8563,11 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         return k != 'id' && k != '_color';
     });
 
+    function float_formatter(row, cell, value, columnDef, dataContext) {
+        var converted = parseFloat(value);
+        return isNaN(converted) ? value : converted.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
     var columns = table_column_keys.map(function(key,i) {
         var width;
         switch (key) {
@@ -8545,11 +8576,14 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
             case 'secretome':
                 width = 100;
                 break;
+            case 'CRISPRi sgRNA':
+                width = 115;
+                break;
             case 'description':
                 width = 1500;
                 break;
             default:
-                width = 75;
+                width = 100;
         }
 
         return {
@@ -8558,6 +8592,7 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
             field: key,
             sortable: true,
             width: width,
+            formatter: float_formatter,
         }
     });
 
@@ -8622,10 +8657,14 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
 
         // Highlight that element in the parallel coordinates graph
         parcoords.highlight([d[elementPos]]);
+        addTooltip([d[elementPos]], [intersectionPoints[elementPos]]);
+
+        // Add tooltips...
     });
 
     grid.onMouseLeave.subscribe(function(e,args) {
         parcoords.unhighlight();
+        cleanTooltip();
     });
 
     // fill grid with data
@@ -8818,7 +8857,6 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
 
     function addTooltip(currentData, currentIntersectionPoints) {
         var tooltipData = getTooltipData(currentData, currentIntersectionPoints);
-
         var fontSize = 10;
 
         parcoords.svg.selectAll('text .hover_tooltip')
@@ -8827,7 +8865,7 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
             .attr('x', function(d) { return d.x; })
             .attr('y', function(d) { return d.y; })
             .attr('class', 'hover_tooltip')
-            .attr('fill', 'black')
+            .attr('fill', function(d) { return d.color; })
             .attr('text-anchor', function(d) { return d.anchor; })
             .attr('alignment-baseline', 'central')
             .attr('font-size', fontSize)
@@ -8838,11 +8876,12 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         var margins = this.parcoords.margin();
         var tooltipData = [];
 
-        var label_by = d3.select('#label_by').property('value');
+        var label_by = "/*INJECT:label_by*/" //d3.select('#label_by').property('value');
 
         for (var i = 0; i < currentData.length; i++) {
             for (var column of [0, currentIntersectionPoints[i].length - 1]) {
                 var text = currentData[i][label_by];
+                var color = currentData[i]['_color'] + "1.0)";
                 var x = currentIntersectionPoints[i][column][0];
                 var y = currentIntersectionPoints[i][column][1];
 
@@ -8850,6 +8889,7 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
                     var tip = {
                         y: y - margins.top,
                         text: text,
+                        color: color,
                     };
                     if (column == 0) {
                         //left-most
@@ -8897,11 +8937,12 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
         }
         var csv_content = "data:text/csv;charset=utf-8,";
         csv_content += lines.join('\n');
-        var encoded = encodeURI(csv_content)
-        var link = document.createElement('a')
-        link.setAttribute('href', encoded)
-        link.setAttribute('download', 'table_contents.txt')
-        link.click()
+        var encoded = encodeURI(csv_content);
+        var link = document.createElement('a');
+        link.setAttribute('href', encoded);
+        link.setAttribute('download', 'table_contents.txt');
+        link.click();
     }
 });
 </script>
+<!--INJECT:html_after-->

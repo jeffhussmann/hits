@@ -1,23 +1,30 @@
-models = cb_obj.document._all_models_by_name._dict
+for axis_name in ['x', 'y']
+    if axis_name == 'x'
+        menu_0 = x_menu_0
+        menu_1 = x_menu_1
+        axis_title = x_axis_title
+        axis_subtitle = x_axis_subtitle
+    else
+        menu_0 = y_menu_0
+        menu_1 = y_menu_1
+        axis_title = y_axis_title
+        axis_subtitle = y_axis_subtitle
 
-scatter_data = models['scatter_source'].data
-label_data = models['filtered_source'].data
-hist_data = models['histogram_source'].data
+    title = menu_0.value[0]
+    subtitle = menu_1.value[0]
+    name = title + ' ' + subtitle 
 
-for axis in ['x', 'y']
-    name = models[axis + '_0_menu'].value + ' ' + models[axis + '_1_menu'].value 
-
-    scatter_data[axis] = scatter_data[name]
-    label_data[axis] = label_data[name]
+    scatter_source.data[axis_name] = scatter_source.data[name]
+    filtered_source.data[axis_name] = filtered_source.data[name]
 
     for suffix in ['_all', '_bins_left', '_bins_right']
-        hist_data[axis + suffix] = hist_data[name + suffix]
+        histogram_source.data[axis_name + suffix] = histogram_source.data[name + suffix]
 
-    models[axis + '_axis'].axis_label = name
+    axis_title.text = title
+    axis_subtitle.text = subtitle
 
-# Call to recompute selection histograms.
-models['scatter_selection_callback'].func(models['scatter_source'].selected, cb_data, require, exports)
+# Note: need to re-add calculation of histograms.
 
-models['scatter_source'].change.emit()
-models['filtered_source'].change.emit()
-models['histogram_source'].change.emit()
+scatter_source.change.emit()
+filtered_source.change.emit()
+histogram_source.change.emit()

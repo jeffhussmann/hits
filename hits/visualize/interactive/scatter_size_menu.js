@@ -1,6 +1,4 @@
-var choice, models;
-
-models = cb_obj.document._all_models_by_name._dict;
+var choice;
 
 choice = cb_obj.value;
 
@@ -8,6 +6,6 @@ if (choice === '') {
   choice = '_uniform_size';
 }
 
-models['scatter_source'].data['_size'] = models['scatter_source'].data[choice];
+scatter_source.data['_size'] = scatter_source.data[choice];
 
-models['scatter_source'].change.emit();
+scatter_source.change.emit();

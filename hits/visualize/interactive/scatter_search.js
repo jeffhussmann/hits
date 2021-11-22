@@ -1,14 +1,12 @@
-var all_matches, case_sensitive, column, column_names, i, j, len, matches, models, possibly_lowercase, query, t, targets,
+var all_matches, column, column_names, i, is_case_sensitive, j, len, matches, possibly_lowercase, query, t, targets,
   indexOf = [].indexOf;
-
-models = cb_obj.document._all_models_by_name._dict;
 
 column_names = {column_names};
 
-case_sensitive = models['case_sensitive'].active.length > 0;
+is_case_sensitive = case_sensitive.active.length > 0;
 
-if (!case_sensitive) {
-  query = cb_obj.value.toLowerCase();
+if (!is_case_sensitive) {
+  query = search_input.value.toLowerCase();
   possibly_lowercase = function(t) {
     return t.toString().toLowerCase();
   };
@@ -24,7 +22,7 @@ all_matches = [];
 if (query !== '') {
   for (j = 0, len = column_names.length; j < len; j++) {
     column = column_names[j];
-    targets = models['scatter_source'].data[column];
+    targets = scatter_source.data[column];
     matches = (function() {
       var k, len1, results;
       results = [];
@@ -40,6 +38,4 @@ if (query !== '') {
   }
 }
 
-models['scatter_source'].selected.indices = all_matches;
-
-//models['scatter_selection_callback'].func(models['scatter_source'].selected, 'from_search', require, exports)
+scatter_source.selected.indices = all_matches;

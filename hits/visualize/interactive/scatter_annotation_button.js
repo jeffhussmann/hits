@@ -1,8 +1,6 @@
-var cross_data, cross_xs, cross_ys, csv_content, encoded, heights, i, j, length, line, lines, link, models, rect_data, ref, widths, x0, x1, xs, y0, y1, ys;
+var cross_data, cross_xs, cross_ys, csv_content, encoded, heights, i, j, length, line, lines, link, rect_data, ref, widths, x0, x1, xs, y0, y1, ys;
 
-models = cb_obj.origin.document._all_models_by_name._dict;
-
-rect_data = models['rect_source'].data;
+rect_data = rect_source.data;
 
 length = rect_data['x'].length;
 
@@ -14,7 +12,7 @@ widths = rect_data['width'];
 
 heights = rect_data['height'];
 
-cross_data = models['cross_source'].data;
+cross_data = cross_source.data;
 
 cross_xs = cross_data['x'];
 
@@ -42,6 +40,6 @@ link = document.createElement('a');
 
 link.setAttribute('href', encoded);
 
-link.setAttribute('download', 'rectangles_' + models['title'].text + '.txt');
+link.setAttribute('download', 'rectangles_{{title}}.txt');
 
 link.click();

@@ -1,44 +1,21 @@
-models = cb_obj.document._all_models_by_name._dict
-
-# cb_data is used to flag if this callback was triggered manually by
-# the search button or subset menu callback's. If not, reset the values of those
-# widgets.
-
-# To prevent this from erasing a selection that was just made, store indices
-# and re-assign them afterwards.
-indices = cb_obj.indices
-
-if cb_data == 'from_heatmap'
-else
-    if (models['search']?) and cb_data != 'from_search'
-        models['search'].value = ''
-    if (models['subset_menu']?) and cb_data != 'from_subset'
-        models['subset_menu'].value = ''
-
-cb_obj.indices = indices
-
 # Make the histograms of all data slightly darker if nothing is selected. 
-if indices.length == 0
-    models['hist_x_all'].glyph.fill_alpha = 0.2
-    models['hist_y_all'].glyph.fill_alpha = 0.2
+if cb_obj.indices.length == 0
+    hist_x_all.glyph.fill_alpha = 0.2
+    hist_y_all.glyph.fill_alpha = 0.2
 else
-    models['hist_x_all'].glyph.fill_alpha = 0.1
-    models['hist_y_all'].glyph.fill_alpha = 0.1
+    hist_x_all.glyph.fill_alpha = 0.1
+    hist_y_all.glyph.fill_alpha = 0.1
 
-full_data = models['scatter_source'].data
-filtered_data = models['filtered_source'].data
+for key, values of scatter_source.data
+    filtered_source.data[key] = (values[i] for i in cb_obj.indices)
 
-for key, values of full_data
-    filtered_data[key] = (values[i] for i in indices)
+filtered_source.change.emit()
 
-models['filtered_source'].change.emit()
-
-if (models['table']?)
-    models['table'].change.emit()
+table.change.emit()
 
 get_domain_info = (name) ->
-    bins_left = models['histogram_source'].data[name + '_bins_left']
-    bins_right = models['histogram_source'].data[name + '_bins_right']
+    bins_left = histogram_source.data[name + '_bins_left']
+    bins_right = histogram_source.data[name + '_bins_right']
     bounds = [bins_left[0], bins_right[bins_right.length - 1]]
     domain_info =
         bins: bins_left
@@ -58,12 +35,12 @@ update_bins = () ->
         # and max data value, and thresholds needs to be given array that
         # include min but not max
         binner = loaded['d3'].histogram().domain(domain_info.bounds).thresholds(domain_info.bins)
-        data = filtered_data[name]
+        data = filtered_source.data[name]
         binned = binner(data)
         counts = binned_to_counts(binned)
-        models['histogram_source'].data[name + '_selected'] = counts
+        histogram_source.data[name + '_selected'] = counts
     
-    models['histogram_source'].change.emit()
+    histogram_source.change.emit()
 
 if d3? and d3.histogram
     update_bins()

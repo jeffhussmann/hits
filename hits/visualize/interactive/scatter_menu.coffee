@@ -1,9 +1,3 @@
-models = cb_obj.document._all_models_by_name._dict
-
-scatter_data = models['scatter_source'].data
-label_data = models['filtered_source'].data
-hist_data = models['histogram_source'].data
-
 squeeze = (possibly_array) ->
     if Array.isArray(possibly_array)
         squeezed = possibly_array[0]
@@ -11,20 +5,30 @@ squeeze = (possibly_array) ->
         squeezed = possibly_array
     return squeezed
 
-for axis in ['x', 'y']
-    name = squeeze models[axis + '_menu'].value
+menus = 
+    'x': x_menu
+    'y': y_menu
 
-    scatter_data[axis] = scatter_data[name]
-    label_data[axis] = label_data[name]
+axes = 
+    'x': x_axis
+    'y': y_axis
+
+for axis_name in ['x', 'y']
+    menu = menus[axis_name]
+    axis = axes[axis_name]
+
+    name = squeeze menu.value
+
+    scatter_source.data[axis_name] = scatter_source.data[name]
+    filtered_source.data[axis_name] = filtered_source.data[name]
 
     for suffix in ['_all', '_bins_left', '_bins_right']
-        hist_data[axis + suffix] = hist_data[name + suffix]
+        histogram_source.data[axis_name + suffix] = histogram_source.data[name + suffix]
 
-    models[axis + '_axis'].axis_label = name
+    axis[0].axis_label = name
 
-# Call to recompute selection histograms.
-models['scatter_selection_callback'].func(models['scatter_source'].selected, cb_data, require, exports)
+# Note: need to re-add calculation of histograms.
 
-models['scatter_source'].change.emit()
-models['filtered_source'].change.emit()
-models['histogram_source'].change.emit()
+scatter_source.change.emit()
+filtered_source.change.emit()
+histogram_source.change.emit()

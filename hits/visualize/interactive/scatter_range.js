@@ -1,14 +1,8 @@
-var lower_bound, models, upper_bound, x_range, y_range;
-
-models = cb_obj.document._all_models_by_name._dict;
+var lower_bound, upper_bound;
 
 lower_bound = {lower_bound};
 
 upper_bound = {upper_bound};
-
-x_range = models['x_range'];
-
-y_range = models['y_range'];
 
 if (x_range.start < lower_bound) {
   x_range.start = lower_bound;

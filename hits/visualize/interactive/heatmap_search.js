@@ -1,8 +1,6 @@
-var c, col_alphas, col_labels, col_matches, data, i, j, k, len, len1, models, query, r, row_alphas, row_labels, row_matches;
+var c, col_alphas, col_labels, col_matches, data, i, j, k, len, len1, query, r, row_alphas, row_labels, row_matches;
 
-models = cb_obj.document._all_models_by_name._dict;
-
-data = models['quad_source'].data;
+data = quad_source.data;
 
 row_labels = {row_labels};
 
@@ -182,12 +180,12 @@ data['top'] = [
   })())
 ];
 
-models['row_label_source'].data['alpha'] = row_alphas;
+row_label_source.data['alpha'] = row_alphas;
 
-models['col_label_source'].data['alpha'] = col_alphas;
+col_label_source.data['alpha'] = col_alphas;
 
-models['quad_source'].change.emit();
+quad_source.change.emit();
 
-models['row_label_source'].change.emit();
+row_label_source.change.emit();
 
-models['col_label_source'].change.emit();
+col_label_source.change.emit();

@@ -1,21 +1,19 @@
-var axis_name, buffer, clean_values, clean_xs, clean_ys, hist_counts, hist_max, hist_range, i, identical_bins, index_is_clean, j, k, len, log_scale, max, min, models, number_is_clean, ranges, ref, ref1, scatter_data, xs, ys;
-
-models = cb_obj.origin.document._all_models_by_name._dict;
+var axis_name, buffer, clean_values, clean_xs, clean_ys, hist_counts, hist_max, i, identical_bins, index_is_clean, j, k, len, log_scale, max, min, number_is_clean, ranges, ref, ref1, xs, ys;
 
 log_scale = {log_scale};
 
 identical_bins = {identical_bins};
 
-scatter_data = models['scatter_source'].data;
-
 ranges = {
-  'x': models['x_range'],
-  'y': models['y_range']
+  'x': x_range,
+  'y': y_range,
+  'hist_x': hist_x_range,
+  'hist_y': hist_y_range
 };
 
-xs = scatter_data.x;
+xs = scatter_source.data.x;
 
-ys = scatter_data.y;
+ys = scatter_source.data.y;
 
 clean_xs = [];
 
@@ -60,10 +58,12 @@ for (k = 0, len = ref1.length; k < len; k++) {
     ranges[axis_name].start = min - buffer;
     ranges[axis_name].end = max + buffer;
   }
+  // If identical_bins, want ranges of each histogram to be
+  // the same so that heights can be meaningfully compared.
+  // If not, maximize dynamic range. 
   if (!identical_bins) {
-    hist_counts = models['histogram_source'].data[axis_name + '_all'];
+    hist_counts = histogram_source.data[axis_name + '_all'];
     hist_max = Math.max(...hist_counts);
-    hist_range = models['hist_' + axis_name + '_range'];
-    hist_range.end = hist_max;
+    ranges['hist_' + axis_name].end = hist_max;
   }
 }
