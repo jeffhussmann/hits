@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 
 setup(
     name='hits',
-    version='0.3.2',
+    version='0.3.3',
 
     author='Jeff Hussmann',
     author_email='jeff.hussmann@gmail.com',
@@ -32,7 +32,7 @@ setup(
         ],
     },
 
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 
     install_requires=[
         'biopython>=1.72',
@@ -47,6 +47,6 @@ setup(
         'pyyaml>=3.13',
         'scipy>=1.2.1',
         'seaborn>=0.11.0',
-        'statsmodels==0.12.1',
+        'statsmodels>=0.12.1',
     ],
 )
