@@ -12,3 +12,4 @@ dist/
 MANIFEST
 hits.egg-info/
 .eggs/
+.nfs*
