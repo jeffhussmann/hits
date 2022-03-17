@@ -411,7 +411,7 @@ def parse_standardized_name(read_name):
     return lane, tile, x, y, member, ''
 
 def parse_SRA_read_name(read_name):
-    accession, number = read_name.split('.')
+    accession, number = read_name.split()[0].split('.')
     # Remove the leading 'SRR'
     accession = accession[3:]
     return accession, number
