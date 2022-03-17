@@ -5,6 +5,8 @@ import Bio.SeqIO
 import pandas as pd
 import pysam
 
+from . import utilities
+
 class Record(object):
     def __init__(self, name, seq):
         self.name = name
@@ -44,6 +46,14 @@ reads = records
 def to_dict(file_name):
     return OrderedDict((r.name, r.seq) for r in reads(file_name))
 
+def write_dict(seq_dict, fn):
+    with open(fn, 'w') as fh:
+        for name, seq in seq_dict.items():
+            record = Record(name, seq)
+            fh.write(str(record))
+
+    pysam.faidx(str(fn))
+
 def load_fai(fasta_fn):
     fasta_fn = Path(fasta_fn)
     fai_fn = fasta_fn.with_suffix(fasta_fn.suffix + '.fai')
@@ -62,4 +72,3 @@ def load_fai(fasta_fn):
     fai = pd.read_csv(fai_fn, sep='\t', index_col=0, header=None, names=column_names)
 
     return fai
-
