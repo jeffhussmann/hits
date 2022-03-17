@@ -1,6 +1,29 @@
 import pprint
 import urllib
 
+from hits import utilities
+
+def parse_attribute_string(attribute_string):
+    if attribute_string == '.':
+        parsed = {}
+    else:
+        fields = attribute_string.split(';')
+        pairs = [field.split('=') for field in fields]
+        parsed = {name: urllib.parse.unquote(value).strip('"') for name, value in pairs}
+
+    return parsed
+
+def make_attribute_string(attribute):
+    entries = []
+    for key, value in sorted(attribute.items()):
+        key = urllib.parse.quote(str(key), safe='')
+        value = urllib.parse.quote(str(value), safe='')
+        entry = f'{key}={value}'
+        entries.append(entry)
+
+    attribute_string = ';'.join(entries)
+    return attribute_string
+
 class Feature(object):
     def __init__(self, line=None):
         if line == None:
@@ -31,7 +54,18 @@ class Feature(object):
         self.children = set()
     
     @classmethod
-    def from_fields(cls, seqname, source, feature, start, end, score, strand, frame, attribute_string):
+    def from_fields(cls,
+                    seqname='.',
+                    source='.',
+                    feature='.',
+                    start='.',
+                    end='.',
+                    score='.',
+                    strand='.',
+                    frame='.',
+                    attribute_string='.',
+                    ID=None,
+                   ):
         obj = cls()
         obj.seqname = seqname
         obj.source = source
@@ -43,6 +77,8 @@ class Feature(object):
         obj.frame = frame
         obj.attribute_string = attribute_string
         obj.parse_attribute_string()
+        if ID is not None:
+            obj.attribute['ID'] = ID
         return obj
 
     @classmethod
@@ -56,29 +92,15 @@ class Feature(object):
         obj.source = '.'
         obj.score = '.'
         obj.frame = '.'
-        obj.attribute = {'ID': 'edge_{0}_{1}'.format(seqname, position)}
+        obj.attribute = {'ID': f'edge_{seqname}_{position}'}
         obj.populate_attribute_string()
         return obj
 
     def parse_attribute_string(self):
-        if self.attribute_string == '.':
-            parsed = {}
-        else:
-            fields = self.attribute_string.split(';')
-            pairs = [field.split('=') for field in fields]
-            parsed = {name: urllib.parse.unquote(value).strip('"') for name, value in pairs}
-
-        self.attribute = parsed
+        self.attribute = parse_attribute_string(self.attribute_string)
 
     def populate_attribute_string(self):
-        entries = []
-        for key, value in sorted(self.attribute.items()):
-            key = urllib.parse.quote(str(key), safe='')
-            value = urllib.parse.quote(str(value), safe='')
-            entry = '{0}={1}'.format(key, value)
-            entries.append(entry)
-
-        self.attribute_string = ';'.join(entries)
+        self.attribute_string = make_attribute_string(self.attribute)
 
     def populate_connections(self, id_to_object):
         parent_id = self.attribute.get('Parent')
@@ -98,7 +120,7 @@ class Feature(object):
     def print_family(self, level=0):
         indent = '\t' * min(level, 3)
 
-        print('{0}{1}'.format(indent, self))
+        print(f'{indent}{self}')
 
         if level == 0:
             pprint.pprint(self.attribute)
@@ -111,7 +133,7 @@ class Feature(object):
         fields = (self.seqname,
                   self.source,
                   self.feature,
-                  str(self.start + 1),
+                  str(self.start + 1), # Note conversion back to 1-based indexing.
                   str(self.end + 1),
                   self.score,
                   self.strand,
@@ -123,7 +145,7 @@ class Feature(object):
     
     @property
     def pasteable(self):
-        return '{0}:{1}-{2}'.format(self.seqname, self.start, self.end)
+        return f'{self.seqname}:{self.start}-{self.end}'
     
     def __hash__(self):
         return hash(str(self))
@@ -151,6 +173,16 @@ class Feature(object):
 
     def __len__(self):
         return self.end - self.start + 1
+
+    def sequence(self, reference_sequences):
+        ''' Given dictionary of reference_sequences which includes an entry for 
+        self.seqname, returns stranded sequence for this feature.
+        '''
+        seq = reference_sequences[self.seqname][self.start:self.end + 1]
+        if self.strand == '-':
+            seq = utilities.reverse_complement(seq)
+
+        return seq
 
 def populate_all_connections(features):
     for f in features:
