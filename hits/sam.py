@@ -3,23 +3,19 @@
 import re
 import subprocess
 import os
-import sys
 import shutil
-import logging
 import heapq
 import contextlib
 import copy
 import functools
 
 from collections import Counter
-from itertools import chain
 from pathlib import Path
 
 import pysam
 import numpy as np
 
 from . import utilities
-from . import external_sort
 from . import fastq
 from . import fasta
 from . import mapping_tools
@@ -1644,7 +1640,7 @@ def overlaps_feature(alignment, feature, require_same_strand=True):
         return False
 
     same_reference = alignment.reference_name == feature.seqname
-    num_overlapping_bases = alignment.get_overlap(feature.start, feature.end + 1)
+    num_overlapping_bases = feature_overlap_length(alignment, feature)
 
     if require_same_strand:
         same_strand = (get_strand(alignment) == feature.strand)
@@ -1652,6 +1648,14 @@ def overlaps_feature(alignment, feature, require_same_strand=True):
         same_strand = True
 
     return same_reference and same_strand and (num_overlapping_bases > 0) 
+
+def feature_overlap_length(alignment, feature):
+    if alignment is None:
+        overlap = 0
+    else:
+        overlap = alignment.get_overlap(feature.start, feature.end + 1)
+
+    return overlap
 
 def reference_edges(alignment):
     if alignment is None or alignment.is_unmapped:
