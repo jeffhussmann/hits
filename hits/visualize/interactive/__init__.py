@@ -43,6 +43,8 @@ def scatter(df=None,
             initial_alpha=0.5,
             nonselection_alpha=0.1,
             initial_data_lims=None,
+            initial_x_lims=None,
+            initial_y_lims=None,
             data_bounds=None,
             zoom_to_initial_data=False,
             alpha_widget_type='slider',
@@ -286,7 +288,7 @@ def scatter(df=None,
         x_name, y_name = [' '.join(t) for t in initial_xy_names]
     else:
         x_name, y_name = initial_xy_names
-    
+
     fig.xaxis.name = 'x_axis'
     fig.yaxis.name = 'y_axis'
 
@@ -433,13 +435,23 @@ def scatter(df=None,
             
             bins[name] = list(np.linspace(left, right, num_bins))
 
-    if initial_data_lims is not None:
-        initial = initial_data_lims
+    if initial_x_lims is None:
+        if initial_data_lims is None:
+            initial_x_lims = initial
+        else:
+            initial_x_lims = initial_data_lims
+
+    if initial_y_lims is None:
+        if initial_data_lims is None:
+            initial_y_lims = initial
+        else:
+            initial_y_lims = initial_data_lims
 
     if data_bounds is not None:
         bounds = data_bounds
         # Ensure that auto-data limits don't extend out of bounds.
-        initial = (max(initial[0], bounds[0]), min(initial[1], bounds[1]))
+        initial_x_lims = (max(initial_x_lims[0], bounds[0]), min(initial_x_lims[1], bounds[1]))
+        initial_y_lims = (max(initial_y_lims[0], bounds[0]), min(initial_y_lims[1], bounds[1]))
 
     diagonals_visible = ('diagonal' in grid)
 
@@ -481,8 +493,8 @@ def scatter(df=None,
             x_min, x_max = bins[x_name][0], bins[x_name][-1]
             y_min, y_max = bins[y_name][0], bins[y_name][-1]
         else:
-            x_min, x_max = initial
-            y_min, y_max = initial
+            x_min, x_max = initial_x_lims
+            y_min, y_max = initial_y_lims
 
         fig.y_range = bokeh.models.Range1d(y_min, y_max)
         fig.x_range = bokeh.models.Range1d(x_min, x_max)
@@ -925,6 +937,7 @@ def scatter(df=None,
     subset_menu = bokeh.models.widgets.Select(title='Select subset:',
                                               options=subset_options,
                                               value='',
+                                              name='subset_menu',
                                              )
 
     # button to dump table to file.
