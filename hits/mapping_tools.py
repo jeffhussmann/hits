@@ -2,6 +2,7 @@ import os
 import tempfile
 import subprocess
 import threading
+import shlex
 import shutil
 from pathlib import Path
 
@@ -16,68 +17,6 @@ def build_bowtie2_index(index_prefix, sequence_file_names):
                              str(index_prefix),
                             ]
     subprocess.check_call(bowtie2_build_command)
-
-def map_bwa(file_name, genome, sai_file_name, sam_file_name, error_file_name, threads=1):
-    ''' Map reads in file_name to genome with bwa. '''
-    index_location = '{0}/{1}'.format(bwa_indexes_location, genome)
-    with open(sai_file_name, 'w') as sai_file, open(error_file_name, 'w') as error_file:
-        bwa_aln_command = ['bwa', 'aln',
-                           '-t', str(threads),
-                           index_location,
-                           file_name,
-                          ]
-        subprocess.check_call(bwa_aln_command, 
-                              stdout=sai_file,
-                              stderr=error_file,
-                             )
-    
-    with open(sam_file_name, 'w') as sam_file, open(error_file_name, 'a') as error_file:
-        bwa_samse_command = ['bwa', 'samse',
-                             '-n', '100',
-                             index_location,
-                             sai_file_name,
-                             file_name,
-                            ]
-        subprocess.check_call(bwa_samse_command,
-                              stdout=sam_file,
-                              stderr=error_file,
-                             )
-    
-def map_paired_bwa(R1_file_name, R2_file_name,
-                   genome,
-                   R1_sai_file_name, R2_sai_file_name,
-                   sam_file_name,
-                   error_file_name,
-                   threads=1,
-                  ):
-    ''' Map paired end reads in R1_file_name and R2_file_name to genome with bwa. '''
-    index_location = '{0}/{1}'.format(bwa_indexes_location, genome)
-    with open(R1_sai_file_name, 'w') as R1_sai_file, open(error_file_name, 'w') as error_file:
-        bwa_aln_R1_command = ['bwa', 'aln', '-t', str(threads), index_location, R1_file_name]
-        subprocess.check_call(bwa_aln_R1_command,
-                              stdout=R1_sai_file,
-                              stderr=error_file,
-                             )
-    with open(R2_sai_file_name, 'w') as R2_sai_file, open(error_file_name, 'w') as error_file:
-        bwa_aln_R2_command = ['bwa', 'aln', '-t', str(threads), index_location, R2_file_name]
-        subprocess.check_call(bwa_aln_R2_command,
-                              stdout=R2_sai_file,
-                              stderr=error_file,
-                             )
-
-    bwa_sampe_command = ['bwa', 'sampe',
-                         '-n', '100',
-                         '-r', '@RG\tID:0\tSM:6',
-                         '-a', '1000',
-                         index_location,
-                         R1_sai_file_name, R2_sai_file_name,
-                         R1_file_name, R2_file_name,
-                        ]
-    with open(sam_file_name, 'w') as sam_file, open(error_file_name, 'a') as error_file:
-        subprocess.check_call(bwa_sampe_command,
-                              stdout=sam_file,
-                              stderr=error_file,
-                             )
 
 class DoNothing(object):
     def __enter__(self):
@@ -163,7 +102,7 @@ def confirm_index_exists(index_prefix):
             command = ['bowtie2-inspect', '--names', str(index_prefix)]
             subprocess.check_call(command, stdout=devnull, stderr=devnull)
         except subprocess.CalledProcessError:
-            raise ValueError('Index prefix {0} does not exist'.format(index_prefix))
+            raise ValueError(f'Index prefix {index_prefix} does not exist')
 
 def launch_bowtie2(index_prefix,
                    R1_fn,
@@ -470,9 +409,9 @@ def map_tophat(reads_file_names,
     try:
         output = subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
-        print('tophat command returned code {0}'.format(e.returncode))
-        print('full command was:\n\t{0}'.format(' '.join(tophat_command)))
-        print('output from tophat was:\n\t{0}'.format(e.output))
+        print(f'tophat command returned code {e.returncode}')
+        print(f'full command was:\n\t{shlex.join(tophat_command)}')
+        print(f'output from tophat was:\n\t{e.output}')
         raise ValueError
 
     # If there were no unmapped reads, tophat won't create a file. I want to be
@@ -528,7 +467,7 @@ def run_STAR_command(STAR_command):
                       )
     except subprocess.CalledProcessError as e:
         print(f'STAR command returned code {e.returncode}')
-        print(f'full command was:\n\n{" ".join(STAR_command)}')
+        print(f'full command was:\n\n{shlex.join(STAR_command)}')
         print(f'output from STAR was:\n\n{e.output.decode()}\n')
         raise
 
@@ -650,6 +589,14 @@ def load_STAR_index(index_dir):
     ]
     run_STAR_command(STAR_command)
 
+def remove_STAR_index(index_dir):
+    STAR_command = [
+        'STAR',
+        '--genomeDir', str(index_dir),
+        '--genomeLoad', 'Remove',
+    ]
+    run_STAR_command(STAR_command)
+
 def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RAM_limit=None):
     total_length = 0
     for fasta_file in fasta_files:
@@ -673,28 +620,6 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RA
 
     run_STAR_command(STAR_command)
 
-def _map_STAR(reads,
-              index_prefix,
-              output_prefix,
-              **kwargs):
-    input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
-
-    with input_fifo_source:
-        R1_fn = input_fifo_source.file_name
-        writer = ThreadFastqWriter(reads, R1_fn)
-
-        STAR_process, STAR_command = map_STAR(R1_fn,
-                                              index_prefix,
-                                              output_prefix,
-                                              **kwargs)
-
-        _, err_output = STAR_process.communicate()
-        if STAR_process.returncode != 0:
-            raise subprocess.CalledProcessError(STAR_process.returncode,
-                                                STAR_command,
-                                                err_output,
-                                               )
-
 def clean_up_STAR_output(output_prefix):
     suffixes_to_clean_up = [
         'Log.final.out',
@@ -711,29 +636,6 @@ def clean_up_STAR_output(output_prefix):
                 shutil.rmtree(full_fn)
             else:
                 full_fn.unlink()
-
-def map_bwa_mem(reads,
-                index_prefix,
-               ):
-    input_fifo_source = TemporaryFifo(name='input_fifo.fastq')
-
-    with input_fifo_source:
-        R1_fn = input_fifo_source.file_name
-        writer = ThreadFastqWriter(reads, R1_fn)
-
-        bwa_command = [
-            'bwa', 'mem',
-            '-a',
-            index_prefix,
-            R1_fn,
-        ]
-
-        bwa_process = subprocess.Popen(bwa_command,
-                                       stdout=subprocess.PIPE,
-                                      )
-        fh = pysam.AlignmentFile(bwa_process.stdout)
-        for mapping in fh:
-            yield mapping
 
 def map_minimap2(fastq_fn, index, bam_fn, num_threads=1):
     minimap2_command = [
@@ -782,8 +684,8 @@ def build_minimap2_index(fasta_fn, index_fn):
                        stderr=subprocess.PIPE,
                       )
     except subprocess.CalledProcessError as e:
-        print('minimap2 command returned code {0}'.format(e.returncode))
-        print('full command was:\n\n{0}\n'.format(' '.join(minimap2_command)))
-        print('stdout from minimap2 was:\n\n{0}\n'.format(e.stdout.decode()))
-        print('stderr from minimap2 was:\n\n{0}\n'.format(e.stdout.decode()))
+        print(f'minimap2 command returned code {e.returncode}')
+        print(f'full command was:\n\n{shlex.join(minimap2_command)}\n')
+        print(f'stdout from minimap2 was:\n\n{e.stdout.decode()}\n')
+        print(f'stderr from minimap2 was:\n\n{e.stderr.decode()}\n')
         raise
