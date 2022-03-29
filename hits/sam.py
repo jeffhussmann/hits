@@ -1736,7 +1736,7 @@ def aligned_tuples(alignment, ref_seq=None):
 def total_edit_distance(alignment, ref_seq=None):
     return edit_distance_in_query_interval(alignment, ref_seq=ref_seq)
 
-def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None):
+def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None, only_Q30=False):
     if query_interval is None:
         query_interval = interval.Interval(0, np.inf)
 
@@ -1757,7 +1757,8 @@ def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None
     
     for q, q_base, r, r_base, qual in tuples[first_i:last_i + 1]:
         if q_base != r_base:
-            distance += 1
+            if qual >= 30 or not only_Q30:
+                distance += 1
 
     return distance
 
