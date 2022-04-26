@@ -368,7 +368,7 @@ def scatter(df=None,
                                                    name='scatter_source',
                                                   )
     if len(initial_indices) > 0:
-        scatter_source.selected = bokeh.models.Selection(indices=initial_indices)
+        scatter_source.selected.indices = initial_indices
 
     scatter = fig.scatter('x',
                           'y',
