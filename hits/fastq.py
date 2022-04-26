@@ -193,6 +193,14 @@ class Read(object):
     @property
     def query_sequence(self):
         return self.seq
+
+    @property
+    def query_name(self):
+        return self.name
+
+    @property
+    def qname(self):
+        return self.name
     
     @utilities.memoized_property
     def query_qualities(self):
