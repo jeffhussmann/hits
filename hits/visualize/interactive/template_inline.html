@@ -8684,16 +8684,19 @@ data = d3.csv(/*INJECT:encoded_data*/, function(data) {
     };
 
     d3.select('#search').on('change', function() {
-        var query = this.value;
-        if (query == '')
+        if (this.value == '')
             return
         
+        var queries = this.value.split('|');
+
         parcoords.brushReset();
         function is_a_match(i) {
             var match = false;
             for (var k of text_columns) {
-                if (data[i][k].indexOf(query) > -1) {
-                    match = true;
+                for (var query of queries) {
+                  if (data[i][k].indexOf(query) > -1) {
+                      match = true;
+                  }
                 }
             }
             return match;
