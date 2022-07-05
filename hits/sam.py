@@ -126,12 +126,7 @@ def total_reference_nucs_except_splicing(cigar):
 def total_read_nucs(cigar):
     return sum(length for op, length in cigar if op in read_consuming_ops)
 
-def contains_indel(parsed_line):
-    cigar_blocks = cigar_string_to_blocks(parsed_line['CIGAR'])
-    kinds = [k for l, k in cigar_blocks]
-    return ('I' in kinds or 'D' in kinds)
-
-def contains_indel_pysam(read):
+def contains_indel(read):
     kinds = [k for k, l in read.cigar]
     return (BAM_CINS in kinds or BAM_CDEL in kinds)
 
@@ -185,27 +180,8 @@ def get_max_soft_clipped_length(alignment):
 
 def cigar_blocks_to_string(cigar_blocks):
     ''' Builds a CIGAR string out of a corresponding list of operations. '''
-    string = ['{0}{1}'.format(length, op_to_char[op])
-              for op, length in cigar_blocks
-             ]
+    string = [f'{length}{op_to_char[op]}' for op, length in cigar_blocks]
     return ''.join(string)
-
-def alignment_to_cigar_blocks(ref_aligned, read_aligned):
-    """ Builds a list of CIGAR operations from an alignment. """
-    expanded_sequence = []
-    for ref_char, read_char in zip(ref_aligned, read_aligned):
-        if ref_char == '-':
-            expanded_sequence.append('I')
-        elif read_char == '-':
-            expanded_sequence.append('D')
-        elif ref_char == read_char:
-            #expanded_sequence.append('=')
-            expanded_sequence.append('M')
-        else:
-            #expanded_sequence.append('X')
-            expanded_sequence.append('M')
-    sequence, counts = utilities.decompose_homopolymer_sequence(expanded_sequence)
-    return [[count, char] for char, count in zip(sequence, counts)]
 
 def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     op_sequence = []
@@ -369,10 +345,57 @@ def collapse_cigar_blocks(cigar_blocks):
         collapsed.append((kind, sum(t[1] for t in blocks)))
     return collapsed
 
-def alignment_to_cigar_string(ref_aligned, read_aligned):
-    """ Builds a CIGAR string from an alignment. """
-    cigar_blocks = alignment_to_cigar_blocks(ref_aligned, read_aligned)
-    return cigar_blocks_to_string(cigar_blocks)
+def aligned_pairs_to_MD_string(aligned_pairs):
+    ''' Produce an MD string from an alignment. '''
+    # Mark all blocks of matching with numbers, all deletion bases with '^*0', and all mismatch bases.
+    MD_list = []
+    current_match_length = 0
+    for ref_char, read_char in aligned_pairs:
+        if ref_char == read_char:
+            current_match_length += 1
+        elif ref_char != '-':
+            if current_match_length > 0:
+                MD_list.append(current_match_length)
+                current_match_length = 0
+
+            if read_char == '-':
+                MD_list.append(0)
+            else:
+                MD_list.append(ref_char)
+    
+    if current_match_length > 0:
+        MD_list.append(current_match_length)
+
+    # Remove all zeros that aren't a deletion followed by a mismatch
+    reduced_MD_list = []
+    for i in range(len(MD_list)):
+        if isinstance(MD_list[i], int):
+            if MD_list[i] > 0:
+                reduced_MD_list.append(MD_list[i])
+            elif 0 < i < len(MD_list) - 1:
+                if isinstance(MD_list[i - 1], str) and isinstance(MD_list[i + 1], str) and MD_list[i - 1][0] == '^' and MD_list[i + 1][0] != '^':
+                    reduced_MD_list.append(MD_list[i])
+        else:
+            reduced_MD_list.append(MD_list[i])
+    
+    # Collapse all deletions.
+    collapsed_MD_list = [reduced_MD_list[0]]
+    for i in range(1, len(reduced_MD_list)):
+        if isinstance(collapsed_MD_list[-1], str) and collapsed_MD_list[-1][0] == '^' and \
+           isinstance(reduced_MD_list[i], str) and reduced_MD_list[i][0] == '^':
+            
+            collapsed_MD_list[-1] += reduced_MD_list[i][1]
+        else:
+            collapsed_MD_list.append(reduced_MD_list[i])
+
+    # The standard calls for a number to start and to end, zero if necessary.
+    if isinstance(collapsed_MD_list[0], str):
+        collapsed_MD_list.insert(0, 0)
+    if isinstance(collapsed_MD_list[-1], str):
+        collapsed_MD_list.append(0)
+    
+    MD_string = ''.join(map(str, collapsed_MD_list))
+    return MD_string
 
 md_number = re.compile(r'[0-9]+')
 md_text = re.compile(r'[A-Z]+')
@@ -629,58 +652,6 @@ def merge_ref_dicts(first_dict, second_dict):
             merged_dict[position] = base
 
     return merged_dict
-
-def alignment_to_MD_string(ref_aligned, read_aligned):
-    ''' Produce an MD string from an alignment. '''
-    # Mark all blocks of matching with numbers, all deletion bases with '^*0', and all mismatch bases.
-    MD_list = []
-    current_match_length = 0
-    for ref_char, read_char in zip(ref_aligned, read_aligned):
-        if ref_char == read_char:
-            current_match_length += 1
-        elif ref_char != '-':
-            if current_match_length > 0:
-                MD_list.append(current_match_length)
-                current_match_length = 0
-
-            if read_char == '-':
-                MD_list.append(0)
-            else:
-                MD_list.append(ref_char)
-    
-    if current_match_length > 0:
-        MD_list.append(current_match_length)
-
-    # Remove all zeros that aren't a deletion followed by a mismatch
-    reduced_MD_list = []
-    for i in range(len(MD_list)):
-        if isinstance(MD_list[i], int):
-            if MD_list[i] > 0:
-                reduced_MD_list.append(MD_list[i])
-            elif 0 < i < len(MD_list) - 1:
-                if isinstance(MD_list[i - 1], str) and isinstance(MD_list[i + 1], str) and MD_list[i - 1][0] == '^' and MD_list[i + 1][0] != '^':
-                    reduced_MD_list.append(MD_list[i])
-        else:
-            reduced_MD_list.append(MD_list[i])
-    
-    # Collapse all deletions.
-    collapsed_MD_list = [reduced_MD_list[0]]
-    for i in range(1, len(reduced_MD_list)):
-        if isinstance(collapsed_MD_list[-1], str) and collapsed_MD_list[-1][0] == '^' and \
-           isinstance(reduced_MD_list[i], str) and reduced_MD_list[i][0] == '^':
-            
-            collapsed_MD_list[-1] += reduced_MD_list[i][1]
-        else:
-            collapsed_MD_list.append(reduced_MD_list[i])
-
-    # The standard calls for a number to start and to end, zero if necessary.
-    if isinstance(collapsed_MD_list[0], str):
-        collapsed_MD_list.insert(0, 0)
-    if isinstance(collapsed_MD_list[-1], str):
-        collapsed_MD_list.append(0)
-    
-    MD_string = ''.join(map(str, collapsed_MD_list))
-    return MD_string
 
 def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     output_file_name = Path(output_file_name)

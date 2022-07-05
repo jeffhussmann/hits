@@ -1,5 +1,4 @@
 import array
-import itertools
 import sys
 import copy
 from collections import Counter, defaultdict
@@ -10,7 +9,6 @@ import pysam
 from . import utilities
 from . import fastq
 from . import fasta
-from . import adapters
 from . import annotation
 from . import sam
 from . import interval
@@ -89,7 +87,7 @@ def print_local_alignment(alignment, fh=sys.stdout):
     target = alignment['target']
     path = alignment['path']
     if path == []:
-        fh.write('{0}\n\n{1}\n'.format(query, target))
+        fh.write(f'{query}\n\n{target}\n')
         return
 
     def index_to_char(seq, index):
@@ -328,7 +326,6 @@ def propose_all_ends(score_matrix, cells_seen, min_score):
             break
 
         if cell in cells_seen:
-            #print(cell)
             continue
 
         yield cell
@@ -342,8 +339,6 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
         a semi-local alignment of R1 and the reverse complement of R2 with
         the expected adapter sequences prepended to each read.
     '''
-
-
     # Attempt a fast approach - check if expected sequencing primers occur at the same offset
     # in both reads and the implied insert in each read is close to identical.
     fast_insert_length = None
@@ -577,11 +572,10 @@ def align_read(read, targets, min_path_length, header,
                     al.cigar = cigar
                     
                     if al.query_length != al.infer_query_length():
-                        raise ValueError('CIGAR implies different query length - {0}: {1}, {2}'.format(al.query_name, al.query_length, al.infer_query_length()))
+                        raise ValueError(f'CIGAR implies different query length - {al.query_name}: {al.query_length}, {al.infer_query_length()}')
 
-                    read_aligned, ref_aligned = zip(*char_pairs)
                     # NOTE: some evidence this might mess up if alignment ends in an indel.
-                    md = sam.alignment_to_MD_string(ref_aligned, read_aligned)
+                    md = sam.aligned_pairs_to_MD_string(char_pairs)
                     al.set_tag('MD', md)
 
                     al.set_tag('AS', alignment['score'])
@@ -652,7 +646,7 @@ def align_reads(target_fasta_fn,
 
             with open(error_fn, 'w') as error_fh:
                 for key in ['input', 'aligned', 'unaligned']:
-                    error_fh.write('{0}: {1:,}\n'.format(key, statistics[key]))
+                    error_fh.write(f'{key}: {statistics[key]:,}\n')
 
     if yield_unaligned:
         return generator()

@@ -637,7 +637,7 @@ def filter_mappings(mappings,
                 fragment_length = abs(R1_aligned.tlen)
                 pair_counts['fragment_lengths'][fragment_length] += 1
                 
-                if sam.contains_indel_pysam(R1_aligned) or sam.contains_indel_pysam(R2_aligned):
+                if sam.contains_indel(R1_aligned) or sam.contains_indel(R2_aligned):
                     pair_counts['indel'] += 1
                 
                 yield R1_aligned, R2_aligned
