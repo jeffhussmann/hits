@@ -109,6 +109,10 @@ class Feature(object):
             self.parent.children.add(self)
 
     @property
+    def ID(self):
+        return self.attribute.get('ID')
+
+    @property
     def descendants(self):
         descendants = set(self.children)
 

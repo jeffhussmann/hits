@@ -1,7 +1,5 @@
 var font_size, k, l, size;
 
-console.log(labels);
-
 size = cb_obj.end - cb_obj.start;
 
 font_size = Math.min(250, Math.round(3000 / size)).toString() + '%';

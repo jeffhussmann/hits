@@ -11,6 +11,9 @@ def are_disjoint(first, second):
     else:
         return first.start > second.end or second.start > first.end
 
+def are_overlapping(first, second):
+    return not are_disjoint(first, second)
+
 def are_adjacent(first, second):
     return first.start == second.end + 1 or second.start == first.end + 1
 
@@ -127,6 +130,9 @@ class Interval:
     
 class DisjointIntervals:
     def __init__(self, intervals):
+        ''' Note that nothing enforces disjointness here - if
+        that is what is needed, use make_disjoint(intervals)
+        '''
         self.intervals = sorted([i for i in intervals if i.end >= i.start])
         self.is_empty = (len(self.intervals) == 0)
         
