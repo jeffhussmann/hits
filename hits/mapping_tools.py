@@ -2,7 +2,6 @@ import os
 import tempfile
 import subprocess
 import threading
-import shlex
 import shutil
 from pathlib import Path
 
@@ -410,14 +409,14 @@ def map_tophat(reads_file_names,
         output = subprocess.check_output(tophat_command, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         print(f'tophat command returned code {e.returncode}')
-        print(f'full command was:\n\t{shlex.join(tophat_command)}')
+        print(f'full command was:\n\t{" ".join(tophat_command)}')
         print(f'output from tophat was:\n\t{e.output}')
         raise ValueError
 
     # If there were no unmapped reads, tophat won't create a file. I want to be
     # able to assume that one exists.
-    accepted_hits_fn = '{0}/accepted_hits.bam'.format(tophat_dir)
-    unmapped_fn = '{0}/unmapped.bam'.format(tophat_dir)
+    accepted_hits_fn = f'{tophat_dir}/accepted_hits.bam'
+    unmapped_fn = f'{tophat_dir}/unmapped.bam'
     if not os.path.exists(unmapped_fn):
         template = pysam.AlignmentFile(accepted_hits_fn)
         empty_unmapped = pysam.AlignmentFile(unmapped_fn, 'wb', template=template)
@@ -467,7 +466,7 @@ def run_STAR_command(STAR_command):
                       )
     except subprocess.CalledProcessError as e:
         print(f'STAR command returned code {e.returncode}')
-        print(f'full command was:\n\n{shlex.join(STAR_command)}')
+        print(f'full command was:\n\n{" ".join(STAR_command)}')
         print(f'output from STAR was:\n\n{e.output.decode()}\n')
         raise
 
@@ -685,7 +684,7 @@ def build_minimap2_index(fasta_fn, index_fn):
                       )
     except subprocess.CalledProcessError as e:
         print(f'minimap2 command returned code {e.returncode}')
-        print(f'full command was:\n\n{shlex.join(minimap2_command)}\n')
+        print(f'full command was:\n\n{" ".join(minimap2_command)}\n')
         print(f'stdout from minimap2 was:\n\n{e.stdout.decode()}\n')
         print(f'stderr from minimap2 was:\n\n{e.stderr.decode()}\n')
         raise
