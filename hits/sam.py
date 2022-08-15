@@ -1080,6 +1080,11 @@ def crop_al_to_ref_int(alignment, start, end):
     
     return alignment
 
+def crop_al_to_feature(al, feature):
+    primer_interval = interval.Interval.from_feature(feature)
+    cropped_al = crop_al_to_ref_int(al, feature.start, feature.end)
+    return cropped_al
+
 def disallow_query_positions_from_other(alignment, other):
     start, end = query_interval(alignment)
     other_start, other_end = query_interval(other)
@@ -1762,3 +1767,31 @@ def make_nonredundant(alignments):
     nonredundant = {fingerprint(al): al for al in alignments if al is not None}
     
     return list(nonredundant.values())
+
+def make_noncontained(alignments, max_length=np.inf, alignments_contained_in=None):
+    ''' Alignment A is contained in alignment B if
+    the query interval covered by A is a subset of the query interval covered by B.
+    Does not remove als longer than max_length.
+    ''' 
+    query_intervals = [interval.get_covered(al) for al in alignments]
+
+    if alignments_contained_in is None:
+        alignments_contained_in = alignments
+        query_intervals_contained_in = query_intervals
+    else:
+        query_intervals_contained_in = [interval.get_covered(al) for al in alignments_contained_in]
+
+    to_remove = set()
+    for first_i in range(len(alignments)):
+        for second_i in range(len(alignments_contained_in)):
+
+            if alignments[first_i] == alignments_contained_in[second_i]:
+                continue
+
+            if query_intervals[first_i] in query_intervals_contained_in[second_i]:
+                if query_intervals[first_i].total_length <= max_length:
+                    to_remove.add(first_i)
+    
+    noncontained = [al for i, al in enumerate(alignments) if i not in to_remove and al is not None]
+    
+    return noncontained
