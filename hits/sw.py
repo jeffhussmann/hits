@@ -363,7 +363,7 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
 
     extended_R1 = before_R1 + R1.seq
     extended_R2 = utilities.reverse_complement(before_R2 + R2.seq)
-    alignment, = generate_alignments(extended_R1,
+    alignments = generate_alignments(extended_R1,
                                      extended_R2, 
                                      'overlap',
                                      2,
@@ -372,6 +372,12 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
                                      1,
                                      0,
                                     )
+
+    if len(alignments) == 0:
+        results = {'failed': 'no alignments detected'}
+        return results
+    else:
+        alignment = alignments[0]
 
     results = {'alignment': alignment}
 
