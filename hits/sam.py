@@ -1279,9 +1279,16 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
         right_ceds = cumulative_edit_distances(right_al, overlap, True, ref_seq=right_ref_seq)
 
         switch_after_edits = {
-            overlap.start - 1 : right_ceds[overlap.start],
+            overlap.start - 1: right_ceds[overlap.start],
             overlap.end: left_ceds[overlap.end],
         }
+
+        # If left_al doesn't covers the query base before overlap.start,
+        # overlap.start - 1 needs to pay a penalty of 1. 
+        if left_covered.start > overlap.start - 1:
+            switch_after_edits[overlap.start - 1] += 1
+
+        # 22.08.15: does equivalent logic need to be added to overlap.end?
 
         for q in range(overlap.start, overlap.end):
             switch_after_edits[q] = left_ceds[q] + right_ceds[q + 1]
