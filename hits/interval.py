@@ -196,7 +196,10 @@ class DisjointIntervals:
             return DisjointIntervals(intersections)
     
     def __eq__(self, other):
-        return self.intervals == other.intervals
+        if type(other) == Interval:
+            return len(self.intervals) == 1 and self.intervals[0] == other
+        else:
+            return self.intervals == other.intervals
 
     def __iter__(self):
         return iter(self.intervals)
