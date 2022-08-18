@@ -1283,10 +1283,14 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
             overlap.end: left_ceds[overlap.end],
         }
 
-        # If left_al doesn't covers the query base before overlap.start,
-        # overlap.start - 1 needs to pay a penalty of 1. 
-        if left_covered.start > overlap.start - 1:
-            switch_after_edits[overlap.start - 1] += 1
+        # 22.08.17: I understand this less well than I thought I did.
+        # It's not clear what the behavior should be for entirely contained als,
+        # but probably should be that switch_after entirely outside should be
+        # included, and if this code is included, this doesn't happen. 
+        # # If left_al doesn't covers the query base before overlap.start,
+        # # overlap.start - 1 needs to pay a penalty of 1. 
+        # if left_covered.start > overlap.start - 1:
+        #     switch_after_edits[overlap.start - 1] += 1
 
         # 22.08.15: does equivalent logic need to be added to overlap.end?
 
