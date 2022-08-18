@@ -96,6 +96,7 @@ def enhanced_scatter(xs, ys,
                      hists_location=None,
                      hist_bins=100,
                      hist_range=None,
+                     hist_alpha=0.2,
                      marker_size=4,
                      text_size=14,
                      text_weight='normal',
@@ -222,15 +223,16 @@ def enhanced_scatter(xs, ys,
         x_offset = 10
         y_offset = 0.5 * text_size
 
-    text_kwargs = {'xy': (x, y),
-                   'xycoords': 'axes fraction',
-                   'textcoords': 'offset points',
-                   'horizontalalignment': horizontal_alignment,
-                   'verticalalignment': vertical_alignment,
-                   'fontsize': text_size,
-                   'family': 'serif',
-                   'weight': text_weight,
-                  }
+    text_kwargs = {
+        'xy': (x, y),
+        'xycoords': 'axes fraction',
+        'textcoords': 'offset points',
+        'horizontalalignment': horizontal_alignment,
+        'verticalalignment': vertical_alignment,
+        'fontsize': text_size,
+        'family': 'serif',
+        'weight': text_weight,
+    }
     
     if do_fit:
         fit = np.polyfit(xs, ys, 1)
@@ -288,11 +290,12 @@ def enhanced_scatter(xs, ys,
             bottom = ax_position.y1
             left = ax_position.x1
         
-        common_kwargs = {'alpha': 0.2,
-                         'histtype': 'stepfilled',
-                         'bins': hist_bins,
-                         'color': 'black',
-                        }
+        common_kwargs = {
+            'alpha': hist_alpha,
+            'histtype': 'stepfilled',
+            'bins': hist_bins,
+            'color': colors if isinstance(colors, str) else 'black',
+        }
 
         if hist_range is None:
             hist_range = {
@@ -312,6 +315,11 @@ def enhanced_scatter(xs, ys,
             fig.delaxes(ax_x)
         if remove_y_hist:
             fig.delaxes(ax_y)
+    else:
+        ax_x = None
+        ax_y = None
+
+    return fig, {'scatter': ax, 'hist_x': ax_x, 'hist_y': ax_y}
 
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
@@ -422,6 +430,8 @@ def label_scatter_plot(ax, xs, ys, labels,
             ha, va = manual_alignments
             x_offset = distance * x_ratio
             y_offset = distance * y_ratio
+        else:
+            raise ValueError(vector)
 
         text = ax.annotate(site,
                            xy=(x, y),
