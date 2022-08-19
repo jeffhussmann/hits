@@ -3,6 +3,8 @@ import operator
 from collections import defaultdict
 from numbers import Number
 
+import numpy as np
+
 from . import sam
 
 def are_disjoint(first, second):
@@ -30,6 +32,7 @@ class Interval:
 
     @classmethod
     def empty(self):
+        ''' Note: evalutates via bool to False since length is 0. '''
         return Interval(-1, -2)
     
     @classmethod
@@ -63,7 +66,7 @@ class Interval:
             # Defer to definition in DisjointIntervals
             return other & self
         elif are_disjoint(self, other):
-            return []
+            return Interval.empty()
         else:
             return Interval(max(self.start, other.start), min(self.end, other.end))
         
