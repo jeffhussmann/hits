@@ -97,6 +97,8 @@ def enhanced_scatter(xs, ys,
                      hist_bins=100,
                      hist_range=None,
                      hist_alpha=0.2,
+                     hist_size_ratio=0.1,
+                     hist_colors=None,
                      marker_size=4,
                      text_size=14,
                      text_weight='normal',
@@ -294,8 +296,10 @@ def enhanced_scatter(xs, ys,
             'alpha': hist_alpha,
             'histtype': 'stepfilled',
             'bins': hist_bins,
-            'color': colors if isinstance(colors, str) else 'black',
         }
+
+        if hist_colors is None:
+            hist_colors = {which: colors if isinstance(colors, str) else 'black' for which in ['x', 'y']}
 
         if hist_range is None:
             hist_range = {
@@ -303,13 +307,18 @@ def enhanced_scatter(xs, ys,
                 'y': (min(ys), max(ys)),
             }
 
-        ax_x = fig.add_axes((ax_position.x0, bottom, ax_position.width, ax_position.height * 0.1), sharex=ax)
-        ax_x.hist(xs, range=hist_range['x'], **common_kwargs)
+        ax_x = fig.add_axes((ax_position.x0, bottom, ax_position.width, ax_position.height * hist_size_ratio), sharex=ax)
+        n_x, *rest = ax_x.hist(xs, range=hist_range['x'], color=hist_colors['x'], **common_kwargs)
         ax_x.axis('off')
 
-        ax_y = fig.add_axes((left, ax_position.y0, ax_position.width * 0.1, ax_position.height), sharey=ax)
-        ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', **common_kwargs)
+        ax_y = fig.add_axes((left, ax_position.y0, ax_position.width * hist_size_ratio, ax_position.height), sharey=ax)
+        n_y, *rest = ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', color=hist_colors['y'], **common_kwargs)
         ax_y.axis('off')
+
+        max_n = max(max(n_x), max(n_y))
+
+        ax_x.set_ylim(0, max_n * 1.1)
+        ax_y.set_xlim(0, max_n * 1.1)
 
         if remove_x_hist:
             fig.delaxes(ax_x)
@@ -350,7 +359,6 @@ def label_scatter_plot(ax, xs, ys, labels,
                        manual_ratios=None,
                        manual_alignments=None,
                        text_kwargs={'size': 10},
-                       arrow_color='black',
                        avoid=True,
                        avoid_axis_labels=False,
                        avoid_existing=False,
