@@ -32,7 +32,7 @@ setup(
         ],
     },
 
-    python_requires='>=3.7',
+    python_requires='>=3.8',
 
     install_requires=[
         'biopython>=1.72',
