@@ -480,6 +480,8 @@ def map_STAR(R1_fn, index_dir, output_prefix,
              include_unmapped=False,
              bam_fn=None,
              mode='stringent',
+             clean_up_afterwards=True,
+             use_shared_memeory=True,
             ):
     if sort:
         bam_suffix = 'Aligned.sortedByCoord.out.bam'
@@ -516,8 +518,12 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         '--runThreadN', str(num_threads),
         '--readMapNumber', str(num_reads),
         '--outFileNamePrefix', str(output_prefix),
-        '--genomeLoad', 'LoadAndKeep',
     ]
+
+    if use_shared_memeory:
+        STAR_command.extend([
+        '--genomeLoad', 'LoadAndKeep',
+    ])
 
     if mode == 'stringent':
         STAR_command.extend([
@@ -579,6 +585,9 @@ def map_STAR(R1_fn, index_dir, output_prefix,
 
     if sort:
         pysam.index(str(bam_fn))
+
+    if clean_up_afterwards:
+        clean_up_STAR_output(output_prefix)
 
     return bam_fn
 
