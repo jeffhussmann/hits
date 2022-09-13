@@ -232,9 +232,14 @@ def scatter(df=None,
         'save',
     ]
 
-    plot_width = size + (35 if two_level_index else 0) # empirical adjustment for extra blank text row
-    plot_height = size
-    
+    if isinstance(size, tuple):
+        plot_width, plot_height = size
+    else:
+        plot_width, plot_height = size, size
+
+    if two_level_index:
+        plot_width += 35 # empirical adjustment for extra blank text row
+
     fig_kwargs = dict(
         plot_width=plot_width,
         plot_height=plot_height,
@@ -686,7 +691,7 @@ def scatter(df=None,
     
     table = bokeh.models.widgets.DataTable(source=filtered_source,
                                            columns=columns,
-                                           width=2 * size if heatmap else size,
+                                           width=2 * plot_width if heatmap else plot_width,
                                            height=600,
                                            sortable=False,
                                            reorderable=False,
