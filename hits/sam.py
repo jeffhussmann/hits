@@ -1645,6 +1645,16 @@ def feature_overlap_length(alignment, feature):
     return overlap
 
 def reference_edges(alignment):
+    ''' Returns a dictionary of 
+    {
+        5: reference position mapped to by the left-most query nt in alignment,
+        3: reference position mapped to by the right-most query nt in alignment,
+    }
+
+    TODO: For consistency with other conventions, these keys should probably
+    be 'left' and 'right' instead of 5 and 3.
+    '''
+
     if alignment is None or alignment.is_unmapped:
         return {5: None, 3: None}
 

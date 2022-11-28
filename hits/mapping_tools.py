@@ -538,16 +538,6 @@ def map_STAR(R1_fn, index_dir, output_prefix,
             '--outFilterMultimapNmax', '1000',
             '--outFilterScoreMinOverLread', '0',
             '--outFilterMatchNminOverLread', '0',
-            '--outFilterMatchNmin', '50',
-        ])
-
-    elif mode == 'tcell':
-        STAR_command.extend([
-            '--outFilterMismatchNoverLmax', '0.02',
-            '--outFilterScoreMinOverLread', '0',
-            '--outFilterMatchNminOverLread', '0',
-            '--outFilterMatchNmin', '50',
-            '--alignEndsType', 'Extend5pOfRead1',
         ])
 
     elif mode == 'guide_alignment':
@@ -557,7 +547,7 @@ def map_STAR(R1_fn, index_dir, output_prefix,
         ])
 
     else:
-        raise ValueError(mode)
+        pass
 
     STAR_command.extend([
         '--readFilesIn', R1_fn_string,
