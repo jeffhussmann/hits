@@ -690,11 +690,11 @@ def merge_sorted_bam_files(input_file_names, merged_file_name, by_name=False, ma
         chunks = utilities.list_chunks(input_file_names, 500)
         merged_chunk_fns = []
         for i, chunk in enumerate(chunks):
-            merged_chunk_fn = str(merged_file_name) + f'.{i:04d}'
+            merged_chunk_fn = f'{merged_file_name}.intermediate_chunk.{i:04d}'
             merged_chunk_fns.append(merged_chunk_fn)
             merge_sorted_bam_files(chunk, merged_chunk_fn, by_name=by_name, make_index=False)
 
-        merge_sorted_bam_files(merged_chunk_fns, merged_file_name)
+        merge_sorted_bam_files(merged_chunk_fns, merged_file_name, by_name=by_name)
 
         for merged_chunk_fn in merged_chunk_fns:
             os.remove(merged_chunk_fn)
