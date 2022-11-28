@@ -3,6 +3,7 @@ import datetime
 import functools
 import inspect
 import numbers
+import re
 import subprocess
 import sys
 
@@ -386,3 +387,7 @@ def get_one_mismatch_resolver(sample_indices):
 
 def current_time_string():
     return f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}'
+
+def find_all_substring_starts(target_sequence, substring):
+    # lookahead necessary in the event of partially-overlapping matches
+    return [match.start() for match in re.finditer(f'(?={substring})', target_sequence)]
