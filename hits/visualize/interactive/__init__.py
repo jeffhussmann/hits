@@ -244,7 +244,7 @@ def scatter(df=None,
         plot_width=plot_width,
         plot_height=plot_height,
         tools=tools,
-        lod_threshold=40000,
+        lod_threshold=80000,
         name='scatter_fig',
         toolbar_location=None,
     )

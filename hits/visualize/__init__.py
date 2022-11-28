@@ -99,6 +99,7 @@ def enhanced_scatter(xs, ys,
                      hist_alpha=0.2,
                      hist_size_ratio=0.1,
                      hist_colors=None,
+                     hist_share_max=True,
                      marker_size=4,
                      text_size=14,
                      text_weight='normal',
@@ -116,6 +117,7 @@ def enhanced_scatter(xs, ys,
                      remove_x_hist=False,
                      label=None,
                      alpha=None,
+                     **scatter_kwargs,
                     ):
 
     if data is not None:
@@ -168,6 +170,7 @@ def enhanced_scatter(xs, ys,
         'linewidths' : (0,),
         'label': label,
         'alpha': alpha,
+        **scatter_kwargs,
     }
 
     scatter = ax.scatter(xs, ys, c=colors, **kwargs)
@@ -176,9 +179,11 @@ def enhanced_scatter(xs, ys,
     fig = ax.figure
     ax_position = ax.get_position()
 
+    cax = None
+
     if not isinstance(colors, str):
         if colorbar:
-            cax = fig.add_axes((ax_position.x0 + ax_position.width * 0.07,
+            cax = fig.add_axes((ax_position.x0 + ax_position.width * 1.17,
                                 ax_position.y1 - ax_position.height * 0.4,
                                 ax_position.width * 0.03,
                                 ax_position.height * 0.35,
@@ -315,10 +320,16 @@ def enhanced_scatter(xs, ys,
         n_y, *rest = ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', color=hist_colors['y'], **common_kwargs)
         ax_y.axis('off')
 
-        max_n = max(max(n_x), max(n_y))
+        if hist_share_max:
+            max_n = max(max(n_x), max(n_y))
+            max_x = max_n
+            max_y = max_n
+        else:
+            max_x = max(n_x)
+            max_y = max(n_y)
 
-        ax_x.set_ylim(0, max_n * 1.1)
-        ax_y.set_xlim(0, max_n * 1.1)
+        ax_x.set_ylim(0, max_x * 1.1)
+        ax_y.set_xlim(0, max_y * 1.1)
 
         if remove_x_hist:
             fig.delaxes(ax_x)
@@ -328,7 +339,7 @@ def enhanced_scatter(xs, ys,
         ax_x = None
         ax_y = None
 
-    return fig, {'scatter': ax, 'hist_x': ax_x, 'hist_y': ax_y}
+    return fig, {'scatter': ax, 'hist_x': ax_x, 'hist_y': ax_y, 'colorbar': cax}
 
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
@@ -363,6 +374,7 @@ def label_scatter_plot(ax, xs, ys, labels,
                        avoid_axis_labels=False,
                        avoid_existing=False,
                        min_arrow_distance=10,
+                       slope=1,
                       ):
     if data is not None:
         xs = data[xs]
@@ -381,8 +393,8 @@ def label_scatter_plot(ax, xs, ys, labels,
 
     def attempt_text(x, y, site, distance, vector, color):
         if vector == 'orthogonal':
-            x_offset = np.sign(x - y) * distance
-            y_offset = -np.sign(x - y) * distance
+            x_offset = np.sign(x * slope - y) * distance
+            y_offset = -np.sign(x * slope - y) * distance
             ha = 'center'
             va = 'top' if y_offset < 0 else 'bottom'
         elif vector == 'upper left':
@@ -620,19 +632,27 @@ def make_stacked_Image(figs, orientation='vertical'):
 
     return stacked_im
 
-def assign_categorical_colors(series, palette=None):
+def assign_categorical_colors(series, palette=None, sort=True):
     if palette is None:
         palette = sns.color_palette()
 
-    values = sorted(series.unique())
+    values = series.unique()
+
+    if sort:
+        values = sorted(values)
+
     value_to_color = dict(zip(values, palette))
     colors = series.map(value_to_color)
 
     return colors, value_to_color
 
-def draw_categorical_legend(value_to_color, ax,
+def draw_categorical_legend(value_to_color,
+                            ax,
                             font_size=12,
                             legend_location='upper left',
+                            order=None,
+                            manual_xy=None,
+                            aliases=None,
                            ):
 
     if legend_location == 'upper left':
@@ -664,11 +684,21 @@ def draw_categorical_legend(value_to_color, ax,
         va = 'center'
         ha = 'center'
 
-    for i, (category, color) in enumerate(sorted(value_to_color.items())):
-        ax.annotate(category,
+    if manual_xy is not None:
+        xy = manual_xy
+
+    if order is None:
+        order = sorted(value_to_color)
+
+    if aliases is None:
+        aliases = {}
+
+    for i, category in enumerate(order):
+        color = value_to_color[category]
+        ax.annotate(aliases.get(category, category),
                     xy=xy,
                     xycoords='axes fraction',
-                    xytext=(0, -(font_size + 2) * i),
+                    xytext=(0, -(font_size + 3) * i),
                     textcoords='offset points',
                     color=color,
                     va=va,
