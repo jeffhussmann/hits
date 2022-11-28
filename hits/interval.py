@@ -49,6 +49,10 @@ class Interval:
 
         return Interval(start, end)
 
+    @property
+    def slice(self):
+        return slice(self.start, self.end + 1)
+
     def __or__(self, other):
         if are_disjoint(self, other):
             left, right = sorted([self, other])
@@ -225,7 +229,7 @@ class DisjointIntervals:
     
     def __sub__(self, other):
         if isinstance(other, DisjointIntervals):
-            return functools.reduce(operator.and_, [self - other_int for other_int in other.intervals])
+            return functools.reduce(operator.and_, [self - other_int for other_int in other.intervals], self)
         else:
             pieces = []
             for interval in self.intervals:
