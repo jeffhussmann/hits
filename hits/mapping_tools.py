@@ -620,7 +620,7 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RA
         'STAR',
         '--runMode', 'genomeGenerate',
         '--genomeDir', str(index_dir),
-        '--genomeFastaFiles', ' '.join(map(str, fasta_files)),
+        '--genomeFastaFiles', *fasta_files,
         '--genomeSAindexNbases', str(wonky_param),
         '--runThreadN', str(num_threads),
     ]
