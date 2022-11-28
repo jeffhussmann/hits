@@ -58,13 +58,16 @@ IUPAC = {
 }
 
 def counts_to_array(counts, dim=1):
-    ''' Converts a dictionary with integer keys into an array. '''
+    ''' Converts a dictionary with integer keys into an array. 
+    Ignores negative keys.
+    '''
     if dim == 1:
         if len(counts) > 0:
             biggest = max(counts)
             array = np.zeros(biggest + 1, int)
             for key, count in counts.items():
-                array[key] = count
+                if key >= 0:
+                    array[key] = count
         else:
             array = np.array([0])
     elif dim == 2:
