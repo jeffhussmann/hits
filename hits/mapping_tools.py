@@ -641,7 +641,7 @@ def map_minimap2(fastq_fn, index, bam_fn, num_threads=1):
     minimap2_command = [
         'minimap2',
         '-a', # sam output
-        '-Y', # use soft clipping for supplmentary alignments instead of hard clipping
+        '-Y', # use soft clipping for supplementary alignments instead of hard clipping
         '-P', # (roughly equivalent to?) report all
         '--MD', # populate MD tags
         '-r', '20', # max bandwidth
