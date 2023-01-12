@@ -199,13 +199,10 @@ def scatter(df=None,
 
     initial_indices = [i for i, n in enumerate(df.index) if n in initial_selection]
 
-    auto_numerical_cols = list(df.select_dtypes('number').columns)
-    if numerical_cols is not None:
-        for col in numerical_cols:
-            if col not in auto_numerical_cols:
-                raise ValueError(col + ' not a numerical column')
-    else:
-        numerical_cols = auto_numerical_cols
+    if two_level_index:
+        two_level_numerical_cols = list(original_df.select_dtypes('number').columns)
+
+    numerical_cols = list(df.select_dtypes('number').columns)
 
     # bokeh can handle NaNs in numpy arrays but not in lists. 
     for numerical_col in numerical_cols:
@@ -857,22 +854,26 @@ def scatter(df=None,
 
         menus = {}
 
-        for level, width in zip((0, 1), menu_width):
-            level_name = original_df.columns.names[level]
+        for level_index, width in zip((0, 1), menu_width):
+            level_name = original_df.columns.names[level_index]
             if level_name is None:
-                level_name = level
+                level_name = level_index
 
             if level_name in level_order:
                 options = level_order[level_name]
             else:
-                options = [v for v in original_df.columns.levels[level] if v != 'gene' and v != '']
+                options = []
+                for value_tuple in two_level_numerical_cols:
+                    value = value_tuple[level_index]
+                    if value not in options:
+                        options.append(value)
 
             for names, axis in zip(initial_xy_names, ('x', 'y')):
-                menus[axis, level] = bokeh.models.widgets.MultiSelect(title=f'{axis.upper()}-axis: {level_name}',
+                menus[axis, level_index] = bokeh.models.widgets.MultiSelect(title=f'{axis.upper()}-axis: {level_name}',
                                                                       options=options,
-                                                                      value=[names[level]],
+                                                                      value=[names[level_index]],
                                                                       size=min(10, len(options)),
-                                                                      name=f'{axis}_{level}_menu',
+                                                                      name=f'{axis}_{level_index}_menu',
                                                                       width=width,
                                                                      )
 

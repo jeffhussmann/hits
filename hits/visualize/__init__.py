@@ -165,7 +165,6 @@ def enhanced_scatter(xs, ys,
         do_fit = False
 
     kwargs = {
-        'cmap': matplotlib.cm.jet,
         's': marker_size,
         'linewidths' : (0,),
         'label': label,
@@ -289,6 +288,9 @@ def enhanced_scatter(xs, ys,
                     **text_kwargs,
         )
 
+    max_x = None
+    max_y = None
+
     if hists_location is not None:
         if hists_location == 'inside':
             bottom = ax_position.y0
@@ -300,8 +302,10 @@ def enhanced_scatter(xs, ys,
         common_kwargs = {
             'alpha': hist_alpha,
             'histtype': 'stepfilled',
-            'bins': hist_bins,
         }
+
+        if isinstance(hist_bins, int):
+            hist_bins = {which: hist_bins for which in ['x', 'y']} 
 
         if hist_colors is None:
             hist_colors = {which: colors if isinstance(colors, str) else 'black' for which in ['x', 'y']}
@@ -313,11 +317,11 @@ def enhanced_scatter(xs, ys,
             }
 
         ax_x = fig.add_axes((ax_position.x0, bottom, ax_position.width, ax_position.height * hist_size_ratio), sharex=ax)
-        n_x, *rest = ax_x.hist(xs, range=hist_range['x'], color=hist_colors['x'], **common_kwargs)
+        n_x, *rest = ax_x.hist(xs, range=hist_range['x'], bins=hist_bins['x'], color=hist_colors['x'], **common_kwargs)
         ax_x.axis('off')
 
         ax_y = fig.add_axes((left, ax_position.y0, ax_position.width * hist_size_ratio, ax_position.height), sharey=ax)
-        n_y, *rest = ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', color=hist_colors['y'], **common_kwargs)
+        n_y, *rest = ax_y.hist(ys, range=hist_range['y'], orientation='horizontal', bins=hist_bins['y'], color=hist_colors['y'], **common_kwargs)
         ax_y.axis('off')
 
         if hist_share_max:
@@ -339,7 +343,7 @@ def enhanced_scatter(xs, ys,
         ax_x = None
         ax_y = None
 
-    return fig, {'scatter': ax, 'hist_x': ax_x, 'hist_y': ax_y, 'colorbar': cax}
+    return fig, {'scatter': ax, 'hist_x': ax_x, 'hist_y': ax_y, 'colorbar': cax, 'hist_maxes': {'x': max_x, 'y': max_y}}
 
 def draw_diagonal(ax, anti=False, color='black', **kwargs):
     if anti:
@@ -653,6 +657,7 @@ def draw_categorical_legend(value_to_color,
                             order=None,
                             manual_xy=None,
                             aliases=None,
+                            title=None,
                            ):
 
     if legend_location == 'upper left':
@@ -693,8 +698,14 @@ def draw_categorical_legend(value_to_color,
     if aliases is None:
         aliases = {}
 
+    if title != None:
+        order = [f'{title}:'] + order
+
     for i, category in enumerate(order):
-        color = value_to_color[category]
+        if category == f'{title}:':
+            color = 'black'
+        else:
+            color = value_to_color[category]
         ax.annotate(aliases.get(category, category),
                     xy=xy,
                     xycoords='axes fraction',
