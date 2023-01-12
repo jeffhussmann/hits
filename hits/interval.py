@@ -134,6 +134,9 @@ class Interval:
                 return disjoint.intervals[0]
             else:
                 return disjoint
+
+    def __iter__(self):
+        return iter(range(self.start, self.end + 1))
     
 class DisjointIntervals:
     def __init__(self, intervals):
@@ -159,7 +162,15 @@ class DisjointIntervals:
             return None
         else:
             return max(interval.end for interval in self.intervals)
-    
+
+    @property
+    def span(self):
+        ''' The convext hull of the intervals. '''
+        if len(self.intervals) == 0:
+            return Interval.empty()
+        else:
+            return Interval(self.start, self.end)
+        
     def __repr__(self):
         return '{{{}}}'.format(', '.join(map(str, self.intervals)))
     
