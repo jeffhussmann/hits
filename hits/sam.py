@@ -63,8 +63,6 @@ ref_consuming_ops = {
     BAM_CREF_SKIP,
 }
 
-_unmapped_template = '{0}\t4\t*\t0\t0\t*\t*\t0\t0\t*\t*\n'.format
-
 def get_strand(mapping):
     if mapping.is_reverse:
         strand = '-'
@@ -1081,9 +1079,12 @@ def crop_al_to_ref_int(alignment, start, end):
     return alignment
 
 def crop_al_to_feature(al, feature):
-    primer_interval = interval.Interval.from_feature(feature)
     cropped_al = crop_al_to_ref_int(al, feature.start, feature.end)
     return cropped_al
+
+def query_interval_overlapping_feature(al, feature):
+    cropped_al = crop_al_to_feature(al, feature)
+    return interval.get_covered(cropped_al)
 
 def disallow_query_positions_from_other(alignment, other):
     start, end = query_interval(alignment)
@@ -1303,6 +1304,9 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     else:
         min_edits = 0
         switch_after = left_covered.end
+        switch_after_edits = {}
+        left_ceds = None
+        right_ceds = None
         best_switch_points = [switch_after]
 
     if gap_interval.is_empty:
