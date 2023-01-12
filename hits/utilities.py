@@ -355,8 +355,8 @@ def homopolymer_lengths(seq, b):
             break
             
         start = i
-        # Advance until the polyb stretch starting at i ends.
-        while  i < len(seq) and seq[i] == b:
+        # Advance until the poly-b stretch starting at i ends.
+        while i < len(seq) and seq[i] == b:
             i += 1
         
         length = i - start
@@ -367,7 +367,12 @@ def homopolymer_lengths(seq, b):
     
     return locations
 
-def get_one_mismatch_resolver(sample_indices):
+def get_one_mismatch_resolver(sample_indices, prioritize_exact_matches=False):
+    ''' If prioritize_exact_matches is True, in cases where two sequences are 
+    hamming distance one from each other, allow the exact sequence for each to
+    uniquely resolve to its label (i.e. don't register a mismatched seq
+    if it is also an exactly matching seq).
+    '''
     def get_all_one_mismatch(seq):
         seqs = set()
         for i in range(len(seq)):
@@ -375,6 +380,12 @@ def get_one_mismatch_resolver(sample_indices):
                 seqs.add(seq[:i] + b + seq[i + 1:])
 
         return seqs
+
+    all_exact_seqs = set()
+    for name, seqs in sample_indices.items():
+        if not isinstance(seqs, list):
+            seqs = [seqs]
+        all_exact_seqs.update(seqs)
     
     resolver = defaultdict(list)
     for name, seqs in sample_indices.items():
@@ -382,10 +393,12 @@ def get_one_mismatch_resolver(sample_indices):
             seqs = [seqs]
         for seq in seqs:
             for one_mismatch_seq in get_all_one_mismatch(seq):
+                if prioritize_exact_matches and one_mismatch_seq != seq and one_mismatch_seq in all_exact_seqs:
+                    continue
                 resolver[one_mismatch_seq].append(name)
             
     resolver = {seq: set(names) for seq, names in resolver.items()}
-            
+
     return resolver
 
 def current_time_string():
