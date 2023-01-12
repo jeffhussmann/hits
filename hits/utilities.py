@@ -407,3 +407,11 @@ def current_time_string():
 def find_all_substring_starts(target_sequence, substring):
     # lookahead necessary in the event of partially-overlapping matches
     return [match.start() for match in re.finditer(f'(?={substring})', target_sequence)]
+
+def partial_class(cls, *args, **kwargs):
+    ''' from https://stackoverflow.com/a/38911383 '''
+
+    class PartialClass(cls):
+        __init__ = functools.partialmethod(cls.__init__, *args, **kwargs)
+
+    return PartialClass
