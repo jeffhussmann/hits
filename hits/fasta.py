@@ -37,7 +37,14 @@ make_record = '>{0}\n{1}\n'.format
 
 def records(file_name):
     ''' Yields the name and sequence lines from a fasta file. '''
-    for record in Bio.SeqIO.parse(str(file_name), 'fasta'):
+    file_name = Path(file_name)
+
+    if file_name.suffix == '.ab1':
+        format = 'abi'
+    else:
+        format = 'fasta'
+
+    for record in Bio.SeqIO.parse(file_name, format):
         yield Record(record.name, str(record.seq).upper())
 
 Read = Record # for backwards compatibility
