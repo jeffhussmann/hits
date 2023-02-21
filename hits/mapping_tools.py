@@ -459,13 +459,17 @@ def map_tophat_paired(R1_fn,
     if not no_sort:
         pysam.index(accepted_hits_fn)
 
-def run_STAR_command(STAR_command):
+def run_STAR_command(STAR_command, clean_up_cwd=False):
     try:
         subprocess.run(STAR_command,
                        check=True,
                        stdout=subprocess.PIPE,
                        stderr=subprocess.STDOUT,
                       )
+
+        if clean_up_cwd:
+            clean_up_STAR_output(f'{os.getcwd()}{os.sep}')
+
     except subprocess.CalledProcessError as e:
         print(f'STAR command returned code {e.returncode}')
         print(f'full command was:\n\n{shlex.join(STAR_command)}')
@@ -587,7 +591,7 @@ def load_STAR_index(index_dir):
         '--genomeDir', str(index_dir),
         '--genomeLoad', 'LoadAndExit',
     ]
-    run_STAR_command(STAR_command)
+    run_STAR_command(STAR_command, clean_up_cwd=True)
 
 def remove_STAR_index(index_dir):
     STAR_command = [
@@ -595,7 +599,7 @@ def remove_STAR_index(index_dir):
         '--genomeDir', str(index_dir),
         '--genomeLoad', 'Remove',
     ]
-    run_STAR_command(STAR_command)
+    run_STAR_command(STAR_command, clean_up_cwd=True)
 
 def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RAM_limit=None):
     total_length = 0
@@ -618,7 +622,7 @@ def build_STAR_index(fasta_files, index_dir, wonky_param=None, num_threads=1, RA
     if RAM_limit is not None:
         STAR_command.extend(['--limitGenomeGenerateRAM', str(RAM_limit)])
 
-    run_STAR_command(STAR_command)
+    run_STAR_command(STAR_command, clean_up_cwd=True)
 
 def clean_up_STAR_output(output_prefix):
     suffixes_to_clean_up = [
