@@ -272,6 +272,7 @@ def enhanced_scatter(xs, ys,
         r_part = '$r^2$' + '= {:0.{digits}f}'.format(r**2, digits=r_digits)
     else:
         r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
+
     if show_p_value:
         p_part = ', p={:0.2e}'.format(p)
     else:
@@ -286,7 +287,7 @@ def enhanced_scatter(xs, ys,
         ax.annotate(text,
                     xytext=(x_sign * x_offset, y_sign * y_offset),
                     **text_kwargs,
-        )
+                   )
 
     max_x = None
     max_y = None
