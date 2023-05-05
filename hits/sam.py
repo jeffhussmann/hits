@@ -651,7 +651,7 @@ def merge_ref_dicts(first_dict, second_dict):
 
     return merged_dict
 
-def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
+def sort_bam(input_file_name, output_file_name, by_name=False, additional_threads=0):
     output_file_name = Path(output_file_name)
 
     samtools_command = ['samtools', 'sort']
@@ -662,12 +662,13 @@ def sort_bam(input_file_name, output_file_name, by_name=False, num_threads=1):
     tail = 'SORT_TEMP'
 
     # Clean up any temporary files left behind by previous attempts to sort.
-    pattern = f'{output_file_name.name}\.{tail}\.\d\d\d\d\.bam'
+    # A little confused by escaping slashes here.
+    pattern = f'{output_file_name.name}\\.{tail}\\.\\d\\d\\d\\d\\.bam'
     for fn in output_file_name.parent.iterdir():
         if re.match(pattern, fn.name):
             fn.unlink()
 
-    samtools_command.extend(['-@', str(num_threads),
+    samtools_command.extend(['-@', str(additional_threads),
                              '-T', str(output_file_name) + f'.{tail}',
                              '-o', str(output_file_name),
                              str(input_file_name),
@@ -788,7 +789,8 @@ class AlignmentSorter:
         ''' Find any temporary files that might have been left behind by a
         previous call with the same output_file_name.
         '''
-        pattern = f'{self.output_file_name.name}\.{AlignmentSorter.temp_prefix_tail}\.\d\d\d\d\.bam'
+        # A little confused by escaping slashes here.
+        pattern = f'{self.output_file_name.name}\\.{AlignmentSorter.temp_prefix_tail}\\.\\d\\d\\d\\d\\.bam'
         for fn in self.output_file_name.parent.iterdir():
             if re.match(pattern, fn.name):
                 fn.unlink()
@@ -803,8 +805,8 @@ class AlignmentSorter:
             sort_command.append('-n')
 
         self.dev_null = open(os.devnull, 'w')
-        sort_command.extend(['-T', str(self.output_file_name) + f'.{AlignmentSorter.temp_prefix_tail}',
-                             '-o', str(self.output_file_name),
+        sort_command.extend(['-T', f'{self.output_file_name}.{AlignmentSorter.temp_prefix_tail}',
+                             '-o', f'{self.output_file_name}',
                              self.fifo.file_name,
                             ])
         self.sort_process = subprocess.Popen(sort_command,
