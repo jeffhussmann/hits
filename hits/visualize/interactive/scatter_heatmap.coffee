@@ -28,7 +28,7 @@ for axis in ['x', 'y']
     for suffix in ['_all', '_bins_left', '_bins_right']
         histogram_source.data[axis + suffix] = histogram_source.data[name + suffix]
     
-    axes[axis].axis_label = name
+    axes[axis][0].axis_label = name
 
 scatter_source.change.emit()
 filtered_source.change.emit()

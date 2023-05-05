@@ -43,7 +43,7 @@ for (j = 0, len = ref.length; j < len; j++) {
     suffix = ref1[k];
     histogram_source.data[axis + suffix] = histogram_source.data[name + suffix];
   }
-  axes[axis].axis_label = name;
+  axes[axis][0].axis_label = name;
 }
 
 scatter_source.change.emit();

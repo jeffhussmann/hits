@@ -842,7 +842,7 @@ def scatter(df=None,
         dendro_fig.y_range = bokeh.models.Range1d(start=0, end=dcoord.max() * 1.05)
     
         # Button to toggle clustering.
-        cluster_button = bokeh.models.widgets.Toggle(label='cluster heatmap',
+        cluster_button = bokeh.models.widgets.Toggle(label='Cluster heatmap',
                                                      width=50,
                                                      name='cluster_button',
                                                      active=cluster,
@@ -1137,7 +1137,7 @@ def scatter(df=None,
                                                filtered_source=filtered_source,
                                                histogram_source=histogram_source,
                                                table=table,
-                                               subset_menu=subset_menu
+                                               subset_menu=subset_menu,
                                            ),
                                           )
     scatter_source.selected.js_on_change('indices', selection_callback)
