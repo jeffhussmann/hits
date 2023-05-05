@@ -717,3 +717,68 @@ def draw_categorical_legend(value_to_color,
                     ha=ha,
                     size=font_size,
                    )
+
+def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim):
+    fig = main_ax.figure
+
+    inset_ax = main_ax.inset_axes([1.2, 0, 1, 1], sharex=main_ax)
+
+    inset_ax.set_ylim(*inset_y_lim)
+
+    inverted_fig_tranform = fig.transFigure.inverted().transform    
+
+    bracket_width = 0.02
+    bracket_offset = 0
+    
+    left_offset = 0.04
+    right_offset = 0.1
+    
+    def draw_line(path, **kwargs):
+        path_in_fig = [inverted_fig_tranform(ax.get_yaxis_transform().transform((x, y))) for x, y, ax in path]
+        
+        xs = [point[0] for point in path_in_fig]
+        ys = [point[1] for point in path_in_fig]
+        
+        line = matplotlib.lines.Line2D(xs,
+                                       ys, 
+                                       transform=fig.transFigure,
+                                       clip_on=False,
+                                       color='black',
+                                       solid_capstyle='butt',
+                                       **kwargs,
+                                      )
+        fig.lines.append(line)
+    
+    paths = [
+        [
+            (1 + left_offset, inset_y_lim[1], main_ax),
+            (0 - right_offset, inset_y_lim[1], inset_ax),
+        ],
+        [
+            (1 + left_offset, inset_y_lim[0], main_ax),
+            (0 - right_offset, inset_y_lim[0], inset_ax),
+        ],
+    ]
+    
+    for path in paths:
+        draw_line(path, alpha=0.5, linestyle='--')
+        
+    paths = [
+        [
+            (1 + left_offset - bracket_offset - bracket_width, inset_y_lim[1], main_ax),
+            (1 + left_offset - bracket_offset, inset_y_lim[1], main_ax),
+            (1 + left_offset - bracket_offset, inset_y_lim[0], main_ax),
+            (1 + left_offset - bracket_offset - bracket_width, inset_y_lim[0], main_ax),
+        ],
+        [
+            (0 - right_offset + bracket_offset + bracket_width, inset_y_lim[1], inset_ax),
+            (0 - right_offset + bracket_offset, inset_y_lim[1], inset_ax),
+            (0 - right_offset + bracket_offset, inset_y_lim[0], inset_ax),
+            (0 - right_offset + bracket_offset + bracket_width, inset_y_lim[0], inset_ax),
+        ],
+    ]
+    
+    for path in paths:
+        draw_line(path, linewidth=2)
+    
+    return inset_ax
