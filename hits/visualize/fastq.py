@@ -3,7 +3,6 @@ import numpy as np
 
 from .. import fastq
 from .. import utilities
-from .. import adapters
 from . import optional_ax, igv_colors, blues
 
 @optional_ax
@@ -11,7 +10,7 @@ def plot_quality_histograms(quality_counts, ax=None):
     ''' Plots full distribution of quality values seens across all reads
         at each cycle.
     '''
-    quality_counts = np.array(quality_counts, dtype=np.float)
+    quality_counts = np.array(quality_counts, dtype=float)
 
     image = ax.imshow(quality_counts.T,
                       origin='lower',
