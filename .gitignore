@@ -13,3 +13,5 @@ MANIFEST
 hits.egg-info/
 .eggs/
 .nfs*
+node_modules
+package-lock.json
