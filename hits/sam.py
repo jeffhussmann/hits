@@ -112,7 +112,7 @@ def splice_in_name(line, new_name):
 cigar_block = re.compile(r'(\d+)([MIDNSHP=X])')
 
 def cigar_string_to_blocks(cigar_string):
-    """ Decomposes a CIGAR string into a list of its operations. """
+    ''' Decomposes a CIGAR string into a list of its operations. '''
     return [(int(l), k) for l, k in cigar_block.findall(cigar_string)]
 
 def total_reference_nucs(cigar):
@@ -1113,13 +1113,13 @@ def query_interval(alignment):
 def ref_interval(alignment):
     return alignment.reference_start, alignment.reference_end - 1
 
-def merge_multiple_adjacent_alignments(als, ref_seqs):
-    merger = functools.partial(merge_adjacent_alignments, ref_seqs=ref_seqs)
+def merge_multiple_adjacent_alignments(als, ref_seqs, max_deletion_length=np.inf):
+    merger = functools.partial(merge_adjacent_alignments, ref_seqs=ref_seqs, max_deletion_length=max_deletion_length)
     als = sorted(als, key=query_interval)
     return functools.reduce(merger, als)
 
-def merge_any_adjacent_pairs(als, ref_seqs):
-    als = sorted(als, key=lambda al: interval.get_covered(al))
+def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf):
+    als = sorted(als, key=query_interval)
 
     if len(als) == 0:
         return als
@@ -1130,7 +1130,7 @@ def merge_any_adjacent_pairs(als, ref_seqs):
             left_al = merged_als.pop()
             right_al = als.pop(0)
             
-            merged = merge_adjacent_alignments(left_al, right_al, ref_seqs)
+            merged = merge_adjacent_alignments(left_al, right_al, ref_seqs, max_deletion_length=max_deletion_length)
             if merged is not None:
                 merged_als.append(merged)
             else:
@@ -1138,10 +1138,11 @@ def merge_any_adjacent_pairs(als, ref_seqs):
 
         return merged_als
 
-def merge_adjacent_alignments(first, second, ref_seqs):
+def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.inf, max_insertion_length=0):
     ''' If first and second are alignments to the same reference name and strand
-    that are adjacent or partially overlap on the query, returns a single merged
-    alignment with an appropriately sized deletion that minimizes edit distance,
+    that are adjacent or partially overlap on the query, or are consistent with being
+    separated by an insertion up to length max_insertion_length, returns a single merged
+    alignment with an appropriately sized insertion or deletion that minimizes edit distance,
     otherwise return None.
     '''
     if first is None or second is None:
@@ -1170,19 +1171,14 @@ def merge_adjacent_alignments(first, second, ref_seqs):
             # left alignment doesn't cover any query not covered by right
             return None
 
-        if left_cropped.reference_end > right_query.reference_start:
-            return None
-
     elif strand == '-':
         right_cropped = crop_al_to_query_int(right_query, left_covered.end + 1, np.inf)
         if right_cropped is None or right_cropped.is_unmapped:
            # right alignment doesn't cover any query not covered by left
            return None
 
-        if right_cropped.reference_end > left_query.reference_start:
-            return None
-
     if interval.are_adjacent(left_covered, right_covered):
+        # If intervals are adjacent, no cropping is necessary.
         left_cropped, right_cropped = left_query, right_query
 
     elif interval.are_disjoint(left_covered, right_covered):
@@ -1212,19 +1208,44 @@ def merge_adjacent_alignments(first, second, ref_seqs):
         # this may not be appropriate in all circumstances
         return None
 
-    left_ref, right_ref = sorted([left_cropped, right_cropped], key=lambda al: al.reference_start)
 
-    if left_ref.reference_end > right_ref.reference_start:
-        return None
+    if strand == '+':
+        first_al, second_al = left_cropped, right_cropped
+    elif strand == '-':
+        first_al, second_al = right_cropped, left_cropped
 
-    deletion_length = right_ref.reference_start - left_ref.reference_end
-    if deletion_length > 0:
-        deletion_cigar = [(BAM_CDEL, deletion_length)]
+    possible_insertion = (first_al.reference_end - 1) >= second_al.reference_start
+
+    if possible_insertion:
+        # Crop left_ref so that no ref position is represented twice.
+        first_al = crop_al_to_ref_int(first_al, first_al.reference_start, second_al.reference_start - 1)
+
+        left_covered, right_covered = sorted(map(interval.get_covered, [first_al, second_al]))
+        insertion_length = (right_covered.start - 1) - left_covered.end
+
+        if insertion_length > max_insertion_length:
+            return None
+        elif insertion_length > 0:
+            # TODO: Does MD tag need to be modified here?
+            indel_cigar = [(BAM_CINS, insertion_length)]
+        else:
+            indel_cigar = []
+
     else:
-        deletion_cigar = []
+        # Possible deletion
+        deletion_length = second_al.reference_start - first_al.reference_end
+
+        if deletion_length > max_deletion_length:
+            return None
+        elif deletion_length > 0:
+            indel_cigar = [(BAM_CDEL, deletion_length)]
+        else:
+            indel_cigar = []
+
+    left_ref, right_ref = sorted([first_al, second_al], key=ref_interval)
 
     merged = copy.deepcopy(left_ref)
-    merged.cigar = left_ref.cigar[:-1] + deletion_cigar + right_ref.cigar[1:]
+    merged.cigar = left_ref.cigar[:-1] + indel_cigar + right_ref.cigar[1:]
 
     return merged
 
