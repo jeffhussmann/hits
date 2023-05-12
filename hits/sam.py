@@ -9,7 +9,7 @@ import contextlib
 import copy
 import functools
 
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pysam
@@ -1118,25 +1118,34 @@ def merge_multiple_adjacent_alignments(als, ref_seqs, max_deletion_length=np.inf
     als = sorted(als, key=query_interval)
     return functools.reduce(merger, als)
 
-def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf):
-    als = sorted(als, key=query_interval)
-
+def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_insertion_length=0):
     if len(als) == 0:
         return als
     else:
-        merged_als = [als[0]]
+        als = sorted(als, key=query_interval)
 
-        while len(als) > 0:
-            left_al = merged_als.pop()
-            right_al = als.pop(0)
-            
-            merged = merge_adjacent_alignments(left_al, right_al, ref_seqs, max_deletion_length=max_deletion_length)
-            if merged is not None:
-                merged_als.append(merged)
-            else:
-                merged_als.extend([left_al, right_al])
+        all_merged_als = []
 
-        return merged_als
+        als_by_ref_name = defaultdict(list)
+        for al in als:
+            als_by_ref_name[al.reference_name].append(al)
+
+        for ref_name, als in als_by_ref_name.items():
+            merged_als = [als[0]]
+
+            while len(als) > 0:
+                left_al = merged_als.pop()
+                right_al = als.pop(0)
+                
+                merged = merge_adjacent_alignments(left_al, right_al, ref_seqs, max_deletion_length=max_deletion_length, max_insertion_length=max_insertion_length)
+                if merged is not None:
+                    merged_als.append(merged)
+                else:
+                    merged_als.extend([left_al, right_al])
+        
+            all_merged_als.extend(merged_als)
+
+        return all_merged_als
 
 def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.inf, max_insertion_length=0):
     ''' If first and second are alignments to the same reference name and strand
@@ -1177,12 +1186,11 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
            # right alignment doesn't cover any query not covered by left
            return None
 
-    if interval.are_adjacent(left_covered, right_covered):
-        # If intervals are adjacent, no cropping is necessary.
-        left_cropped, right_cropped = left_query, right_query
+    query_gap = right_covered.start - left_covered.end - 1
 
-    elif interval.are_disjoint(left_covered, right_covered):
-        return None
+    if query_gap >= 0:
+        # If intervals are disjoint, no cropping is necessary.
+        left_cropped, right_cropped = left_query, right_query
 
     else:
         overlap = left_covered & right_covered
@@ -1208,17 +1216,22 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
         # this may not be appropriate in all circumstances
         return None
 
-
     if strand == '+':
         first_al, second_al = left_cropped, right_cropped
     elif strand == '-':
         first_al, second_al = right_cropped, left_cropped
 
-    possible_insertion = (first_al.reference_end - 1) >= second_al.reference_start
+    possible_insertion = (first_al.reference_end - 1) + max(query_gap, 0) >= second_al.reference_start
+
+    possible_deletion = query_gap <= 0
 
     if possible_insertion:
-        # Crop left_ref so that no ref position is represented twice.
+        # Crop first_al so that no ref position is represented twice.
         first_al = crop_al_to_ref_int(first_al, first_al.reference_start, second_al.reference_start - 1)
+
+        # If cropping eliminates first_al, not a valid insertion.
+        if first_al is None:
+            return None
 
         left_covered, right_covered = sorted(map(interval.get_covered, [first_al, second_al]))
         insertion_length = (right_covered.start - 1) - left_covered.end
@@ -1231,7 +1244,7 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
         else:
             indel_cigar = []
 
-    else:
+    elif possible_deletion:
         # Possible deletion
         deletion_length = second_al.reference_start - first_al.reference_end
 
@@ -1241,6 +1254,9 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
             indel_cigar = [(BAM_CDEL, deletion_length)]
         else:
             indel_cigar = []
+
+    else:
+        return None
 
     left_ref, right_ref = sorted([first_al, second_al], key=ref_interval)
 
