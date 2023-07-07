@@ -119,7 +119,7 @@ def plot_composition(base_counts,
                         'linestyle': 'None',
                        }
 
-        ax.plot(xs, fractions, **marker_style) 
+        ax.plot(xs, fractions, clip_on=False, **marker_style) 
 
         if not expected_seq:
             ax.plot(xs, fractions, **line_style) 
@@ -136,7 +136,7 @@ def plot_composition(base_counts,
             end = min(end, max(xs) + 1)
             draw_range_bracket(ax, start, end - 1, text)
     
-    y_max = 1.01
+    y_max = 1
     y_line = 1
 
     if as_percentage:
@@ -147,11 +147,22 @@ def plot_composition(base_counts,
     ax.axhline(y=y_line, color='black', alpha=0.5)
     ax.set_xlim(min(xs) - 0.5, max(xs) + 0.5)
 
-    ax.legend(loc='center left',
-              bbox_to_anchor=(1.04, 0.5),
+    ax.legend(loc='center right',
+              bbox_to_anchor=(-0.1, 0.5),
               framealpha=0.5,
               numpoints=1,
              )
+
+def draw_range_bracket(ax, start, end, text):
+    ax.plot([start, start, end, end], [1.01, 1.02, 1.02, 1.01], transform=ax.get_xaxis_transform(), clip_on=False, color='black')
+    ax.annotate(text,
+                xy=(np.mean([start, end]), 1),
+                xycoords=('data', 'axes fraction'),
+                xytext=(0, 8),
+                textcoords='offset points',
+                ha='center',
+                va='bottom',
+               )
 
 @optional_ax
 def shade_background(start, sequence, observed_seq=None, match_threshold=0.95, ax=None, save_as=None):
