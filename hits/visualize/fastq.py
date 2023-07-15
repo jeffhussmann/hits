@@ -84,6 +84,7 @@ def plot_data_statistics(stats,
 def plot_composition(base_counts,
                      bases_before=0,
                      expected_seq=None,
+                     draw_lines=False,
                      bracket_ranges=None,
                      ax=None,
                      save_as=None,
@@ -108,20 +109,23 @@ def plot_composition(base_counts,
         if as_percentage:
             fractions *= 100
 
-        line_style = {'linestyle': '-',
-                      'linewidth': 0.5,
-                      'alpha': 0.5,
-                      'color': igv_colors[base],
-                     }
-        marker_style = {'marker': '.',
-                        'color': igv_colors[base],
-                        'label': base,
-                        'linestyle': 'None',
-                       }
+        line_style = {
+            'linestyle': '-',
+            'linewidth': 0.5,
+            'alpha': 0.5,
+            'color': igv_colors[base],
+        }
+
+        marker_style = {
+            'marker': '.',
+            'color': igv_colors[base],
+            'label': base,
+            'linestyle': 'None',
+        }
 
         ax.plot(xs, fractions, clip_on=False, **marker_style) 
 
-        if not expected_seq:
+        if draw_lines and not expected_seq:
             ax.plot(xs, fractions, **line_style) 
     
     if expected_seq:
@@ -147,11 +151,19 @@ def plot_composition(base_counts,
     ax.axhline(y=y_line, color='black', alpha=0.5)
     ax.set_xlim(min(xs) - 0.5, max(xs) + 0.5)
 
-    ax.legend(loc='center right',
-              bbox_to_anchor=(-0.1, 0.5),
-              framealpha=0.5,
-              numpoints=1,
-             )
+    for b_i, b in enumerate(bases_to_plot):
+        ax.annotate(b,
+                    xy=(0, 1),
+                    xycoords='axes fraction',
+                    xytext=(-30, -b_i * 14), 
+                    textcoords='offset points',
+                    color=igv_colors[b],
+                    va='top',
+                    ha='right',
+                    size=12,
+                    weight='bold',
+                    font='monospace',
+                   )
 
 def draw_range_bracket(ax, start, end, text):
     ax.plot([start, start, end, end], [1.01, 1.02, 1.02, 1.01], transform=ax.get_xaxis_transform(), clip_on=False, color='black')
