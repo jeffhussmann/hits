@@ -238,12 +238,12 @@ def scatter(df=None,
         plot_width += 35 # empirical adjustment for extra blank text row
 
     fig_kwargs = dict(
-        plot_width=plot_width,
-        plot_height=plot_height,
+        width=plot_width,
+        height=plot_height,
         tools=tools,
         lod_threshold=80000,
         name='scatter_fig',
-        toolbar_location=None,
+        toolbar_inner=True,
     )
 
     min_border = 80
@@ -256,6 +256,7 @@ def scatter(df=None,
     
     fig = bokeh.plotting.figure(**fig_kwargs)
     fig.toolbar.logo = None
+    fig.toolbar.autohide = True
 
     if log_scale:
         for axis in [fig.xaxis, fig.yaxis]:
@@ -265,7 +266,7 @@ def scatter(df=None,
     fig.grid.visible = (grid == 'grid')
     fig.grid.name = 'grid'
     
-    lasso = bokeh.models.LassoSelectTool(select_every_mousemove=False)
+    lasso = bokeh.models.LassoSelectTool(continuous=False)
     fig.add_tools(lasso)
     
     if initial_xy_names is None:
@@ -804,7 +805,7 @@ def scatter(df=None,
         
         for ax in [heatmap_fig.xaxis, heatmap_fig.yaxis]:
             ax.ticker = bokeh.models.FixedTicker(ticks=np.arange(num_exps))
-            ax.formatter = bokeh.models.FuncTickFormatter(code=make_tick_formatter(orders[order_key]))
+            ax.formatter = bokeh.models.CustomJSTickFormatter(code=make_tick_formatter(orders[order_key]))
             ax.major_label_text_font_size = '8pt'
 
         heatmap_fig.xaxis.major_label_orientation = np.pi / 4
@@ -1057,8 +1058,6 @@ def scatter(df=None,
 
     widgets = [w for w in widgets if w.name not in hide_widgets]
 
-    toolbar = bokeh.models.ToolbarBox(toolbar=fig.toolbar, toolbar_location='right')
-
     row = bokeh.layouts.row
     col = bokeh.layouts.column
     spacer = bokeh.layouts.Spacer
@@ -1066,10 +1065,6 @@ def scatter(df=None,
     columns = [
         col(hist_figs['x'], fig),
         col(spacer(height=100), hist_figs['y']),
-        # Note: update to bokeh 2.4.1 changed behavior of ToolbarBox height
-        # such that without this phantom 1px spacer, it thinks it can
-        # only be 100px high and collapses most buttons into an overflow.
-        col(spacer(height=100), row(spacer(width=1, height=800), toolbar)),
     ]
 
     if heatmap:
@@ -1608,9 +1603,6 @@ def heatmap(df, cmap, vmin, vmax, height=500):
     for which in labels:
         label_figs[which].add_layout(labels[which])
     
-    fig.toolbar_location = None
-    toolbar = bokeh.models.ToolbarBox(toolbar=fig.toolbar)
-
     # Build callbacks last so that all args are available.
 
     range_kwargs = dict(lower_bound=lower_bound, upper_bound=x_upper_bound)
@@ -1645,7 +1637,7 @@ def heatmap(df, cmap, vmin, vmax, height=500):
 
     rows = [
         [bokeh.layouts.Spacer(width=label_fig_size), label_figs['top'], bokeh.layouts.Spacer(width=label_fig_size)],
-        [label_figs['left'], fig, label_figs['right'], toolbar, search_input],
+        [label_figs['left'], fig, label_figs['right'], search_input],
         [bokeh.layouts.Spacer(width=label_fig_size), label_figs['bottom']],
     ]
 
