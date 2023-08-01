@@ -164,13 +164,16 @@ def enhanced_scatter(xs, ys,
     if same_lists:
         do_fit = False
 
+    
+
     kwargs = {
         's': marker_size,
-        'linewidths' : (0,),
         'label': label,
         'alpha': alpha,
         **scatter_kwargs,
     }
+
+    kwargs.setdefault('linewidths', (0,))
 
     scatter = ax.scatter(xs, ys, c=colors, **kwargs)
     ax.set_xlabel(x_label, size=16)
@@ -333,8 +336,8 @@ def enhanced_scatter(xs, ys,
             max_x = max(n_x)
             max_y = max(n_y)
 
-        ax_x.set_ylim(0, max_x * 1.1)
-        ax_y.set_xlim(0, max_y * 1.1)
+        ax_x.set_ylim(0, max_x * 1.1 if max_x > 0 else 1)
+        ax_y.set_xlim(0, max_y * 1.1 if max_y > 0 else 1)
 
         if remove_x_hist:
             fig.delaxes(ax_x)
