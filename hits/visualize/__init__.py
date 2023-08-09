@@ -264,29 +264,29 @@ def enhanced_scatter(xs, ys,
                         xytext=(x_sign * x_offset, y_sign * y_offset * 4),
                         **text_kwargs)
 
-    if in_log_space:
-        # Values have been log'ed before being passed in, so exponentiate them
-        # to recover correct correlation.
-        r, p = scipy.stats.pearsonr(in_log_space**xs, in_log_space**ys)
-    else:
-        r, p = scipy.stats.pearsonr(xs, ys)
-
-    if variance:
-        r_part = '$r^2$' + '= {:0.{digits}f}'.format(r**2, digits=r_digits)
-    else:
-        r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
-
-    if show_p_value:
-        p_part = ', p={:0.2e}'.format(p)
-    else:
-        p_part = ''
-
-    text = r_part + p_part
-
-    if color_by_correlation:
-        text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
-
     if show_correlation:
+        if in_log_space:
+            # Values have been log'ed before being passed in, so exponentiate them
+            # to recover correct correlation.
+            r, p = scipy.stats.pearsonr(in_log_space**xs, in_log_space**ys)
+        else:
+            r, p = scipy.stats.pearsonr(xs, ys)
+
+        if variance:
+            r_part = '$r^2$' + '= {:0.{digits}f}'.format(r**2, digits=r_digits)
+        else:
+            r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
+
+        if show_p_value:
+            p_part = ', p={:0.2e}'.format(p)
+        else:
+            p_part = ''
+
+        text = r_part + p_part
+
+        if color_by_correlation:
+            text_kwargs['color'] = matplotlib.cm.seismic(0.5 * r + 0.5)
+
         ax.annotate(text,
                     xytext=(x_sign * x_offset, y_sign * y_offset),
                     **text_kwargs,
