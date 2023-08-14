@@ -18,6 +18,9 @@ SOLEXA_OFFSET = 64
 MAX_QUAL = 93
 MAX_EXPECTED_QUAL = 42
 
+MIN_SOLEXA_ORD = SOLEXA_OFFSET - 5
+MAX_SANGER_ORD = SANGER_OFFSET + 41
+
 def decode_sanger(qual):
     ''' Converts a string of sanger-encoded quals to a list of integers. '''
     return [ord(q) - SANGER_OFFSET for q in qual]
@@ -287,10 +290,10 @@ def detect_encoding(line_groups):
             groups_examined.append(line_group)
             read = line_group_to_read(line_group)
             ords = [ord(q) for q in read.qual]
-            if min(ords) < SOLEXA_OFFSET - 5:
+            if min(ords) < MIN_SOLEXA_ORD:
                 encoding = 'SANGER'
                 break
-            if max(ords) > SANGER_OFFSET + 41:
+            if max(ords) > MAX_SANGER_ORD:
                 encoding = 'SOLEXA'
                 break
     except StopIteration:
@@ -305,6 +308,15 @@ def detect_encoding(line_groups):
     line_groups = chain(groups_examined, line_groups)
     
     return qual_convertor, line_groups
+
+def unambiguous_sanger_Q40(length):
+    ''' Return a qual str of specified length with first character
+        equal to the highest sanger-encoding-specific value and
+        the remaining character equal to sanger Q40.
+    '''
+    first_char = chr(MIN_SOLEXA_ORD - 1) 
+    remaining_chars = encode_sanger([40]*(length - 1))
+    return first_char + remaining_chars
 
 def read_pairs(R1_file_name, R2_file_name, **kwargs):
     R1_reads = reads(R1_file_name, **kwargs)
