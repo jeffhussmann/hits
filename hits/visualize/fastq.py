@@ -91,6 +91,7 @@ def plot_composition(base_counts,
                      match_threshold=0.95,
                      as_percentage=False,
                      bases_to_plot=utilities.base_order,
+                     y_max=1,
                     ):
     ''' Plot fractions of all base calls that are each base at each cycle.
     '''
@@ -123,7 +124,7 @@ def plot_composition(base_counts,
             'linestyle': 'None',
         }
 
-        ax.plot(xs, fractions, clip_on=False, **marker_style) 
+        ax.plot(xs, fractions, clip_on=(y_max != 1), **marker_style) 
 
         if draw_lines and not expected_seq:
             ax.plot(xs, fractions, **line_style) 
@@ -140,7 +141,6 @@ def plot_composition(base_counts,
             end = min(end, max(xs) + 1)
             draw_range_bracket(ax, start, end - 1, text)
     
-    y_max = 1
     y_line = 1
 
     if as_percentage:
