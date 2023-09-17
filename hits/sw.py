@@ -913,3 +913,16 @@ def extend_repeatedly(initial_al, target_seq_bytes, extend_before=True, extend_a
         extended = extend_alignment_with_one_nt_deletion(previous, target_seq_bytes, extend_before, extend_after)
 
     return extended
+
+def align_primers_to_sequence(primers, sequence_name, sequence):
+    header = pysam.AlignmentHeader.from_references([sequence_name], [len(sequence)])
+
+    mapper = SeedAndExtender(sequence, 10, header, sequence_name)
+
+    primer_alignments = {}
+    for primer_name, primer in primers.items():
+        primer_alignments[primer_name] = mapper.seed_and_extend(primer, len(primer) - 10, len(primer), primer_name)
+        if not primer_alignments[primer_name]:
+            raise ValueError(f'At least one primer from {primers} could not be located in {sequence_name}')
+        
+    return primer_alignments
