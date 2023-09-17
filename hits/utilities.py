@@ -246,23 +246,25 @@ def memoized_with_kwargs(f):
 
     return memoized_f
 
-def reservoir_sample(iterable, n):
-    sampler = ReservoirSampler(n)
+def reservoir_sample(iterable, n, seed=None):
+    sampler = ReservoirSampler(n, seed=seed)
     for item in iterable:
         sampler.add(item)
     return sampler.sample
 
-class ReservoirSampler():
-    def __init__(self, sample_size):
+class ReservoirSampler:
+    def __init__(self, sample_size, seed=None):
         self.sample = []
         self.sample_size = sample_size
         self.num_items_seen = 0
+
+        self.rng = np.random.default_rng(seed=seed)
 
     def add(self, item):
         if self.num_items_seen < self.sample_size:
             self.sample.append(item)
         else:
-            j = np.random.randint(self.num_items_seen + 1)
+            j = self.rng.integers(low=0, high=self.num_items_seen + 1)
             if j < self.sample_size:
                 self.sample[j] = item
 
