@@ -415,3 +415,11 @@ def partial_class(cls, *args, **kwargs):
         __init__ = functools.partialmethod(cls.__init__, *args, **kwargs)
 
     return PartialClass
+
+convert_strand = {
+    '+': 1,
+    '-': -1,
+    '.': 0,
+}
+
+undo_convert_strand = reverse_dictionary(convert_strand)
