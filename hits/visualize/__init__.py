@@ -153,6 +153,7 @@ def enhanced_scatter(xs, ys,
             colors = kernel(points)
         else:
             colors = 'black'
+
     elif colors is not None:
         if isinstance(colors, str):
             # colors is a single color name
@@ -163,8 +164,6 @@ def enhanced_scatter(xs, ys,
     
     if same_lists:
         do_fit = False
-
-    
 
     kwargs = {
         's': marker_size,
@@ -273,7 +272,7 @@ def enhanced_scatter(xs, ys,
             r, p = scipy.stats.pearsonr(xs, ys)
 
         if variance:
-            r_part = '$r^2$' + '= {:0.{digits}f}'.format(r**2, digits=r_digits)
+            r_part = 'r$^2$' + '= {:0.{digits}f}'.format(r**2, digits=r_digits)
         else:
             r_part = 'r = {:0.{digits}f}'.format(r, digits=r_digits)
 
