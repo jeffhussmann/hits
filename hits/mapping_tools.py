@@ -476,7 +476,9 @@ def run_STAR_command(STAR_command, clean_up_cwd=False):
         print(f'output from STAR was:\n\n{e.output.decode()}\n')
         raise
 
-def map_STAR(R1_fn, index_dir, output_prefix,
+def map_STAR(R1_fn,
+             index_dir,
+             output_prefix,
              R2_fn=None,
              num_threads=1,
              num_reads=-1,
@@ -680,6 +682,9 @@ def map_minimap2(fastq_fn, index, bam_fn,
     minimap2_process.wait()
 
     if minimap2_process.returncode != 0:
+        print(f'minimap2 command returned code {minimap2_process.returncode}')
+        print(f'full command was:\n\n{shlex.join(minimap2_command)}\n')
+        print(f'stderr from minimap2 was:\n\n{minimap2_process.stderr.read().decode()}\n')
         raise subprocess.CalledProcessError(minimap2_process.returncode, minimap2_process.args)
 
 def build_minimap2_index(fasta_fn, index_fn):
