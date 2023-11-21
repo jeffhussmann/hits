@@ -1,8 +1,11 @@
 ''' Utilities for dealing with fastq files. '''
 
-import gzip
-import functools
 import array
+import functools
+import gzip
+import heapq
+import os
+import tempfile
 from pathlib import Path
 from itertools import chain
 from collections import namedtuple
@@ -459,3 +462,36 @@ def get_pair_name(standardized):
     coordinates = coordinates_from_standardized(standardized)
     pair_name = ':'.join(coordinates)
     return pair_name
+
+class ExternalSorter:
+    def __init__(self, read_iter, sorted_fn, chunk_size=int(1e5), sort_key=lambda read: read.query_name):
+        self.read_iter = read_iter
+        self.sorted_fn = sorted_fn
+        self.chunk_size = chunk_size
+        self.sort_key = sort_key
+
+        self.chunk_fns = []
+
+    def sort_and_write_chunk(self, chunk):
+        sorted_chunk = sorted(chunk, key=self.sort_key)
+        
+        with tempfile.NamedTemporaryFile(prefix=f'{self.sorted_fn}.', mode='w', delete=False) as chunk_file:
+            self.chunk_fns.append(chunk_file.name)
+
+            for read in sorted_chunk:
+                chunk_file.write(str(read))
+
+    def merge_sorted_chunks(self):
+        sorted_chunks = (reads(fn) for fn in self.chunk_fns)
+        yield from heapq.merge(*sorted_chunks, key=self.sort_key)
+
+        for chunk_fn in self.chunk_fns:
+            os.remove(chunk_fn)
+
+    def sort(self):
+        for chunk in utilities.chunks(self.read_iter, self.chunk_size):
+            self.sort_and_write_chunk(chunk)
+
+        with gzip.open(self.sorted_fn, 'wt', compresslevel=1) as fh:
+            for read in self.merge_sorted_chunks():
+                fh.write(str(read))
