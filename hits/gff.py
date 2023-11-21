@@ -16,8 +16,8 @@ def parse_attribute_string(attribute_string):
 def make_attribute_string(attribute):
     entries = []
     for key, value in sorted(attribute.items()):
-        key = urllib.parse.quote(str(key), safe='')
-        value = urllib.parse.quote(str(value), safe='')
+        key = urllib.parse.quote(str(key), safe='#')
+        value = urllib.parse.quote(str(value), safe='#')
         entry = f'{key}={value}'
         entries.append(entry)
 
