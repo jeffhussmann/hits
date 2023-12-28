@@ -797,7 +797,14 @@ def extend_alignment(initial_al, target_seq_bytes):
     if not isinstance(target_seq_bytes, bytes):
         target_seq_bytes = target_seq_bytes.encode()
 
-    new_query_start, new_query_end, new_target_start = extend_perfect_seed(query_seq_bytes, target_seq_bytes, initial_al.query_alignment_start, initial_al.query_alignment_end, initial_al.reference_start, initial_al.reference_end)
+    new_query_start, new_query_end, new_target_start = extend_perfect_seed(query_seq_bytes,
+                                                                           target_seq_bytes,
+                                                                           initial_al.query_alignment_start,
+                                                                           initial_al.query_alignment_end,
+                                                                           initial_al.reference_start,
+                                                                           initial_al.reference_end,
+                                                                          )
+
     added_to_start = initial_al.query_alignment_start - new_query_start
     added_to_end = new_query_end - initial_al.query_alignment_end
     cigar = initial_al.cigar
@@ -925,4 +932,89 @@ def align_primers_to_sequence(primers, sequence_name, sequence):
         if not primer_alignments[primer_name]:
             raise ValueError(f'At least one primer from {primers} could not be located in {sequence_name}')
         
+    return primer_alignments
+
+def align_primers_to_genome(primers, genome, suffix_length):
+    def find_all_matches(target_seq, query):
+        matches = []
+
+        while True:
+            if len(matches) == 0:
+                start = 0
+            else:
+                start = matches[-1] + 1
+
+            try:
+                next_match = target_seq.index(query, start)
+                matches.append(next_match)
+            except ValueError:
+                break
+
+        return matches
+
+    def find_alignments_of_query_suffix_to_large_target(target_seq, target_name, query_seq, query_name, suffix_length):
+        if not isinstance(target_seq, bytes) or not isinstance(query_seq, bytes):
+            raise TypeError
+
+        header = pysam.AlignmentHeader.from_references([target_name], [len(target_seq)])
+
+        als = []
+
+        query_suffix = query_seq[-suffix_length:]
+
+        soft_clipped = len(query_seq) - len(query_suffix)
+
+        for reverse in [False, True]:
+            if reverse:
+                possibly_RCed_query_suffix = utilities.reverse_complement(query_suffix)
+                possibly_RCed_query_seq = utilities.reverse_complement(query_seq)
+            else:
+                possibly_RCed_query_suffix = query_suffix
+                possibly_RCed_query_seq = query_seq
+
+            matches = find_all_matches(target_seq, possibly_RCed_query_suffix)
+
+            for match in matches:
+                al = pysam.AlignedSegment(header)
+
+                match_block = (sam.BAM_CMATCH, len(possibly_RCed_query_suffix))
+
+                if soft_clipped > 0:
+                    soft_clipped_block = (sam.BAM_CSOFT_CLIP, soft_clipped)
+                    cigar_blocks = [soft_clipped_block, match_block]
+                else:
+                    cigar_blocks = [match_block]
+
+
+                if reverse:
+                    cigar_blocks = cigar_blocks[::-1]
+
+                al.cigartuples = cigar_blocks
+
+                al.is_reverse = reverse
+                al.is_unmapped = False
+                al.reference_name = target_name
+                al.query_sequence = possibly_RCed_query_seq
+                al.query_qualities = [41] * len(possibly_RCed_query_seq)
+                al.query_name = query_name
+                al.reference_start = match
+
+                al = extend_alignment(al, target_seq)
+
+                als.append(al)
+
+        return als
+
+    primer_alignments = {primer_name: [] for primer_name in primers}
+    
+    for ref_name, ref_seq in genome.items():
+        ref_seq_bytes = ref_seq.upper().encode()
+
+        for primer_name, primer_seq in primers.items():
+            primer_seq_bytes = primer_seq.encode()
+            
+            als = find_alignments_of_query_suffix_to_large_target(ref_seq_bytes, ref_name, primer_seq_bytes, primer_name, suffix_length)
+            
+            primer_alignments[primer_name].extend(als)
+            
     return primer_alignments
