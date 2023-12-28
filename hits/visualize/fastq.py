@@ -307,6 +307,8 @@ def plot_average_qualities(qs, label=None, save_as=None, ax=None):
     ax.set_xlabel('Cycle')
     ax.set_ylabel('Average q score')
 
+    return means
+
 @optional_ax
 def plot_paired_average_qualities(stats, name=None, save_as=None, ax=None):
     if name == None:
