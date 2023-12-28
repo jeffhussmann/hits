@@ -70,12 +70,13 @@ def get_strand(mapping):
         strand = '+'
     return strand
 
+opposite_strand = {
+    '+': '-',
+    '-': '+',
+}
+
 def get_opposite_strand(mapping):
-    if mapping.is_reverse:
-        strand = '+'
-    else:
-        strand = '-'
-    return strand
+    return opposite_strand[get_strand(mapping)]
 
 def get_original_seq(mapping):
     if mapping.is_reverse:
@@ -1295,6 +1296,9 @@ def cumulative_edit_distances(mapping, query_interval, from_end, ref_seq=None):
             
     return c_e_ds
 
+def are_overlapping(first_al, second_al):
+    return interval.get_covered(first_al) & interval.get_covered(second_al)
+
 def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq, tie_break):
     ''' If left_al and right_al overlap on the query, find the query position such that switching from
     left_al to right_al after that position minimizes the total number of edits.
@@ -1303,14 +1307,15 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     right_covered = interval.get_covered(right_al)
     overlap = left_covered & right_covered
 
-    if left_al is None:
-        if right_al is None:
-            raise ValueError
+    if left_al is None and right_al is None:
+        raise ValueError
+
+    elif left_al is None:
         gap_interval = interval.Interval(0, right_covered.start - 1)
+
     elif right_al is None:
-        if left_al is None:
-            raise ValueError
         gap_interval = interval.Interval(left_covered.end + 1, len(left_al.seq) - 1)
+
     else:
         gap_interval = interval.Interval(left_covered.end + 1, right_covered.start - 1)
 
@@ -1340,6 +1345,7 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
         min_edits = min(switch_after_edits.values())
         best_switch_points = [s for s, d in switch_after_edits.items() if d == min_edits]
         switch_after = tie_break(best_switch_points)
+
     else:
         min_edits = 0
         switch_after = left_covered.end
@@ -1390,12 +1396,15 @@ def closest_query_position(r, alignment, which_side='either'):
 
     return q
 
+def query_position_to_ref_position(alignment):
+    return {true_query_position(q, alignment): r
+            for q, r in alignment.aligned_pairs
+            if r is not None and q is not None
+           }
+
 def closest_ref_position(q, alignment, which_side='either'):
     ''' Return ref position paired with q (or with the closest to q) '''
-    q_to_r = {true_query_position(q, alignment): r
-              for q, r in alignment.aligned_pairs
-              if r is not None and q is not None
-             }
+    q_to_r = query_position_to_ref_position(alignment)
 
     if q in q_to_r:
         r = q_to_r[q]
