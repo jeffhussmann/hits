@@ -643,11 +643,20 @@ def clean_up_STAR_output(output_prefix):
             else:
                 full_fn.unlink()
 
-def map_minimap2(fastq_fn, index, bam_fn,
+def map_minimap2(fastq_fn,
+                 index,
+                 bam_fn,
                  report_all=True,
                  num_threads=1,
                  use_ont_index=False,
                 ):
+
+    # minimap2 can handle multiple input files.
+    if not isinstance(fastq_fn, list):
+        fastq_fn = [fastq_fn]
+
+    fastq_fn = [str(fn) for fn in fastq_fn]    
+
     minimap2_command = [
         'minimap2',
         '-a', # sam output
@@ -656,8 +665,7 @@ def map_minimap2(fastq_fn, index, bam_fn,
         '-r', '20', # max bandwidth
         '-t', str(num_threads),
         str(index),
-        str(fastq_fn),
-    ]
+    ] + fastq_fn
 
     if report_all:
         minimap2_command = minimap2_command[:1] + ['-P'] + minimap2_command[1:] # (roughly equivalent to?) report all
@@ -687,13 +695,16 @@ def map_minimap2(fastq_fn, index, bam_fn,
         print(f'stderr from minimap2 was:\n\n{minimap2_process.stderr.read().decode()}\n')
         raise subprocess.CalledProcessError(minimap2_process.returncode, minimap2_process.args)
 
-def build_minimap2_index(fasta_fn, index_fn):
+def build_minimap2_index(fasta_fn, index_fn, use_ont_index=False):
     minimap2_command = [
         'minimap2',
         '-H',
         '-d', str(index_fn),
         str(fasta_fn),
     ]
+
+    if use_ont_index:
+        minimap2_command = minimap2_command[:1] + ['-x', 'map-ont'] + minimap2_command[1:]
 
     try:
         subprocess.run(minimap2_command,
