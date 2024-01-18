@@ -13,11 +13,12 @@ def parse_attribute_string(attribute_string):
 
     return parsed
 
+_safe_chars = '#\{}()+-:'
 def make_attribute_string(attribute):
     entries = []
     for key, value in sorted(attribute.items()):
-        key = urllib.parse.quote(str(key), safe='#')
-        value = urllib.parse.quote(str(value), safe='#')
+        key = urllib.parse.quote(str(key), safe=_safe_chars)
+        value = urllib.parse.quote(str(value), safe=_safe_chars)
         entry = f'{key}={value}'
         entries.append(entry)
 
