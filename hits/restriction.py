@@ -82,6 +82,9 @@ enzymes = {
     'BsmBI': Enzyme(
         'BsmBI',
         'CGTCTC',
-        {'+': 6, '-': 10},
+        {
+            '+': 6,
+            '-': 10,
+        },
     ),
 }

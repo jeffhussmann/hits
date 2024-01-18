@@ -1,6 +1,7 @@
 import array
-import sys
 import copy
+import logging
+import sys
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -933,6 +934,40 @@ def align_primers_to_sequence(primers, sequence_name, sequence):
             raise ValueError(f'At least one primer from {primers} could not be located in {sequence_name}')
         
     return primer_alignments
+
+def amplify_sequence_with_primers(sequence, primers):
+    primer_alignments = align_primers_to_sequence(primers, 'sequence', sequence) 
+
+    if len(primer_alignments['left']) == 0:
+        raise ValueError
+
+    if len(primer_alignments['left']) > 1:
+        logging.warning('More than one alignment for left primer')
+
+    left_alignment = max(primer_alignments['left'], key=lambda al: al.query_alignment_length)
+
+    if sam.get_strand(left_alignment) != '+':
+        raise ValueError
+
+    after_left = left_alignment.reference_end
+        
+    if len(primer_alignments['right']) == 0:
+        raise ValueError
+
+    if len(primer_alignments['right']) > 1:
+        logging.warning('More than one alignment for right primer')
+
+    right_alignment = max(primer_alignments['right'], key=lambda al: al.query_alignment_length)
+        
+    if sam.get_strand(right_alignment) != '-':
+        raise ValueError
+
+    right_start = right_alignment.reference_start
+        
+    if after_left >= right_start:
+        raise ValueError
+        
+    return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
 
 def align_primers_to_genome(primers, genome, suffix_length):
     def find_all_matches(target_seq, query):
