@@ -941,9 +941,6 @@ def amplify_sequence_with_primers(sequence, primers):
     if len(primer_alignments['left']) == 0:
         raise ValueError
 
-    if len(primer_alignments['left']) > 1:
-        logging.warning('More than one alignment for left primer')
-
     left_alignment = max(primer_alignments['left'], key=lambda al: al.query_alignment_length)
 
     if sam.get_strand(left_alignment) != '+':
@@ -953,9 +950,6 @@ def amplify_sequence_with_primers(sequence, primers):
         
     if len(primer_alignments['right']) == 0:
         raise ValueError
-
-    if len(primer_alignments['right']) > 1:
-        logging.warning('More than one alignment for right primer')
 
     right_alignment = max(primer_alignments['right'], key=lambda al: al.query_alignment_length)
         
@@ -969,24 +963,42 @@ def amplify_sequence_with_primers(sequence, primers):
         
     return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
 
-def align_primers_to_genome(primers, genome, suffix_length):
-    def find_all_matches(target_seq, query):
-        matches = []
+def find_all_matches(target_seq, query):
+    matches = []
 
-        while True:
-            if len(matches) == 0:
-                start = 0
-            else:
-                start = matches[-1] + 1
+    while True:
+        if len(matches) == 0:
+            start = 0
+        else:
+            start = matches[-1] + 1
 
-            try:
-                next_match = target_seq.index(query, start)
-                matches.append(next_match)
-            except ValueError:
-                break
+        try:
+            next_match = target_seq.index(query, start)
+            matches.append(next_match)
+        except ValueError:
+            break
 
-        return matches
+    return matches
 
+
+def count_exact_matches_for_primers_in_genome(primers, genome, verbose=False):
+    matches = Counter()
+
+    for ref_name, ref_seq in genome.items():
+        if verbose:
+            print(f'Searching {ref_name} ({len(ref_seq):,})')
+
+        ref_seq = ref_seq.upper()
+
+        for primer_name, primer_seq in primers.items():
+            print(f'{primer_name}: {primer_seq}')
+            primer_seq = primer_seq.upper()
+
+            matches[primer_name] += len(find_all_matches(ref_seq, primer_seq))
+
+    return matches
+            
+def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
     def find_alignments_of_query_suffix_to_large_target(target_seq, target_name, query_seq, query_name, suffix_length):
         if not isinstance(target_seq, bytes) or not isinstance(query_seq, bytes):
             raise TypeError
@@ -1009,7 +1021,10 @@ def align_primers_to_genome(primers, genome, suffix_length):
 
             matches = find_all_matches(target_seq, possibly_RCed_query_suffix)
 
+            if verbose:
+                print(f'{len(matches)} matches')
             for match in matches:
+
                 al = pysam.AlignedSegment(header)
 
                 match_block = (sam.BAM_CMATCH, len(possibly_RCed_query_suffix))
@@ -1019,7 +1034,6 @@ def align_primers_to_genome(primers, genome, suffix_length):
                     cigar_blocks = [soft_clipped_block, match_block]
                 else:
                     cigar_blocks = [match_block]
-
 
                 if reverse:
                     cigar_blocks = cigar_blocks[::-1]
@@ -1043,9 +1057,13 @@ def align_primers_to_genome(primers, genome, suffix_length):
     primer_alignments = {primer_name: [] for primer_name in primers}
     
     for ref_name, ref_seq in genome.items():
+        if verbose:
+            print(f'Searching {ref_name} ({len(ref_seq):,})')
+ 
         ref_seq_bytes = ref_seq.upper().encode()
 
         for primer_name, primer_seq in primers.items():
+            print(f'{primer_name}: {primer_seq}')
             primer_seq_bytes = primer_seq.encode()
             
             als = find_alignments_of_query_suffix_to_large_target(ref_seq_bytes, ref_name, primer_seq_bytes, primer_name, suffix_length)
