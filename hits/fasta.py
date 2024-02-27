@@ -50,8 +50,8 @@ def records(file_name):
 Read = Record # for backwards compatibility
 reads = records
 
-def to_dict(file_name):
-    return OrderedDict((r.name, r.seq) for r in reads(file_name))
+def to_dict(file_name, upper_case=False):
+    return OrderedDict((r.name, r.seq.upper() if upper_case else r.seq) for r in reads(file_name))
 
 def write_dict(seq_dict, fn):
     with open(fn, 'w') as fh:
