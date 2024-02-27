@@ -119,37 +119,42 @@ def quality_and_complexity(reads_iter, max_read_length, alignments=False, min_q=
     
     return stats
 
-def quality_and_complexity_paired(read_pairs, max_read_length):
-    R1_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
-    R1_c_array = np.zeros((max_read_length, 256), int)
-    R2_q_array = np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int)
-    R2_c_array = np.zeros((max_read_length, 256), int)
+def quality_and_complexity_paired(read_pairs, max_read_length, min_q=0):
+    stats = {}
+    for which in ['R1', 'R2']:
+        stats[which] = {
+            'q': np.zeros((max_read_length, MAX_EXPECTED_QUAL + 1), int),
+            'c': np.zeros((max_read_length, 256), int),
+            'c_above_min_q': np.zeros((max_read_length, 256), int),
+            'average_q': np.zeros((max_read_length, 256), int),
+        }
     
     joint_average_q_distribution = np.zeros((MAX_EXPECTED_QUAL + 1, MAX_EXPECTED_QUAL + 1), int)
     
     for R1, R2 in read_pairs:
-        R1_average_q = process_read(R1.seq.encode(), R1.qual.encode(), R1_q_array, R1_c_array)
-        R2_average_q = process_read(R2.seq.encode(), R2.qual.encode(), R2_q_array, R2_c_array)
-        joint_average_q_distribution[int(R1_average_q), int(R2_average_q)] += 1
+        process_read(R1.seq.encode(),
+                     R1.qual.encode(),
+                     stats['R1']['q'],
+                     stats['R1']['average_q'],
+                     stats['R1']['c'],
+                     stats['R1']['c_above_min_q'],
+                     min_q,
+                    )
+        process_read(R2.seq.encode(),
+                     R2.qual.encode(),
+                     stats['R2']['q'],
+                     stats['R2']['average_q'],
+                     stats['R2']['c'],
+                     stats['R2']['c_above_min_q'],
+                     min_q,
+                    )
         
     # See comment in quality_and_complexity above. 
-    R1_c_array = np.vstack([R1_c_array.T[ord(b)] for b in base_order]).T
-    R2_c_array = np.vstack([R2_c_array.T[ord(b)] for b in base_order]).T
+    for which in ['R1', 'R2']:
+        for k in ['c', 'c_above_min_q', 'average_q']:
+            stats[which][k] = np.vstack([stats[which][k].T[ord(b)] for b in base_order]).T
     
-    R1_average_q_distribution = joint_average_q_distribution.sum(axis=1) 
-    R2_average_q_distribution = joint_average_q_distribution.sum(axis=0) 
-
-    results = {
-        'R1_qs': R1_q_array,
-        'R1_cs': R1_c_array,
-        'R2_qs': R2_q_array,
-        'R2_cs': R2_c_array,
-        'joint_average_qs': joint_average_q_distribution,
-        'R1_average_qs': R1_average_q_distribution,
-        'R2_average_qs': R2_average_q_distribution,
-    }
-    
-    return results
+    return stats
 
 def get_line_groups(line_source):
     if isinstance(line_source, Path):
