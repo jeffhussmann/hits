@@ -25,8 +25,11 @@ def make_attribute_string(attribute):
     attribute_string = ';'.join(entries)
     return attribute_string
 
-class Feature(object):
+class Feature:
     def __init__(self, line=None):
+        self.parent = None
+        self.children = set()
+    
         if line == None:
             # Allow __init__ to be called with no arguments to allow the
             # @classmethod constructor below.
@@ -51,9 +54,6 @@ class Feature(object):
         
         self.parse_attribute_string()
 
-        self.parent = None
-        self.children = set()
-    
     @classmethod
     def from_fields(cls,
                     seqname='.',
