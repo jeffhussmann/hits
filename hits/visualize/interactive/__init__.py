@@ -271,8 +271,9 @@ def scatter(df=None,
     
     if initial_xy_names is None:
         if two_level_index:
-            first_level = original_df.columns.levels[0]
-            second_level = [s for s in original_df.columns.levels[1] if s != '']
+            only_used_levels = original_df.columns.remove_unused_levels().levels
+            first_level = only_used_levels[0]
+            second_level = [s for s in only_used_levels[1] if s != '']
 
             if first_level[1] != 'gene':
                 initial_xy_names = (
