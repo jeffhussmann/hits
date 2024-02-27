@@ -1667,7 +1667,7 @@ def header_from_STAR_index(index):
 def header_from_fasta(fasta_fn):
     fai = fasta.load_fai(fasta_fn).sort_index()
 
-    names = [name for name, row in fai.iterrows()]
+    names = [str(name) for name, row in fai.iterrows()]
     lengths = [row['LENGTH'] for name, row in fai.iterrows()]
 
     header = pysam.AlignmentHeader.from_references(names, lengths)
