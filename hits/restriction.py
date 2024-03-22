@@ -18,6 +18,22 @@ class Enzyme:
     def total_matches(self, seq):
         return len(self.forward_matches(seq)) + len(self.reverse_matches(seq))
 
+    def cut_afters(self, seq):
+        cut_afters = {
+            '+': set(),
+            '-': set(),
+        }
+
+        for forward_match in self.forward_matches(seq):
+            cut_afters['+'].add(forward_match + self.cut_offsets['+'])
+            cut_afters['-'].add(forward_match + self.cut_offsets['-'])
+            
+        for reverse_match in self.reverse_matches(seq):
+            cut_afters['-'].add(reverse_match + len(self.recognition_site) - 1 - self.cut_offsets['+'] - 1)
+            cut_afters['+'].add(reverse_match + len(self.recognition_site) - 1 - self.cut_offsets['-'] - 1)
+
+        return cut_afters
+
     def digest(self, seq):
         ''' If seq contains exactly one forward match and exactly one reverse match,
             return 3 digested fragments each containing all full overhangs.
@@ -27,7 +43,8 @@ class Enzyme:
         forward_matches = self.forward_matches(seq)
         reverse_matches = self.reverse_matches(seq)
 
-        if len(forward_matches) == 1 and len(reverse_matches) == 1:
+        # Last condition is for palindromic sites
+        if len(forward_matches) == 1 and len(reverse_matches) == 1 and forward_matches[0] != reverse_matches[0]:
             forward_match = forward_matches[0]
             reverse_match = reverse_matches[0]
 
@@ -43,7 +60,6 @@ class Enzyme:
                 middle_seq = seq[middle_start:middle_end]
 
             else:
-
                 left_end = forward_match + max(self.cut_offsets.values()) + 1
                 left_seq = seq[:left_end]
 
@@ -54,7 +70,9 @@ class Enzyme:
                 middle_start = left_end - abs(self.overhang_length)
                 middle_seq = seq[middle_start:middle_end]
 
-        elif (len(forward_matches), len(reverse_matches)) in {(1, 0), (0, 1)}:
+        elif (((len(forward_matches), len(reverse_matches)) in {(1, 0), (0, 1)}) or
+              (len(forward_matches) == 1 and len(reverse_matches) == 1 and forward_matches[0] == reverse_matches[0])
+        ):
             if len(forward_matches) == 0:
                 match = forward_matches[0]
             else:
@@ -67,6 +85,9 @@ class Enzyme:
             right_seq = seq[right_start:]
 
             middle_seq = ''
+
+        else:
+            raise ValueError('unexpected number of restriction sites')
 
         return left_seq, middle_seq, right_seq
 
