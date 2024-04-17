@@ -371,7 +371,7 @@ def label_scatter_plot(ax, xs, ys, labels,
                        color=None,
                        to_label=slice(None),
                        vector='orthogonal',
-                       initial_distance=50,
+                       initial_distance=5,
                        distance_increment=10,
                        arrow_alpha=0.2,
                        manual_ratios=None,
@@ -386,12 +386,16 @@ def label_scatter_plot(ax, xs, ys, labels,
     if data is not None:
         xs = data[xs]
         ys = data[ys]
+
         if color is not None:
             if color in data:
                 color = data[color]
             else:
                 color = [color]*len(xs)
-        if labels in data:
+
+        if isinstance(labels, list):
+            pass
+        elif labels in data:
             labels = data[labels]
         elif labels == data.index.name:
             labels = data.index
