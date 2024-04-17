@@ -12,21 +12,21 @@ def plot_quality_histograms(quality_counts, ax=None):
     '''
     quality_counts = np.array(quality_counts, dtype=float)
 
-    image = ax.imshow(quality_counts.T,
-                      origin='lower',
-                      interpolation='nearest',
-                      cmap=blues,
-                     )
+    ax.imshow(quality_counts.T,
+              origin='lower',
+              interpolation='nearest',
+              cmap=blues,
+             )
     ax.set_xlabel('Cycle index')
     ax.set_ylabel('Quality score')
 
     return ax.figure
 
 def plot_paired_quality_histograms(stats):
-    num_cycles, num_q_scores = stats['R1_qs'].shape
+    num_cycles, num_q_scores = stats['R1']['q'].shape
     fig, (R1_ax, R2_ax) = plt.subplots(2, 1, figsize=(0.1 * num_cycles, 0.1 * (num_q_scores * 2 + 10)))
-    plot_quality_histograms(stats['R1_qs'], ax=R1_ax)
-    plot_quality_histograms(stats['R2_qs'], ax=R2_ax)
+    plot_quality_histograms(stats['R1']['q'], ax=R1_ax)
+    plot_quality_histograms(stats['R2']['q'], ax=R2_ax)
     R1_ax.set_title('R1')
     R2_ax.set_title('R2')
 
