@@ -2,15 +2,18 @@ def Annotation_factory(fields, read_only=False, **kwargs):
     if read_only:
         curlies = ['{' + name + ':' + spec[-1] + '}' for name, spec in fields]
     else:
-        curlies = ['{' + name + ':' + spec.format(**kwargs) + '}'
-                   for name, spec in fields
-                  ]
+        curlies = [
+            '{' + name + ':' + spec.format(**kwargs) + '}'
+            for name, spec in fields
+        ]
+
     template = '_'.join(curlies).format
     names = [name for name, spec in fields]
-    cast_function = {'s': str,
-                     'd': int,
-                     'f': float,
-                    }
+    cast_function = {
+        's': str,
+        'd': int,
+        'f': float,
+    }
     casts = [cast_function[spec[-1]] for name, spec in fields]
 
     class Annotation(dict):
