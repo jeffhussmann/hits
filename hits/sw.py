@@ -1063,7 +1063,6 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
         ref_seq_bytes = ref_seq.upper().encode()
 
         for primer_name, primer_seq in primers.items():
-            print(f'{primer_name}: {primer_seq}')
             primer_seq_bytes = primer_seq.encode()
             
             als = find_alignments_of_query_suffix_to_large_target(ref_seq_bytes, ref_name, primer_seq_bytes, primer_name, suffix_length)
