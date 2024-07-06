@@ -1010,10 +1010,11 @@ def scatter(df=None,
         'y': [],
     }, name='cross_source')
 
-    crosses = fig.cross('x', 'y', size=25,
-                        line_color='black',
-                        source=cross_source,
-                       )
+    crosses = fig.scatter('x', 'y', size=25,
+                          marker='cross',
+                          line_color='black',
+                          source=cross_source,
+                         )
     cross_annotater = bokeh.models.PointDrawTool(renderers=[crosses])
     if 'annotation' not in hide_widgets:
         fig.add_tools(cross_annotater)
