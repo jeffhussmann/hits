@@ -258,7 +258,7 @@ def reads(file_name, standardize_names=False, ensure_sanger_encoding=False, up_t
     if standardize_names:
         name_standardizer, line_groups = detect_structure(line_groups)
     elif up_to_space:
-        name_standardizer = lambda n: n.split(' ')[0]
+        name_standardizer = lambda n: n.split()[0]
     else:
         name_standardizer = identity
 
@@ -358,17 +358,28 @@ def get_read_name_parser(read_name):
         # Simulated data sometimes needs read names to contain information
         # and can't use standard Illumina-formatted read names.
         parser = None
+
     elif read_name.startswith('SRR'):
         if len(read_name.split('.')) == 2:
             parser = parse_SRA_read_name
         elif len(read_name.split('.')) == 3:
             parser = parse_paired_SRA_read_name
+
     elif read_name.startswith('ERR') or read_name.startswith('DRR'):
         parser = parse_ERR_read_name
+
     else:
         num_words = len(read_name.split())
+
         if num_words > 1:
-            parser = parse_new_illumina_read_name
+            location_info, member_info = read_name.split()[:2]
+            fields = location_info.split(':')
+
+            if len(fields) == 8 and any(b in fields[-1] for b in 'TCAG'):
+                parser = parse_illumina_read_name_with_UMI
+            else:
+                parser = parse_new_illumina_read_name
+
         elif num_words == 1:
             if '#' in read_name:
                 parser = parse_old_illumina_read_name
@@ -376,8 +387,10 @@ def get_read_name_parser(read_name):
                 parser = parse_unindexed_old_illumina_read_name
             else:
                 parser = parse_standardized_name
+
         else:
             raise ValueError(f'read name format not recognized - {read_name}')
+
     return parser
 
 def get_read_name_standardizer(read_name):
@@ -385,24 +398,35 @@ def get_read_name_standardizer(read_name):
         standardizer.
     '''
     parser = get_read_name_parser(read_name)
+
     if parser == parse_SRA_read_name or parser == parse_ERR_read_name:
         standardize = templates['SRA'].format
         def standardizer(read_name):
             accession, number = parser(read_name)
             standardized = standardize(accession, number)
             return standardized
+            
     elif parser == parse_paired_SRA_read_name:
         standardize = templates['paired_SRA'].format
         def standardizer(read_name):
             accession, number, member = parser(read_name)
             standardized = standardize(accession, number, member)
             return standardized
+
+    elif parser == parse_illumina_read_name_with_UMI:
+        standardize = templates['UMI'].format
+        def standardizer(read_name):
+            lane, tile, x, y, member, index, UMI = parser(read_name)
+            standardized = standardize(lane, tile, x, y, UMI)
+            return standardized
+
     elif parser is not None:
         standardize = templates['default'].format
         def standardizer(read_name):
             lane, tile, x, y, member, index = parser(read_name)
             standardized = standardize(lane, tile, x, y)
             return standardized
+
     else:
         standardizer = identity
 
@@ -416,11 +440,31 @@ templates = {
     'SRA': '{0:0>9.9s}:{1:0>10.10s}',
     'paired_SRA': '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}',
 }
+templates['UMI'] = templates['default'] + ':{4}'
+
+def parse_illumina_read_name_with_UMI(read_name):
+    location_info, member_info = read_name.split()[:2]
+    fields = location_info.split(':')
+
+    if len(fields) == 8 and any(b in fields[-1] for b in 'TCAG'):
+        UMI = fields[-1]
+        fields = fields[:-1]
+    else:
+        UMI = ''
+
+    lane, tile, x, y = fields[-4:]
+
+    member, _, _, index = member_info.split(':')
+    
+    return lane, tile, x, y, member, index, UMI
 
 def parse_new_illumina_read_name(read_name):
     location_info, member_info = read_name.split()[:2]
+
     lane, tile, x, y = location_info.split(':')[-4:]
+
     member, _, _, index = member_info.split(':')
+    
     return lane, tile, x, y, member, index
 
 def parse_old_illumina_read_name(read_name):
