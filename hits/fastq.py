@@ -224,6 +224,10 @@ class Read(object):
     @utilities.memoized_property
     def Q93_fraction(self):
         return np.mean(np.array(self.query_qualities) == 93)
+
+    @utilities.memoized_property
+    def mean_Q(self):
+        return np.mean(self.query_qualities)
     
 def line_group_to_read(line_group, name_standardizer=identity, qual_convertor=identity):
     name_line, seq_line, _, qual_line = line_group
