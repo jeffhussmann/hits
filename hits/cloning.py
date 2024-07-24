@@ -52,11 +52,23 @@ def goldengate_assemble(backbone, insert, restriction_enzyme='BsmBI', digest_ins
     if restriction_enzyme.overhang_length == 0:
         raise ValueError('no overhang')
 
-    if left_vector[-restriction_enzyme.overhang_length:] != middle_insert[:restriction_enzyme.overhang_length]:
-        raise ValueError('incompatible overhang on left')
+    def check_overhangs(insert_orientation):
+        return (
+            (left_vector[-restriction_enzyme.overhang_length:] == insert_orientation[:restriction_enzyme.overhang_length]) and 
+            (insert_orientation[-restriction_enzyme.overhang_length:] == right_vector[:restriction_enzyme.overhang_length])
+        )
 
-    if middle_insert[-restriction_enzyme.overhang_length:] != right_vector[:restriction_enzyme.overhang_length]:
-        raise ValueError('incompatible overhang on right')
+    forward_matches = check_overhangs(middle_insert)
+    reverse_matches = check_overhangs(hits.utilities.reverse_complement(middle_insert))
+
+    if not forward_matches and not reverse_matches:
+        raise ValueError('no compatible overhang orientation')
+    elif forward_matches and reverse_matches:
+        raise ValueError('ambiguous overhang orientation')
+    elif forward_matches and not reverse_matches:
+        pass
+    elif not forward_matches and reverse_matches:
+        middle_insert = hits.utilities.reverse_complement(middle_insert)
 
     assembled = left_vector[:-restriction_enzyme.overhang_length] + middle_insert + right_vector[restriction_enzyme.overhang_length:]
 

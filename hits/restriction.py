@@ -74,9 +74,9 @@ class Enzyme:
               (len(forward_matches) == 1 and len(reverse_matches) == 1 and forward_matches[0] == reverse_matches[0])
         ):
             if len(forward_matches) == 0:
-                match = forward_matches[0]
-            else:
                 match = reverse_matches[0]
+            else:
+                match = forward_matches[0]
 
             left_end = match + max(self.cut_offsets.values()) + 1
             left_seq = seq[:left_end]
@@ -148,6 +148,14 @@ enzymes = {
         {
             '+': 0,
             '-': 4,
+        },
+    ),
+    'BbsI': Enzyme(
+        'BbsI',
+        'GAAGAC',
+        {
+            '+': 7,
+            '-': 11,
         },
     ),
 }
