@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 from collections import defaultdict
-from itertools import islice, groupby, cycle, product, chain
+from itertools import chain, combinations, cycle, groupby, islice, product
 
 import numpy as np
 import pandas as pd
@@ -425,3 +425,8 @@ convert_strand = {
 }
 
 undo_convert_strand = reverse_dictionary(convert_strand)
+
+def powerset(iterable):
+    ''' Adapted from itertools documentation. '''
+    as_list = list(iterable)
+    return chain.from_iterable(combinations(as_list, r) for r in range(len(as_list) + 1))
