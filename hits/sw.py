@@ -980,7 +980,6 @@ def find_all_matches(target_seq, query):
 
     return matches
 
-
 def count_exact_matches_for_primers_in_genome(primers, genome, verbose=False):
     matches = Counter()
 

@@ -1411,7 +1411,8 @@ def parallel_coordinates(df=None,
     df['_color'] = color_series.map(make_color_string)
 
     template_fn = Path(__file__).parent / 'template_inline.html'
-    html_template = open(template_fn).read()
+    with open(template_fn) as template_fh:
+        html_template = template_fh.read()
 
     encoded_data = base64.b64encode(df.to_csv().encode())
     URI = "'data:text/plain;base64,{0}'".format(encoded_data.decode())
