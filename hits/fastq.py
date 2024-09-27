@@ -5,6 +5,7 @@ import functools
 import gzip
 import heapq
 import os
+import s3fs
 import tempfile
 from pathlib import Path
 from itertools import chain
@@ -161,7 +162,19 @@ def get_line_groups(line_source):
         line_source = str(line_source)
 
     if isinstance(line_source, str):
-        if line_source.endswith('.gz'):
+        s3_prefix = 's3://'
+        if line_source.startswith(s3_prefix):
+            s3 = s3fs.S3FileSystem()
+            def opener(s3_path):
+                if s3_path.endswith('.gz'):
+                    with s3.open(s3_path[len(s3_prefix):], 'rb') as s3_fh:
+                        with gzip.open(s3_fh, mode='rt') as gz_fh:
+                            yield from gz_fh
+                else:
+                    with s3.open(s3_path[len(s3_prefix):]) as s3_fh:
+                        yield from s3_fh
+
+        elif line_source.endswith('.gz'):
             opener = functools.partial(gzip.open, mode='rt')
         else:
             opener = open

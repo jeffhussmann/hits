@@ -45,6 +45,7 @@ setup(
         'pillow>=5.3.0',
         'pysam>=0.15.1',
         'pyyaml>=3.13',
+        's3fs',
         'scipy>=1.2.1',
         'seaborn>=0.11.0',
         'statsmodels>=0.12.1',
