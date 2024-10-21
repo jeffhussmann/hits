@@ -185,8 +185,6 @@ def get_line_groups(line_source):
     groups = zip(*[lines]*4)
     return groups
 
-make_record = '@{0}\n{1}\n+\n{2}\n'.format
-
 class Read(object):
     def __init__(self, name, seq, qual):
         self.name = name
@@ -194,7 +192,7 @@ class Read(object):
         self.qual = qual
         
     def __str__(self):
-        return make_record(self.name, self.seq, self.qual)
+        return f'@{self.name}\n{self.seq}\n+\n{self.qual}\n'
     
     def reverse_complement(self):
         return Read(self.name,
