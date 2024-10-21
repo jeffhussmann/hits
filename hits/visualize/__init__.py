@@ -361,10 +361,10 @@ def draw_diagonal(ax, anti=False, color='black', **kwargs):
             color=color,
             **kwargs)
 
-def draw_zeros_and_diagonal(ax, color='black', alpha=0.5):
-    draw_diagonal(ax, color=color, alpha=alpha)
-    ax.axhline(0, color=color, alpha=alpha)
-    ax.axvline(0, color=color, alpha=alpha)
+def draw_zeros_and_diagonal(ax, color='black', alpha=0.5, **kwargs):
+    draw_diagonal(ax, color=color, alpha=alpha, **kwargs)
+    ax.axhline(0, color=color, alpha=alpha, **kwargs)
+    ax.axvline(0, color=color, alpha=alpha, **kwargs)
 
 def label_scatter_plot(ax, xs, ys, labels,
                        data=None,
