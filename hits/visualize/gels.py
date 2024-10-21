@@ -23,12 +23,10 @@ def load_labels(image_fn):
     return labels
 
 def load_annotations(image_fn):
-    root, ext = os.path.splitext(image_fn)
-    annotation_fn = '{0}.yaml'.format(root)
+    annotation_fn = Path(image_fn).with_suffix('.yaml')
 
-    if os.path.exists(annotation_fn):
-        with open(annotation_fn) as annotation_fh:
-            annotations = yaml.load(annotation_fh)
+    if annotation_fn.exists():
+        annotations = yaml.safe_load(annotation_fn.read_text())
     else:
         annotations = {}
 
@@ -260,6 +258,7 @@ def plot_gel(image_fn,
              invert=False,
              window_size=10,
             ):
+
     image = load_image(image_fn)
     annotations = load_annotations(image_fn)
 
