@@ -13,7 +13,7 @@ def parse_attribute_string(attribute_string):
 
     return parsed
 
-_safe_chars = '#\{}()+-:'
+_safe_chars = r'#\{}()+-:'
 def make_attribute_string(attribute):
     entries = []
     for key, value in sorted(attribute.items()):
