@@ -606,12 +606,12 @@ def plot_counts(l, ax=None, log_scales=None, normalize=False, **kwargs):
     else:
         ax.set_ylim(0)
 
-def make_stacked_Image(figs, orientation='vertical'):
+def make_stacked_Image(figs, orientation='vertical', dpi=None):
     ims = []
 
     for fig in figs:
         with io.BytesIO() as buffer:
-            fig.savefig(buffer, format='png', bbox_inches='tight')
+            fig.savefig(buffer, format='png', bbox_inches='tight', dpi=dpi)
             im = PIL.Image.open(buffer)
             im.load()
             ims.append(im)
