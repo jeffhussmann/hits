@@ -1300,10 +1300,28 @@ def cumulative_edit_distances(mapping, query_interval, from_end, ref_seq=None):
 def are_overlapping(first_al, second_al):
     return interval.get_covered(first_al) & interval.get_covered(second_al)
 
-def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq, tie_break):
+def find_best_query_switch_after(left_al,
+                                 right_al,
+                                 left_ref_seq=None,
+                                 right_ref_seq=None,
+                                 reference_sequences=None,
+                                 tie_break=min,
+                                ):
     ''' If left_al and right_al overlap on the query, find the query position such that switching from
     left_al to right_al after that position minimizes the total number of edits.
     '''
+    if left_ref_seq is None:
+        if left_al is None:
+            left_ref_seq = None
+        else:
+            left_ref_seq = reference_sequences[left_al.reference_name]
+
+    if right_ref_seq is None:
+        if right_al is None:
+            right_ref_seq = None
+        else:
+            right_ref_seq = reference_sequences[right_al.reference_name]
+
     left_covered = interval.get_covered(left_al)
     right_covered = interval.get_covered(right_al)
     overlap = left_covered & right_covered
@@ -1350,9 +1368,6 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     else:
         min_edits = 0
         switch_after = left_covered.end
-        switch_after_edits = {}
-        left_ceds = None
-        right_ceds = None
         best_switch_points = [switch_after]
 
     if gap_interval.is_empty:
@@ -1370,6 +1385,22 @@ def find_best_query_switch_after(left_al, right_al, left_ref_seq, right_ref_seq,
     }
 
     return results
+
+def crop_to_best_switch_point(left_al, right_al, reference_sequences):
+    if left_al is None and right_al is None:
+        cropped_als = {
+            'left': None,
+            'right': None,
+        }
+    else:
+        switch_results = find_best_query_switch_after(left_al, right_al, reference_sequences=reference_sequences)
+        
+        cropped_als = {
+            'left': crop_al_to_query_int(left_al, 0, max(switch_results['best_switch_points'])),
+            'right': crop_al_to_query_int(right_al, min(switch_results['best_switch_points']) + 1, np.inf),
+        }
+    
+    return cropped_als
 
 def true_query_position(p, alignment):
     if alignment.is_reverse:
@@ -1675,7 +1706,7 @@ def header_from_fasta(fasta_fn):
 
     return header
 
-def overlaps_feature(alignment, feature, require_same_strand=True):
+def overlaps_feature(alignment, feature, require_same_strand=True, min_overlap_length=1):
     if alignment is None or alignment.is_unmapped:
         return False
 
@@ -1687,7 +1718,7 @@ def overlaps_feature(alignment, feature, require_same_strand=True):
     else:
         same_strand = True
 
-    return same_reference and same_strand and (num_overlapping_bases > 0) 
+    return same_reference and same_strand and (num_overlapping_bases >= min_overlap_length) 
 
 def feature_overlap_length(alignment, feature):
     if alignment is None:
