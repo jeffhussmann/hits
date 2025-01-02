@@ -1,5 +1,6 @@
 import colorsys
 import io
+import itertools
 import functools
 from collections import Counter
 
@@ -652,7 +653,7 @@ def assign_categorical_colors(series, palette=None, sort=True):
     if sort:
         values = sorted(values)
 
-    value_to_color = dict(zip(values, palette))
+    value_to_color = dict(zip(values, itertools.cycle(palette)))
     colors = series.map(value_to_color)
 
     return colors, value_to_color
