@@ -645,7 +645,6 @@ def merge_ref_dicts(first_dict, second_dict):
     for position, base in second_dict.items():
         if position in merged_dict:
             if merged_dict[position] != base:
-                # contradiction
                 raise ValueError(first_dict, second_dict)
         else:
             merged_dict[position] = base
@@ -1132,7 +1131,8 @@ def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_inse
             als_by_ref_name[al.reference_name].append(al)
 
         for ref_name, als in als_by_ref_name.items():
-            merged_als = [als[0]]
+            merged_als = [als.pop(0)]
+            #merged_als = [als[0]]
 
             while len(als) > 0:
                 left_al = merged_als.pop()
@@ -1175,17 +1175,16 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
 
     # Ensure that the alignments point towards each other.
     strand = get_strand(first)
-    if strand == '+':
-        left_cropped = crop_al_to_query_int(left_query, 0, right_covered.start - 1)
-        if left_cropped is None or left_cropped.is_unmapped:
-            # left alignment doesn't cover any query not covered by right
-            return None
 
-    elif strand == '-':
-        right_cropped = crop_al_to_query_int(right_query, left_covered.end + 1, np.inf)
-        if right_cropped is None or right_cropped.is_unmapped:
-           # right alignment doesn't cover any query not covered by left
-           return None
+    left_cropped = crop_al_to_query_int(left_query, 0, right_covered.start - 1)
+    if left_cropped is None or left_cropped.is_unmapped:
+        # left alignment doesn't cover any query not covered by right
+        return None
+
+    right_cropped = crop_al_to_query_int(right_query, left_covered.end + 1, np.inf)
+    if right_cropped is None or right_cropped.is_unmapped:
+        # right alignment doesn't cover any query not covered by left
+        return None
 
     query_gap = right_covered.start - left_covered.end - 1
 
@@ -1222,7 +1221,9 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
     elif strand == '-':
         first_al, second_al = right_cropped, left_cropped
 
-    possible_insertion = (first_al.reference_end - 1) + max(query_gap, 0) >= second_al.reference_start
+    # Relative positions on reference determine whether to check for insertion or deletion.
+
+    possible_insertion = (first_al.reference_end - 1) >= second_al.reference_start
 
     possible_deletion = query_gap <= 0
 
