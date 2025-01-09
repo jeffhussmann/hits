@@ -1132,13 +1132,13 @@ def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_inse
 
         for ref_name, als in als_by_ref_name.items():
             merged_als = [als.pop(0)]
-            #merged_als = [als[0]]
 
             while len(als) > 0:
                 left_al = merged_als.pop()
                 right_al = als.pop(0)
                 
                 merged = merge_adjacent_alignments(left_al, right_al, ref_seqs, max_deletion_length=max_deletion_length, max_insertion_length=max_insertion_length)
+
                 if merged is not None:
                     merged_als.append(merged)
                 else:
