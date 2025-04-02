@@ -1,6 +1,5 @@
 import array
 import copy
-import logging
 import sys
 from collections import Counter, defaultdict
 
@@ -10,7 +9,6 @@ import pysam
 from . import utilities
 from . import fastq
 from . import fasta
-from . import annotation
 from . import sam
 from . import interval
 from .sw_cython import *
@@ -125,16 +123,6 @@ def print_local_alignment(alignment, fh=sys.stdout):
 
     fh.write('query\t{0}\n'.format(''.join(query_string)))
     fh.write('target\t{0}\n'.format(''.join(target_string)))
-
-trimmed_annotation_fields = [
-    ('original_name', 's'),
-    ('insert_length', '04d'),
-    ('adapter_seq', 's'),
-    ('adapter_qual', 's'),
-]
-
-TrimmedAnnotation = annotation.Annotation_factory(trimmed_annotation_fields)
-NO_DETECTED_OVERLAP = -2
 
 def generate_alignments(query,
                         target,
@@ -335,7 +323,12 @@ def global_alignment(query, target, **kwargs):
     al, = generate_alignments(query, target, 'global', **kwargs)
     return al
 
-def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=False, in_R1_prefix=None, in_R2_prefix=None):
+def infer_insert_length(R1, R2, before_R1, before_R2,
+                        indel_penalty=-5,
+                        in_R1_prefix=None,
+                        in_R2_prefix=None,
+                        min_overlap_length=10,
+                       ):
     ''' Infer the length of the insert represented by R1 and R2 by performing
         a semi-local alignment of R1 and the reverse complement of R2 with
         the expected adapter sequences prepended to each read.
@@ -380,7 +373,13 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
     else:
         alignment = alignments[0]
 
-    results = {'alignment': alignment}
+    results = {
+        'alignment': alignment,
+    }
+
+    if len(alignment['path']) < min_overlap_length:
+        results['failed'] = 'overlap shorter than minimum required'
+        return results
 
     R1_start = len(before_R1)
     R2_start = len(R2.seq) - 1
@@ -461,25 +460,22 @@ def infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty=-5, solid=Fa
         results['failed'] = 'bad score'
     else:
         if length_from_R1 != length_from_R2:
-            if solid and not(alignment['insertions'] or alignment['deletions']):
-                pass
-            else:
-                # This shouldn't be possible without an illegal indel.
-                results['failed'] = 'length mismatch'
+            # This shouldn't be possible without an illegal indel.
+            results['failed'] = 'length mismatch'
         else:
             results['length'] = length_from_R1
     
     return results
 
 def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
-    extended_R1 = (before_R1.lower() + R1.seq).decode()
-    extended_R2 = (utilities.reverse_complement(before_R2.lower() + R2.seq)).decode()
+    extended_R1 = before_R1.lower() + R1.seq
+    extended_R2 = utilities.reverse_complement(before_R2.lower() + R2.seq)
     #fh.write(R1.name + '\n')
     #fh.write(R1.qual + '\n')
     #fh.write(R2.qual + '\n')
     #fh.write('{0}\t{1}\t{2}\n'.format(alignment['score'], len(alignment['path']) * .2, alignment['score'] - len(alignment['path']) * 2))
     #fh.write(str(alignment['path']) + '\n')
-    print_local_alignment(extended_R1, extended_R2, alignment['path'], fh=fh)
+    print_local_alignment(alignment, fh=fh)
     #fh.write(str(alignment['insertions']) + '\n')
     #fh.write(str(alignment['deletions']) + '\n')
     #fh.write(str(sorted(alignment['mismatches'])) + '\n')
@@ -504,8 +500,8 @@ def align_read(read, targets, min_path_length, header,
         if target_name not in ref_intervals:
             ref_intervals[target_name] = interval.Interval(0, len(target_seq) - 1)
 
-    skipped_at_start = read_interval.start
-    skipped_at_end = len(read) - 1 - read_interval.end
+    skipped_at_start = max(read_interval.start, 0)
+    skipped_at_end = max(len(read) - 1 - read_interval.end, 0)
 
     # Register full seq and quals before possibly trimming read
     original_forward_seq = read.seq
@@ -669,7 +665,10 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
         in_R1_prefix = None
         in_R2_prefix = None
 
-    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty, in_R1_prefix=in_R1_prefix, in_R2_prefix=in_R2_prefix)
+    results = infer_insert_length(R1, R2, before_R1, before_R2, indel_penalty,
+                                  in_R1_prefix=in_R1_prefix,
+                                  in_R2_prefix=in_R2_prefix,
+                                 )
 
     if 'failed' in results:
         insert_length = len(R1) + len(R2)

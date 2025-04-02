@@ -68,6 +68,7 @@ def get_strand(mapping):
         strand = '-'
     else:
         strand = '+'
+
     return strand
 
 opposite_strand = {
