@@ -1069,3 +1069,16 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
             primer_alignments[primer_name].extend(als)
             
     return primer_alignments
+
+def find_primer_prefix_ignoring_Ns(read_seq, primer_prefix):
+    read_prefix = read_seq[:len(primer_prefix) + 6]
+    mismatches = mismatches_at_offset(primer_prefix.encode(), read_seq.encode())
+
+    indices_of_zeros = np.where(mismatches == 0)[0]
+
+    if len(indices_of_zeros) > 0:
+        start = indices_of_zeros[0]
+    else:
+        start = None
+
+    return start

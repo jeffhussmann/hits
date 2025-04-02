@@ -215,18 +215,21 @@ def extend_perfect_seed_with_one_nt_deletion(char* query_seq, char* target_seq, 
     return gained_before, gained_after
 
 @cython.boundscheck(False)
-def mismatches_at_offset(char* donor, char* target):
-    ''' Number of mismatches if donor is aligned to target at each possible offset. '''
-    mismatches = np.zeros((len(donor), len(target) - len(donor)), int)
+def mismatches_at_offset(char* query, char* target):
+    ''' Number of mismatches if query is aligned to target at each possible offset.
+    Note that query must be shorter than target.
+    '''
+    mismatches = np.zeros((len(query), len(target) - len(query)), int)
     cdef long [:, ::1] mismatches_view = mismatches
     cdef unsigned int row, col
     
-    for col in range(len(target) - len(donor)):
-        for row in range(len(donor)):
-            if donor[row] != target[col + row]:
+    for col in range(len(target) - len(query)):
+        for row in range(len(query)):
+            if query[row] != target[col + row] and query[row] != b'N' and target[col + row] != b'N':
                 mismatches_view[row, col] += 1
                 
     total_mismatches = mismatches.sum(axis=0)
+
     return total_mismatches
 
 def hamming_distance(char* first, char* second):
