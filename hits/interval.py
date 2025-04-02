@@ -95,7 +95,7 @@ class Interval:
         return self.comparison_key < other.comparison_key
     
     def __repr__(self):
-        return '[{0:,} - {1:,}]'.format(self.start, self.end)
+        return f'[{self.start:,} - {self.end:,}]'
     
     def __key(self):
         return (self.start, self.end)
@@ -272,6 +272,11 @@ def make_disjoint(intervals):
 
 def get_disjoint_covered(alignments):
     intervals = [get_covered(al) for al in alignments if al is not None]
+    covered = make_disjoint(intervals)
+    return covered
+
+def get_disjoint_covered_on_ref(alignments):
+    intervals = [get_covered_on_ref(al) for al in alignments if al is not None]
     covered = make_disjoint(intervals)
     return covered
 
