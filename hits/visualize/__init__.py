@@ -725,21 +725,11 @@ def draw_categorical_legend(value_to_color,
                     size=font_size,
                    )
 
-def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim):
+def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim, location='right'):
     fig = main_ax.figure
-
-    inset_ax = main_ax.inset_axes([1.2, 0, 1, 1], sharex=main_ax)
-
-    inset_ax.set_ylim(*inset_y_lim)
 
     inverted_fig_tranform = fig.transFigure.inverted().transform    
 
-    bracket_width = 0.02
-    bracket_offset = 0
-    
-    left_offset = 0.04
-    right_offset = 0.1
-    
     def draw_line(path, **kwargs):
         path_in_fig = [inverted_fig_tranform(ax.get_yaxis_transform().transform((x, y))) for x, y, ax in path]
         
@@ -756,14 +746,35 @@ def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim):
                                       )
         fig.lines.append(line)
     
+    main_brackset_sign = -1
+
+    if location == 'right':
+        ax_bounds = [1.2, 0, 1, 1]
+        main_bracket_x = 1.04
+        inset_bracket_x = -0.1
+        inset_bracket_sign = 1
+
+    else:
+        ax_bounds = [0, -1.1, 1, 1]
+        main_bracket_x = 1.05
+        inset_bracket_x = 1.02
+        inset_bracket_sign = -1
+
+    inset_ax = main_ax.inset_axes(ax_bounds, sharex=main_ax)
+
+    inset_ax.set_ylim(*inset_y_lim)
+
+    bracket_width = 0.01
+    bracket_offset = 0
+    
     paths = [
         [
-            (1 + left_offset, inset_y_lim[1], main_ax),
-            (0 - right_offset, inset_y_lim[1], inset_ax),
+            (main_bracket_x, inset_y_lim[1], main_ax),
+            (inset_bracket_x, inset_y_lim[1], inset_ax),
         ],
         [
-            (1 + left_offset, inset_y_lim[0], main_ax),
-            (0 - right_offset, inset_y_lim[0], inset_ax),
+            (main_bracket_x, inset_y_lim[0], main_ax),
+            (inset_bracket_x, inset_y_lim[0], inset_ax),
         ],
     ]
     
@@ -772,16 +783,16 @@ def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim):
         
     paths = [
         [
-            (1 + left_offset - bracket_offset - bracket_width, inset_y_lim[1], main_ax),
-            (1 + left_offset - bracket_offset, inset_y_lim[1], main_ax),
-            (1 + left_offset - bracket_offset, inset_y_lim[0], main_ax),
-            (1 + left_offset - bracket_offset - bracket_width, inset_y_lim[0], main_ax),
+            (main_bracket_x + main_brackset_sign * (bracket_offset + bracket_width), inset_y_lim[1], main_ax),
+            (main_bracket_x + main_brackset_sign * bracket_offset, inset_y_lim[1], main_ax),
+            (main_bracket_x + main_brackset_sign * bracket_offset, inset_y_lim[0], main_ax),
+            (main_bracket_x + main_brackset_sign * (bracket_offset + bracket_width), inset_y_lim[0], main_ax),
         ],
         [
-            (0 - right_offset + bracket_offset + bracket_width, inset_y_lim[1], inset_ax),
-            (0 - right_offset + bracket_offset, inset_y_lim[1], inset_ax),
-            (0 - right_offset + bracket_offset, inset_y_lim[0], inset_ax),
-            (0 - right_offset + bracket_offset + bracket_width, inset_y_lim[0], inset_ax),
+            (inset_bracket_x + inset_bracket_sign * (bracket_offset + bracket_width), inset_y_lim[1], inset_ax),
+            (inset_bracket_x + inset_bracket_sign * bracket_offset, inset_y_lim[1], inset_ax),
+            (inset_bracket_x + inset_bracket_sign * bracket_offset, inset_y_lim[0], inset_ax),
+            (inset_bracket_x + inset_bracket_sign * (bracket_offset + bracket_width), inset_y_lim[0], inset_ax),
         ],
     ]
     
