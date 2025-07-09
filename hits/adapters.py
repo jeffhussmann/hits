@@ -19,7 +19,7 @@ primers = {
     'truseq_small_RNA': {
         'R1':         'TCTTTCCCTACACGACGCTCTTCCGATCT', # Note: same as truseq R1
         'R2':     'GTGACTGGAGTTCCTTGGCACCCGAGAATTCCA',
-    }
+    },
 }
 
 primers['mix_and_match'] = {

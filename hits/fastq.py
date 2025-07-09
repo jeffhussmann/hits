@@ -369,7 +369,7 @@ def read_quartets(fns, **kwargs):
     return (Quartet(*reads) for reads in zip(*all_reads))
 
 def get_read_name_parser(read_name):
-    if read_name.startswith('test'):
+    if read_name.startswith('test') or read_name.startswith('simulated'):
         # Simulated data sometimes needs read names to contain information
         # and can't use standard Illumina-formatted read names.
         parser = None
