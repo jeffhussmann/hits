@@ -1830,25 +1830,17 @@ def total_edit_distance(alignment, ref_seq=None):
     return edit_distance_in_query_interval(alignment, ref_seq=ref_seq)
 
 def edit_distance_in_query_interval(alignment, query_interval=None, ref_seq=None, only_Q30=False):
-    if query_interval is None:
-        query_interval = interval.Interval(0, np.inf)
+    if query_interval is not None:
+        alignment = crop_al_to_query_int(alignment, query_interval.start, query_interval.end)
 
-    if query_interval.is_empty or alignment is None or alignment.is_unmapped:
+    if alignment is None or alignment.is_unmapped:
         return 0
 
     distance = 0
 
-    start = query_interval.start
-    end = query_interval.end
-
     tuples = aligned_tuples(alignment, ref_seq)
-    if alignment.is_reverse:
-        tuples = tuples[::-1]
 
-    first_i = min(i for i, (q, _, _, _, _) in enumerate(tuples) if q is not None and q >= start)
-    last_i = max(i for i, (q, _, _, _, _) in enumerate(tuples) if q is not None and q <= end)
-    
-    for q, q_base, r, r_base, qual in tuples[first_i:last_i + 1]:
+    for q, q_base, r, r_base, qual in tuples:
         if q_base != r_base:
             if qual >= 30 or not only_Q30:
                 distance += 1
