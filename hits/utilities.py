@@ -430,3 +430,16 @@ def powerset(iterable):
     ''' Adapted from itertools documentation. '''
     as_list = list(iterable)
     return chain.from_iterable(combinations(as_list, r) for r in range(len(as_list) + 1))
+
+def equivalence_classes(iterable, relation):
+    eq_classes = []
+
+    for item in iterable:
+        for eq_class in eq_classes:
+            if relation(item, eq_class[0]):
+                eq_class.append(item)
+                break
+        else:
+            eq_classes.append([item])
+
+    return eq_classes
