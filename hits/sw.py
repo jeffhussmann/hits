@@ -482,7 +482,10 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
     #for q, t in sorted(alignment['mismatches']):
     #    fh.write('\t{0}\t{1}\n'.format(extended_R1[q], extended_R2[t]))
 
-def align_read(read, targets, min_path_length, header,
+def align_read(read,
+               targets,
+               min_path_length,
+               header,
                min_score_ratio=0.8,
                max_alignments_per_target=1,
                both_directions=True,
@@ -854,7 +857,12 @@ def extend_alignment(initial_al, target_seq_bytes):
     
     return new_al
 
-def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_before=True, extend_after=True):
+def extend_alignment_with_one_nt_deletion(initial_al,
+                                          target_seq_bytes,
+                                          extend_before=True,
+                                          extend_after=True,
+                                          minimum_gain=1,
+                                         ):
     query_seq_bytes = initial_al.query_sequence.encode()
     
     if not isinstance(target_seq_bytes, bytes):
@@ -862,8 +870,10 @@ def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_b
 
     gained_before, gained_after = extend_perfect_seed_with_one_nt_deletion(query_seq_bytes, target_seq_bytes, initial_al.query_alignment_start, initial_al.query_alignment_end, initial_al.reference_start, initial_al.reference_end)
     cigar = initial_al.cigar
+
+    extended = False
     
-    if gained_before > 0 and extend_before:
+    if gained_before >= minimum_gain and extend_before:
         # Remove from starting soft clip...
         kind, length = cigar[0]
         if kind != sam.BAM_CSOFT_CLIP:
@@ -880,8 +890,10 @@ def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_b
         deletion = (sam.BAM_CDEL, 1)
 
         cigar = soft_clip + [new_match, deletion] + cigar[1:]
+
+        extended = True
             
-    if gained_after > 0 and extend_after:
+    if gained_after >= minimum_gain and extend_after:
         # Remove from ending soft clip...
         kind, length = cigar[-1]
         if kind != sam.BAM_CSOFT_CLIP:
@@ -898,26 +910,34 @@ def extend_alignment_with_one_nt_deletion(initial_al, target_seq_bytes, extend_b
         deletion = (sam.BAM_CDEL, 1)
 
         cigar = cigar[:-1] + [deletion, new_match] + soft_clip
+
+        extended = True
         
-    if (gained_before > 0 and extend_before) or (gained_after > 0 and extend_after):
+    if extended:
         new_al = copy.deepcopy(initial_al)
         new_al.cigar = cigar
         if (gained_before > 0 and extend_before):
             # reference_start changes by 1 for deletion plus gained_before
             new_al.reference_start = initial_al.reference_start - 1 - gained_before
+
     else:
         new_al = initial_al
     
     return new_al
 
-def extend_repeatedly(initial_al, target_seq_bytes, extend_before=True, extend_after=True):
-    ''' extend with 1 nt deletions until doing so doesn't change the alignment '''
+def extend_repeatedly(initial_al,
+                      target_seq_bytes,
+                      **extend_kwargs,
+                     ):
+    ''' Extend initial_al with additional sequence from target_seq_bytes
+    separated by 1 nt deletions until doing so doesn't change the alignment.
+    '''
     
     extended = initial_al # Confusing to call this 'extended' but helps make the while loop simpler.
     previous = None
     while extended is not previous:
         previous = extended
-        extended = extend_alignment_with_one_nt_deletion(previous, target_seq_bytes, extend_before, extend_after)
+        extended = extend_alignment_with_one_nt_deletion(previous, target_seq_bytes, **extend_kwargs)
 
     return extended
 
