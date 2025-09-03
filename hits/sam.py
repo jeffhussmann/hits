@@ -1879,6 +1879,8 @@ def make_noncontained(alignments, max_length=np.inf, alignments_contained_in=Non
     the query interval covered by A is a subset of the query interval covered by B.
     Does not remove als longer than max_length.
     ''' 
+    alignments = make_nonredundant(alignments)
+
     query_intervals = [interval.get_covered(al) for al in alignments]
 
     if alignments_contained_in is None:

@@ -293,6 +293,8 @@ def remove_nested(alignments):
     return necessary
 
 def make_parsimonious(alignments):
+    alignments = sam.make_nonredundant(alignments)
+
     initial_covered = get_disjoint_covered(alignments)
     
     no_nested = remove_nested(alignments)
