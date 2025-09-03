@@ -374,6 +374,9 @@ def get_read_name_parser(read_name):
         # and can't use standard Illumina-formatted read names.
         parser = None
 
+    elif read_name.endswith('/ccs'):
+        parser = parse_CCS_read_name
+
     elif read_name.startswith('SRR'):
         if len(read_name.split('.')) == 2:
             parser = parse_SRA_read_name
@@ -435,6 +438,13 @@ def get_read_name_standardizer(read_name):
             standardized = standardize(lane, tile, x, y, UMI)
             return standardized
 
+    elif parser == parse_CCS_read_name:
+        standardize = templates['CCS'].format
+        def standardizer(read_name):
+            movie, hole = parser(read_name)
+            standardized = standardize(movie, hole)
+            return standardized
+
     elif parser is not None:
         standardize = templates['default'].format
         def standardizer(read_name):
@@ -454,6 +464,7 @@ templates = {
     'default': '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}',
     'SRA': '{0:0>9.9s}:{1:0>10.10s}',
     'paired_SRA': '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}',
+    'CCS': '{0}/{1:0>12.10s}/ccs',
 }
 templates['UMI'] = templates['default'] + ':{4}'
 
@@ -496,6 +507,10 @@ def parse_unindexed_old_illumina_read_name(read_name):
 def parse_standardized_name(read_name):
     lane, tile, x, y, member = read_name.split(':')
     return lane, tile, x, y, member, ''
+
+def parse_CCS_read_name(read_name):
+    movie, hole, _ = read_name.split('/') 
+    return movie, hole
 
 def parse_SRA_read_name(read_name):
     accession, number = read_name.split()[0].split('.')
