@@ -1387,7 +1387,11 @@ def find_best_query_switch_after(left_al,
 
     return results
 
-def crop_to_best_switch_point(left_al, right_al, reference_sequences):
+def crop_to_best_switch_point(left_al, right_al, reference_sequences, include_overlap=False):
+    ''' 
+        include_overlap: If True, assign the region equally well explained to both.  
+    '''
+
     if left_al is None and right_al is None:
         cropped_als = {
             'left': None,
@@ -1395,10 +1399,17 @@ def crop_to_best_switch_point(left_al, right_al, reference_sequences):
         }
     else:
         switch_results = find_best_query_switch_after(left_al, right_al, reference_sequences=reference_sequences)
+
+        if include_overlap:
+            left_end = max(switch_results['best_switch_points'])
+            right_start = min(switch_results['best_switch_points']) + 1
+        else:
+            left_end = switch_results['switch_after']
+            right_start = switch_results['switch_after'] + 1
         
         cropped_als = {
-            'left': crop_al_to_query_int(left_al, 0, max(switch_results['best_switch_points'])),
-            'right': crop_al_to_query_int(right_al, min(switch_results['best_switch_points']) + 1, np.inf),
+            'left': crop_al_to_query_int(left_al, 0, left_end),
+            'right': crop_al_to_query_int(right_al, right_start, np.inf),
         }
     
     return cropped_als
