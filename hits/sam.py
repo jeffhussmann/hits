@@ -763,7 +763,6 @@ def get_mapq_counts(bam_file_name):
 def mapping_to_Read(mapping):
     seq = mapping.get_forward_sequence()
     qual = fastq.encode_sanger(mapping.get_forward_qualities())
-
     read = fastq.Read(mapping.query_name, seq, qual)
     return read
 
@@ -1119,7 +1118,7 @@ def merge_multiple_adjacent_alignments(als, ref_seqs, max_deletion_length=np.inf
     als = sorted(als, key=query_interval)
     return functools.reduce(merger, als)
 
-def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_insertion_length=0):
+def merge_any_adjacent_pairs(als, ref_seqs, **merge_kwargs):
     if len(als) == 0:
         return als
     else:
@@ -1138,7 +1137,11 @@ def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_inse
                 left_al = merged_als.pop()
                 right_al = als.pop(0)
                 
-                merged = merge_adjacent_alignments(left_al, right_al, ref_seqs, max_deletion_length=max_deletion_length, max_insertion_length=max_insertion_length)
+                merged = merge_adjacent_alignments(left_al,
+                                                   right_al,
+                                                   ref_seqs,
+                                                   **merge_kwargs,
+                                                  )
 
                 if merged is not None:
                     merged_als.append(merged)
@@ -1149,7 +1152,13 @@ def merge_any_adjacent_pairs(als, ref_seqs, max_deletion_length=np.inf, max_inse
 
         return all_merged_als
 
-def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.inf, max_insertion_length=0):
+def merge_adjacent_alignments(first,
+                              second,
+                              ref_seqs,
+                              max_deletion_length=np.inf,
+                              max_insertion_length=0,
+                              forbidden_region=None,
+                             ):
     ''' If first and second are alignments to the same reference name and strand
     that are adjacent or partially overlap on the query, or are consistent with being
     separated by an insertion up to length max_insertion_length, returns a single merged
@@ -1164,11 +1173,12 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
 
     if first.reference_name != second.reference_name:
         return None
-    else:
-        ref_seq = ref_seqs[first.reference_name]
 
     if get_strand(first) != get_strand(second):
         return None
+
+    if forbidden_region is None:
+        forbidden_region = interval.Interval.empty()
 
     left_query, right_query = sorted([first, second], key=query_interval)
     left_covered = interval.get_covered(left_query)
@@ -1194,24 +1204,14 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
         left_cropped, right_cropped = left_query, right_query
 
     else:
-        overlap = left_covered & right_covered
-        left_ceds = cumulative_edit_distances(left_query, overlap, False, ref_seq=ref_seq)
-        right_ceds = cumulative_edit_distances(right_query, overlap, True, ref_seq=ref_seq)
+        switch_results = find_best_query_switch_after(left_query,
+                                                      right_query,
+                                                      reference_sequences=ref_seqs,
+                                                     )
 
-        switch_after_edits = {
-            overlap.start - 1 : right_ceds[overlap.start],
-            overlap.end: left_ceds[overlap.end],
-        }
 
-        for q in range(overlap.start, overlap.end):
-            switch_after_edits[q] = left_ceds[q] + right_ceds[q + 1]
-
-        min_edits = min(switch_after_edits.values())
-        best_switch_points = [s for s, d in switch_after_edits.items() if d == min_edits]
-        switch_after = best_switch_points[0]
-
-        left_cropped = crop_al_to_query_int(left_query, 0, switch_after)
-        right_cropped = crop_al_to_query_int(right_query, switch_after + 1, right_query.query_length)
+        left_cropped = crop_al_to_query_int(left_query, 0, switch_results['switch_after'])
+        right_cropped = crop_al_to_query_int(right_query, switch_results['switch_after'] + 1, right_query.query_length)
 
     if left_cropped is None or left_cropped.is_unmapped or right_cropped is None or right_cropped.is_unmapped:
         # this may not be appropriate in all circumstances
@@ -1236,6 +1236,11 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
         if first_al is None:
             return None
 
+        insertion_starts_after = first_al.reference_end - 1
+
+        if insertion_starts_after in forbidden_region:
+            return None
+
         left_covered, right_covered = sorted(map(interval.get_covered, [first_al, second_al]))
         insertion_length = (right_covered.start - 1) - left_covered.end
 
@@ -1248,10 +1253,12 @@ def merge_adjacent_alignments(first, second, ref_seqs, max_deletion_length=np.in
             indel_cigar = []
 
     elif possible_deletion:
-        # Possible deletion
-        deletion_length = second_al.reference_start - first_al.reference_end
+        deletion_interval = interval.Interval(first_al.reference_end + 1, second_al.reference_start)
+        deletion_length = deletion_interval.total_length
 
-        if deletion_length > max_deletion_length:
+        if deletion_interval.total_length > max_deletion_length:
+            return None
+        elif (deletion_interval & forbidden_region).total_length > 0:
             return None
         elif deletion_length > 0:
             indel_cigar = [(BAM_CDEL, deletion_length)]
