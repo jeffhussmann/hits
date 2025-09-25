@@ -1,7 +1,9 @@
 import pprint
 import urllib
 
-from hits import utilities
+import hits.utilities
+
+memoized_property = hits.utilities.memoized_property
 
 def parse_attribute_string(attribute_string):
     if attribute_string == '.':
@@ -183,11 +185,29 @@ class Feature:
         ''' Given dictionary of reference_sequences which includes an entry for 
         self.seqname, returns stranded sequence for this feature.
         '''
+
         seq = reference_sequences[self.seqname][self.start:self.end + 1]
         if self.strand == '-':
-            seq = utilities.reverse_complement(seq)
+            seq = hits.utilities.reverse_complement(seq)
 
         return seq
+
+    @memoized_property
+    def ref_p_to_offset(self):
+        if self.strand == '+':
+            ref_p_order = range(self.start, self.end + 1)
+
+        elif self.strand == '-':
+            ref_p_order = range(self.end, self.start - 1, -1)
+
+        else:
+            raise ValueError('feature needs to be stranded')
+            
+        return {ref_p: offset for offset, ref_p in enumerate(ref_p_order)}
+
+    @memoized_property
+    def offset_to_ref_p(self):
+        return hits.utilities.reverse_dictionary(self.ref_p_to_offset)
 
 def populate_all_connections(features):
     for f in features:
