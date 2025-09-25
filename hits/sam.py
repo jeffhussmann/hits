@@ -1,13 +1,14 @@
 ''' Utilities for dealing with sam files. '''
 
-import re
-import subprocess
-import os
-import shutil
-import heapq
 import contextlib
 import copy
+import gzip
 import functools
+import heapq
+import os
+import re
+import shutil
+import subprocess
 
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -15,11 +16,11 @@ from pathlib import Path
 import pysam
 import numpy as np
 
-from . import utilities
 from . import fastq
 from . import fasta
-from . import mapping_tools
 from . import interval
+from . import mapping_tools
+from . import utilities
 
 BAM_CMATCH = 0     # M
 BAM_CINS = 1       # I
@@ -767,11 +768,29 @@ def mapping_to_Read(mapping):
     return read
 
 def sam_to_fastq(sam_file_name):
-    sam_file = pysam.AlignmentFile(str(sam_file_name))
+    sam_file = pysam.AlignmentFile(sam_file_name)
     for mapping in sam_file:
         yield mapping_to_Read(mapping)
 
 bam_to_fastq = sam_to_fastq
+
+def convert_bam_to_fastq(bam_fn, fastq_fn):
+    ''' Only write one fastq entry per unique read name. '''
+    bam_fn = Path(bam_fn)
+    fastq_fn = Path(fastq_fn)
+
+    if fastq_fn.name.endswith('gz'):
+        writer = gzip.open(fastq_fn, 'wt', compresslevel=1)
+    else:
+        writer = open(fastq_fn, 'w')
+
+    names_written = set()
+
+    with writer as fh:
+        for read in bam_to_fastq(bam_fn):
+            if read.name not in names_written:
+                writer.write(str(read))
+                names_written.add(read.name)
 
 class AlignmentSorter:
     ''' Context manager that handles writing AlignedSegments into a samtools
