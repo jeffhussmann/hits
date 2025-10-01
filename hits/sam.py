@@ -1140,22 +1140,23 @@ def merge_multiple_adjacent_alignments(als, ref_seqs, max_deletion_length=np.inf
 def merge_any_adjacent_pairs(als, ref_seqs, **merge_kwargs):
     if len(als) == 0:
         return als
-    else:
-        als = sorted(als, key=query_interval)
 
+    else:
         all_merged_als = []
 
-        als_by_ref_name = defaultdict(list)
+        als_by_ref_name_and_strand = defaultdict(list)
         for al in als:
-            als_by_ref_name[al.reference_name].append(al)
+            als_by_ref_name_and_strand[al.reference_name, get_strand(al)].append(al)
 
-        for ref_name, als in als_by_ref_name.items():
-            merged_als = [als.pop(0)]
+        for (ref_name, strand), ref_als in als_by_ref_name_and_strand.items():
+            ref_als = sorted(ref_als, key=query_interval)
 
-            while len(als) > 0:
+            merged_als = [ref_als.pop(0)]
+
+            while len(ref_als) > 0:
                 left_al = merged_als.pop()
-                right_al = als.pop(0)
-                
+                right_al = ref_als.pop(0)
+
                 merged = merge_adjacent_alignments(left_al,
                                                    right_al,
                                                    ref_seqs,
