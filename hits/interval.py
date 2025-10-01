@@ -82,6 +82,9 @@ class Interval:
             return self.start <= other <= self.end
         else:
             raise ValueError(other)
+
+    def __add__(self, other):
+        return Interval(self.start + other, self.end + other)
         
     @property    
     def comparison_key(self):
