@@ -148,3 +148,40 @@ def trim_by_local_alignment(adapter, seq):
                 trim_at = adapter_start_in_seq
 
     return trim_at
+
+def find_illumina_sequencing_primers_in_PCR_product(PCR_product):
+    illumina_sequencing_primers = {
+        which: {kind: primers[kind][which] for kind in ['truseq', 'nextera']}
+        for which in ['R1', 'R2']
+    }
+    
+    def find(which, sequence):
+        locations = []
+    
+        for kind, primer in illumina_sequencing_primers[which].items():
+    
+            for strand, possibly_reversed in [('+', primer), ('-', utilities.reverse_complement(primer))]:
+                if possibly_reversed in sequence:
+                    index = sequence.index(possibly_reversed)
+                    if strand == '+':
+                        locations.append((kind, '+', index + len(possibly_reversed)))
+                    else:
+                        locations.append((kind, '-', index))
+    
+        if len(locations) == 0:
+            raise ValueError('no location found')
+        elif len(locations) > 1:
+            raise ValueError('multiple locations found')
+    
+        location = locations[0]
+    
+        return location
+
+    R1_location = find('R1', PCR_product)
+    R2_location = find('R2', PCR_product)
+
+    strands = {strand for _, strand, _ in (R1_location, R2_location)}
+    if len(strands) != 2:
+        raise ValueError
+    
+    return R1_location, R2_location

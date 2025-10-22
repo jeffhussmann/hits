@@ -130,10 +130,13 @@ def build_region_fetcher(genome_dir, load_references=False):
 
 def load_entire_genome(genome_dir):
     seqs = {}
+
     fasta_file_names = get_all_fasta_file_names(genome_dir)
+
     for fasta_file_name in fasta_file_names:
         for record in Bio.SeqIO.parse(fasta_file_name, 'fasta'):
             seqs[record.id] = str(record.seq)
+
     return seqs
 
 def max_RNAME_length(genome_index):

@@ -982,40 +982,51 @@ def amplify_sequence_with_primers(sequence, primers):
         
     return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
 
-def find_all_matches(target_seq, query):
-    matches = []
+def find_all_matches(target_seq, query, case_sensitive=False):
+    if not case_sensitive:
+        target_seq = target_seq.upper()
+        query = query.upper()
 
-    while True:
-        if len(matches) == 0:
-            start = 0
+    all_matches = []
+
+    for strand in ['+', '-']:
+        if strand == '-':
+            possibly_reversed = utilities.reverse_complement(query)
         else:
-            start = matches[-1] + 1
+            possibly_reversed = query
 
-        try:
-            next_match = target_seq.index(query, start)
-            matches.append(next_match)
-        except ValueError:
-            break
+        strand_matches = []
 
-    return matches
+        while True:
+            if len(strand_matches) == 0:
+                start = 0
+            else:
+                _, previous_match = strand_matches[-1]
+                start = previous_match + 1
 
-def count_exact_matches_for_primers_in_genome(primers, genome, verbose=False):
-    matches = Counter()
+            try:
+                next_match = target_seq.index(possibly_reversed, start)
+                strand_matches.append((strand, next_match))
+            except ValueError:
+                break
+
+        all_matches.extend(strand_matches)
+
+    return all_matches
+
+def find_all_matches_in_genome(seq, genome, verbose=False):
+    matches = []
 
     for ref_name, ref_seq in genome.items():
         if verbose:
             print(f'Searching {ref_name} ({len(ref_seq):,})')
 
-        ref_seq = ref_seq.upper()
+        ref_matches = find_all_matches(ref_seq, seq)
 
-        for primer_name, primer_seq in primers.items():
-            print(f'{primer_name}: {primer_seq}')
-            primer_seq = primer_seq.upper()
-
-            matches[primer_name] += len(find_all_matches(ref_seq, primer_seq))
+        matches.extend([(ref_name, strand, position) for strand, position in ref_matches])
 
     return matches
-            
+
 def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
     def find_alignments_of_query_suffix_to_large_target(target_seq, target_name, query_seq, query_name, suffix_length):
         if not isinstance(target_seq, bytes) or not isinstance(query_seq, bytes):

@@ -6,7 +6,11 @@ def gibson_assemble(PCR_template, PCR_primers, backbone, restriction_enzyme):
     if isinstance(restriction_enzyme, str):
         restriction_enzyme = hits.restriction.enzymes[restriction_enzyme]
 
-    PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers)
+    try:
+        PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers)
+    except ValueError:
+        PCR_template = hits.utilities.reverse_complement(PCR_template)
+        PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers)
 
     cut_afters = restriction_enzyme.cut_afters(backbone)
 
