@@ -186,6 +186,7 @@ def cigar_blocks_to_string(cigar_blocks):
 
 def aligned_pairs_to_cigar(aligned_pairs, guide=None):
     op_sequence = []
+
     for read, ref in aligned_pairs:
         if read == None or read == '-':
             op_sequence.append(BAM_CDEL)
@@ -218,11 +219,18 @@ def aligned_pairs_to_cigar(aligned_pairs, guide=None):
 
     return cigar
 
-def cigar_to_aligned_pairs(cigar, start):
+def cigar_to_aligned_pairs(cigar, start, include_soft_clipping=True):
     aligned_pairs = []
 
     ref_pos = start
+
     read_pos = 0
+    if not include_soft_clipping and len(cigar) > 0:
+        # Start at soft clipped length
+        first_op, first_length = cigar[0]
+        if first_op == BAM_CSOFT_CLIP:
+            read_pos = first_length
+
     for op, length in cigar:
         if op == BAM_CMATCH or op == BAM_CEQUAL or op == BAM_CDIFF:
             for i in range(length):
@@ -252,12 +260,13 @@ def cigar_to_aligned_pairs(cigar, start):
 
                 read_pos += 1
         
-        elif BAM_CSOFT_CLIP:
-            # Soft-clipping results in gap in ref
-            for i in range(length):
-                aligned_pairs.append((read_pos, 'S'))
+        elif op == BAM_CSOFT_CLIP:
+            if include_soft_clipping:
+                # Soft-clipping results in gap in ref
+                for i in range(length):
+                    aligned_pairs.append((read_pos, 'S'))
 
-                read_pos += 1
+                    read_pos += 1
 
         else:
             raise ValueError('Unsupported op', cigar)
@@ -342,8 +351,10 @@ def truncate_cigar_blocks_from_beginning(cigar_blocks, truncated_length):
 
 def collapse_cigar_blocks(cigar_blocks):
     collapsed = []
+
     for kind, blocks in utilities.group_by(cigar_blocks, lambda t: t[0]):
-        collapsed.append((kind, sum(t[1] for t in blocks)))
+        collapsed.append((kind, sum(length for _, length in blocks)))
+
     return collapsed
 
 def aligned_pairs_to_MD_string(aligned_pairs):
@@ -786,7 +797,7 @@ def convert_bam_to_fastq(bam_fn, fastq_fn):
 
     names_written = set()
 
-    with writer as fh:
+    with writer:
         for read in bam_to_fastq(bam_fn):
             if read.name not in names_written:
                 writer.write(str(read))
@@ -901,22 +912,6 @@ def merge_by_name(*mapping_iterators):
         last_qname = qname
         yield al_by_name.aligned_segment
 
-def aligned_pairs_exclude_soft_clipping(mapping):
-    cigar = mapping.cigartuples
-    aligned_pairs = mapping.aligned_pairs
-    
-    first_op, first_length = cigar[0]
-
-    if first_op == BAM_CSOFT_CLIP:
-        aligned_pairs = aligned_pairs[first_length:]
-
-    if len(cigar) > 1:
-        last_op, last_length = cigar[-1]
-        if last_op == BAM_CSOFT_CLIP and last_length != 0:
-            aligned_pairs = aligned_pairs[:-last_length]
-
-    return aligned_pairs
-
 def parse_idxstats(bam_fn):
     lines = pysam.idxstats(str(bam_fn)).splitlines()
     fields = [line.split('\t') for line in lines]
@@ -925,36 +920,6 @@ def parse_idxstats(bam_fn):
 
 def get_num_alignments(bam_fn):
     return sum(parse_idxstats(bam_fn).values())
-
-def collapse_soft_clip_blocks(cigar_blocks):
-    ''' If there are multiple consecutive soft clip blocks on either end,
-    collapse them into a single block.
-    '''
-    first_non_cigar_index = 0
-    while cigar_blocks[first_non_cigar_index][0] == BAM_CSOFT_CLIP:
-        first_non_cigar_index += 1
-
-    if first_non_cigar_index > 0:
-        total_length = sum(length for kind, length in cigar_blocks[:first_non_cigar_index])
-        if total_length > 0:
-            to_add = [(BAM_CSOFT_CLIP, total_length)]
-        else:
-            to_add = []
-        cigar_blocks = to_add + cigar_blocks[first_non_cigar_index:]
-    
-    last_non_cigar_index = len(cigar_blocks) - 1
-    while cigar_blocks[last_non_cigar_index][0] == BAM_CSOFT_CLIP:
-        last_non_cigar_index -= 1
-
-    if last_non_cigar_index < len(cigar_blocks) - 1:
-        total_length = sum(length for kind, length in cigar_blocks[last_non_cigar_index + 1:])
-        if total_length > 0:
-            to_add = [(BAM_CSOFT_CLIP, total_length)]
-        else:
-            to_add = []
-        cigar_blocks = cigar_blocks[:last_non_cigar_index + 1] + to_add
-
-    return cigar_blocks
 
 def crop_al_to_query_int(alignment, start, end):
     ''' Replace any parts of alignment that involve query bases not in the
@@ -978,17 +943,18 @@ def crop_al_to_query_int(alignment, start, end):
     if alignment.is_reverse:
         start, end = alignment.query_length - 1 - end, alignment.query_length - 1 - start
 
-    aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start)
+    aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start, include_soft_clipping=False)
 
     start_i = 0
     read, ref = aligned_pairs[start_i]
-    while read is None or read == 's' or read < start:
+    while read is None or read == 'S' or read < start:
         start_i += 1
         read, ref = aligned_pairs[start_i]
+
         
     end_i = len(aligned_pairs) - 1
     read, ref = aligned_pairs[end_i]
-    while read is None or read == 's' or read > end:
+    while read is None or ref is None or read > end:
         end_i -= 1
         read, ref = aligned_pairs[end_i]
 
@@ -1007,15 +973,16 @@ def crop_al_to_query_int(alignment, start, end):
     restricted_pairs = aligned_pairs[start_i:end_i + 1]
     cigar = aligned_pairs_to_cigar(restricted_pairs) 
 
-    before_soft = start
-    if before_soft > 0:
-        cigar = [(BAM_CSOFT_CLIP, before_soft)] + cigar
+    # Add soft clip blocks using first and last read position in restricted pairs.
 
-    after_soft = alignment.query_length - end - 1
-    if after_soft > 0:
-        cigar = cigar + [(BAM_CSOFT_CLIP, after_soft)]
+    soft_clipped_at_start = restricted_pairs[0][0]
 
-    cigar = collapse_soft_clip_blocks(cigar)
+    if soft_clipped_at_start > 0:
+        cigar = [(BAM_CSOFT_CLIP, soft_clipped_at_start)] + cigar
+
+    soft_clipped_at_end = alignment.query_length - 1 - restricted_pairs[-1][0]
+    if soft_clipped_at_end > 0:
+        cigar = cigar + [(BAM_CSOFT_CLIP, soft_clipped_at_end)]
 
     restricted_rs = [r for q, r in restricted_pairs if r != None and r != 'S']
     if not restricted_rs:
@@ -1832,7 +1799,7 @@ def aligned_tuples(alignment, ref_seq=None):
             tuples.append((true_read_i, read_b, ref_i, ref_b, qual))
 
     else:
-        aligned_pairs = aligned_pairs_exclude_soft_clipping(alignment)
+        aligned_pairs = cigar_to_aligned_pairs(alignment.cigar, alignment.reference_start, include_soft_clipping=False)
         
         for read_i, ref_i in aligned_pairs:
             if read_i is None:

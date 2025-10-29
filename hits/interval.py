@@ -78,8 +78,10 @@ class Interval:
         if isinstance(other, Interval):
             # is a strict sub-interval of
             return (other.start >= self.start and other.end <= self.end) and (self != other)
+
         elif isinstance(other, Number):
             return self.start <= other <= self.end
+
         else:
             raise ValueError(other)
 
