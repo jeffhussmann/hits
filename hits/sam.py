@@ -1096,9 +1096,6 @@ def query_interval(alignment):
 
     return start, end
 
-def ref_interval(alignment):
-    return alignment.reference_start, alignment.reference_end - 1
-
 def merge_multiple_adjacent_alignments(als, ref_seqs, max_deletion_length=np.inf):
     merger = functools.partial(merge_adjacent_alignments, ref_seqs=ref_seqs, max_deletion_length=max_deletion_length)
     als = sorted(als, key=query_interval)
@@ -1255,7 +1252,7 @@ def merge_adjacent_alignments(first,
     else:
         return None
 
-    left_ref, right_ref = sorted([first_al, second_al], key=ref_interval)
+    left_ref, right_ref = sorted([first_al, second_al], key=interval.get_covered_on_ref)
 
     merged = copy.deepcopy(left_ref)
     merged.cigar = left_ref.cigar[:-1] + indel_cigar + right_ref.cigar[1:]
@@ -1737,34 +1734,29 @@ def feature_overlap_length(alignment, feature):
 def reference_edges(alignment):
     ''' Returns a dictionary of 
     {
-        5: reference position mapped to by the left-most query nt in alignment,
-        3: reference position mapped to by the right-most query nt in alignment,
+        'left': reference position mapped to by the left-most query nt in alignment,
+        'right': reference position mapped to by the right-most query nt in alignment,
     }
 
-    TODO: For consistency with other conventions, these keys should probably
-    be 'left' and 'right' instead of 5 and 3.
     '''
 
     if alignment is None or alignment.is_unmapped:
-        return {5: None, 3: None}
+        return {'left': None, 'right': None}
 
     strand = get_strand(alignment)
 
     if strand == '+':
         edges = {
-            5: alignment.reference_start,
-            3: alignment.reference_end - 1,
+            'left': alignment.reference_start,
+            'right': alignment.reference_end - 1,
         }
     elif strand == '-':
         edges = {
-            5: alignment.reference_end - 1,
-            3: alignment.reference_start,
+            'left': alignment.reference_end - 1,
+            'right': alignment.reference_start,
         }
 
     return edges
-
-def reference_interval(alignment):
-    return interval.Interval(alignment.reference_start, alignment.reference_end - 1)
 
 def aligned_tuples(alignment, ref_seq=None):
     tuples = []
