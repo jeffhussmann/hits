@@ -954,7 +954,7 @@ def align_primers_to_sequence(primers, sequence_name, sequence):
         
     return primer_alignments
 
-def amplify_sequence_with_primers(sequence, primers):
+def amplify_oriented_sequence_with_primers(sequence, primers):
     primer_alignments = align_primers_to_sequence(primers, 'sequence', sequence) 
 
     if len(primer_alignments['left']) == 0:
@@ -981,6 +981,19 @@ def amplify_sequence_with_primers(sequence, primers):
         raise ValueError
         
     return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
+
+def amplify_sequence_with_primers(sequence, primers, both_orientations=False):
+    try:
+        product = amplify_oriented_sequence_with_primers(sequence, primers)
+
+    except ValueError:
+        if both_orientations:
+            sequence = utilities.reverse_complement(sequence)
+            product = amplify_oriented_sequence_with_primers(sequence, primers)
+        else:
+            raise ValueError
+    
+    return product
 
 def find_all_matches(target_seq, query, case_sensitive=False):
     if not case_sensitive:
