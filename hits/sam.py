@@ -264,7 +264,7 @@ def cigar_to_aligned_pairs(cigar, start, include_soft_clipping=True):
             if include_soft_clipping:
                 # Soft-clipping results in gap in ref
                 for i in range(length):
-                    aligned_pairs.append((read_pos, 'S'))
+                    aligned_pairs.append((read_pos, None))
 
                     read_pos += 1
 
@@ -303,7 +303,7 @@ def cigar_to_aligned_pairs_backwards(cigar, end, read_length):
         elif op == BAM_CSOFT_CLIP:
             # Soft-clipping results in gap in ref
             for i in range(length):
-                aligned_pairs.append((read_pos, 'S'))
+                aligned_pairs.append((read_pos, None))
 
                 read_pos -= 1
 
@@ -927,6 +927,7 @@ def crop_al_to_query_int(alignment, start, end):
     query coords are given relative to the original read (and are therefore
     transformed if alignment is reversed.)
     '''
+
     alignment = copy.deepcopy(alignment)
 
     if alignment is None or alignment.is_unmapped:
@@ -947,14 +948,13 @@ def crop_al_to_query_int(alignment, start, end):
 
     start_i = 0
     read, ref = aligned_pairs[start_i]
-    while read is None or read == 'S' or read < start:
+    while read is None or read < start:
         start_i += 1
         read, ref = aligned_pairs[start_i]
 
-        
     end_i = len(aligned_pairs) - 1
     read, ref = aligned_pairs[end_i]
-    while read is None or ref is None or read > end:
+    while read is None or read > end:
         end_i -= 1
         read, ref = aligned_pairs[end_i]
 
@@ -984,7 +984,7 @@ def crop_al_to_query_int(alignment, start, end):
     if soft_clipped_at_end > 0:
         cigar = cigar + [(BAM_CSOFT_CLIP, soft_clipped_at_end)]
 
-    restricted_rs = [r for q, r in restricted_pairs if r != None and r != 'S']
+    restricted_rs = [r for q, r in restricted_pairs if r != None]
     if not restricted_rs:
         alignment.is_unmapped = True
         alignment.cigar = []
@@ -1255,7 +1255,7 @@ def merge_adjacent_alignments(first,
     left_ref, right_ref = sorted([first_al, second_al], key=interval.get_covered_on_ref)
 
     merged = copy.deepcopy(left_ref)
-    merged.cigar = left_ref.cigar[:-1] + indel_cigar + right_ref.cigar[1:]
+    merged.cigar = collapse_cigar_blocks(left_ref.cigar[:-1] + indel_cigar + right_ref.cigar[1:])
 
     return merged
 
