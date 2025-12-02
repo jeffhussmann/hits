@@ -1074,6 +1074,28 @@ def query_interval_overlapping_feature(al, feature):
     cropped_al = crop_al_to_feature(al, feature)
     return interval.get_covered(cropped_al)
 
+def feature_overlap_length(alignment, feature):
+    if alignment is None:
+        overlap = 0
+    else:
+        overlap = alignment.get_overlap(feature.start, feature.end + 1)
+
+    return overlap
+
+def overlaps_feature(alignment, feature, require_same_strand=True, min_overlap_length=1):
+    if alignment is None or alignment.is_unmapped:
+        return False
+
+    same_reference = alignment.reference_name == feature.seqname
+    num_overlapping_bases = feature_overlap_length(alignment, feature)
+
+    if require_same_strand:
+        same_strand = (get_strand(alignment) == feature.strand)
+    else:
+        same_strand = True
+
+    return same_reference and same_strand and (num_overlapping_bases >= min_overlap_length) 
+
 def disallow_query_positions_from_other(alignment, other):
     start, end = query_interval(alignment)
     other_start, other_end = query_interval(other)
@@ -1708,28 +1730,6 @@ def header_from_fasta(fasta_fn):
     header = pysam.AlignmentHeader.from_references(names, lengths)
 
     return header
-
-def overlaps_feature(alignment, feature, require_same_strand=True, min_overlap_length=1):
-    if alignment is None or alignment.is_unmapped:
-        return False
-
-    same_reference = alignment.reference_name == feature.seqname
-    num_overlapping_bases = feature_overlap_length(alignment, feature)
-
-    if require_same_strand:
-        same_strand = (get_strand(alignment) == feature.strand)
-    else:
-        same_strand = True
-
-    return same_reference and same_strand and (num_overlapping_bases >= min_overlap_length) 
-
-def feature_overlap_length(alignment, feature):
-    if alignment is None:
-        overlap = 0
-    else:
-        overlap = alignment.get_overlap(feature.start, feature.end + 1)
-
-    return overlap
 
 def reference_edges(alignment):
     ''' Returns a dictionary of 
