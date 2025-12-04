@@ -1,3 +1,5 @@
+from Bio.SeqFeature import SeqFeature, FeatureLocation
+
 import hits.utilities
 
 class Enzyme:
@@ -33,6 +35,73 @@ class Enzyme:
             cut_afters['+'].add(reverse_match + len(self.recognition_site) - 1 - self.cut_offsets['-'] - 1)
 
         return cut_afters
+
+    def overhang_features(self, seq):
+        ''' Return SeqFeatures of overhangs produced by digestion,
+        annotated on the strand retained by side not containing the
+        recognition site (i.e. the side retained in a IIS cloning
+        strategy).
+        '''
+        all_overhangs = []
+        features = []
+
+        if self.overhang_length > 0:
+
+            for forward_match in self.forward_matches(seq):
+                cuts = (
+                    forward_match + self.cut_offsets['+'],
+                    forward_match + self.cut_offsets['-'],
+                )
+
+                if self.overhang < 0:
+                    start, end = cuts
+                    strand = 1
+                else:
+                    end, start = cuts
+                    strand = -1
+
+                overhang = (start + 1, end, strand)
+
+                all_overhangs.append(overhang)
+                
+            for reverse_match in self.reverse_matches(seq):
+                cuts = (
+                    reverse_match + len(self.recognition_site) - 1 - self.cut_offsets['+'] - 1,
+                    reverse_match + len(self.recognition_site) - 1 - self.cut_offsets['-'] - 1,
+                )
+
+                if self.overhang > 0:
+                    start, end = cuts
+                    strand = 1
+                else:
+                    end, start = cuts
+                    strand = -1
+
+                overhang = (start + 1, end, strand)
+
+                all_overhangs.append(overhang)
+
+            for start, end, strand in all_overhangs:
+                overhang_seq = seq[start:end+1]
+                if strand == -1:
+                    overhang_seq = hits.utilities.reverse_complement(overhang_seq)
+
+                name = f'overhang_{overhang_seq}'
+                feature = SeqFeature(location=FeatureLocation(start,
+                                                              end,
+                                                              strand=strand,
+                                                             ),
+                                     id=name,
+                                     type='misc_feature',
+                                     qualifiers={
+                                         'label': name,
+                                         'overhang_seq': overhang_seq,
+                                         'overhang_seq_rc': hits.utilities.reverse_complement(overhang_seq),
+                                     },
+                                    )
+                features.append(feature)
+
+        return features
 
     def digest(self, seq):
         ''' If seq contains exactly one forward match and exactly one reverse match,
