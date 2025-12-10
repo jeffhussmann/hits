@@ -54,13 +54,11 @@ class Enzyme:
                 )
 
                 if self.overhang < 0:
-                    start, end = cuts
                     strand = 1
                 else:
-                    end, start = cuts
                     strand = -1
 
-                overhang = (start + 1, end, strand)
+                overhang = (*cuts, strand)
 
                 all_overhangs.append(overhang)
                 
@@ -71,18 +69,21 @@ class Enzyme:
                 )
 
                 if self.overhang > 0:
-                    start, end = cuts
                     strand = 1
                 else:
-                    end, start = cuts
                     strand = -1
 
-                overhang = (start + 1, end, strand)
+                overhang = (*cuts, strand)
 
                 all_overhangs.append(overhang)
 
-            for start, end, strand in all_overhangs:
-                overhang_seq = seq[start:end+1]
+            for plus_cut_after, minus_cut_after, strand in all_overhangs:
+                left_cut_after, right_cut_after = sorted([plus_cut_after, minus_cut_after])
+                start = left_cut_after + 1 # by definition of cut_after
+                end = right_cut_after + 1 # because FeatureLocation is end-exclusive
+
+                overhang_seq = seq[start:end]
+
                 if strand == -1:
                     overhang_seq = hits.utilities.reverse_complement(overhang_seq)
 
