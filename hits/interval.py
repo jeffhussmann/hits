@@ -327,3 +327,24 @@ def make_parsimonious(alignments):
         raise ValueError
         
     return parsimonious
+
+def positions_to_connected_stretches(positions):
+    ''' given set of positions, return list of connected [start, end] intervals '''
+    intervals = []
+    
+    positions = sorted(positions)
+    
+    current_start = positions[0]
+    current_p = current_start
+    
+    for p in positions[1:]:
+        if p == current_p + 1:
+            current_p = p
+        else:
+            intervals.append(Interval(current_start, current_p))
+            current_start = p
+            current_p = current_start
+
+    intervals.append(Interval(current_start, current_p))
+            
+    return intervals
