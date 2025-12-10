@@ -426,10 +426,10 @@ convert_strand = {
 
 undo_convert_strand = reverse_dictionary(convert_strand)
 
-def powerset(iterable):
+def powerset(iterable, min_size=0):
     ''' Adapted from itertools documentation. '''
     as_list = list(iterable)
-    return chain.from_iterable(combinations(as_list, r) for r in range(len(as_list) + 1))
+    return chain.from_iterable(combinations(as_list, r) for r in range(min_size, len(as_list) + 1))
 
 def equivalence_classes(iterable, relation):
     eq_classes = []
