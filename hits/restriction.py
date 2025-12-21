@@ -143,15 +143,12 @@ class Enzyme:
         elif (((len(forward_matches), len(reverse_matches)) in {(1, 0), (0, 1)}) or
               (len(forward_matches) == 1 and len(reverse_matches) == 1 and forward_matches[0] == reverse_matches[0])
         ):
-            if len(forward_matches) == 0:
-                match = reverse_matches[0]
-            else:
-                match = forward_matches[0]
 
-            left_end = match + max(self.cut_offsets.values()) + 1
+            all_cut_afters = set.union(*self.cut_afters(seq).values())
+            left_end = max(all_cut_afters) + 1
             left_seq = seq[:left_end]
 
-            right_start = match + len(self.recognition_site) - 1 - max(self.cut_offsets.values())
+            right_start = min(all_cut_afters) + 1
             right_seq = seq[right_start:]
 
             middle_seq = ''
@@ -160,40 +157,6 @@ class Enzyme:
             raise ValueError('unexpected number of restriction sites')
 
         return left_seq, middle_seq, right_seq
-
-    def assemble(self, vector, oligo, digest_oligo=True):
-        left_vector, _, right_vector = self.digest(vector)
-
-        if digest_oligo:
-            _, middle_oligo, _ = self.digest(oligo)
-        else:
-            middle_oligo = oligo
-
-        if self.overhang_length > 0:
-            # Golden gate
-            if left_vector[-self.overhang_length:] != middle_oligo[:self.overhang_length]:
-                raise ValueError('incompatible overhang on left')
-
-            if middle_oligo[-self.overhang_length:] != right_vector[:self.overhang_length]:
-                raise ValueError('incompatible overhang on right')
-
-            assembled = left_vector[:-self.overhang_length] + middle_oligo + right_vector[self.overhang_length:]
-
-        else:
-            # Gibson
-            def find_HA_length(left, right):
-                matching_lengths = [HA_length for HA_length in range(10, min(len(left), len(right))) if left[-HA_length:] == right[:HA_length]]
-                if len(matching_lengths) == 0:
-                    raise ValueError
-                else:
-                    return max(matching_lengths)
-
-            left_HA = find_HA_length(left_vector, oligo)
-            right_HA = find_HA_length(oligo, right_vector)
-
-            assembled = left_vector[:-left_HA] + oligo + right_vector[right_HA:]
-
-        return assembled
 
 enzymes = {
     'BsmBI': Enzyme(
@@ -229,3 +192,14 @@ enzymes = {
         },
     ),
 }
+
+def enzyme_from_possible_string(possible_string):
+    if isinstance(possible_string, str):
+        enzyme = enzymes[possible_string]
+    else:
+        enzyme = possible_string
+
+    if not isinstance(enzyme, Enzyme):
+        raise ValueError(enzyme)
+
+    return enzyme

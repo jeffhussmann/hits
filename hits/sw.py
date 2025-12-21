@@ -941,7 +941,18 @@ def extend_repeatedly(initial_al,
 
     return extended
 
+def possibly_convert_primers_to_dictionary(primers):
+    if len(primers) != 2:
+        raise ValueError
+
+    if not isinstance(primers, dict):
+        primers = dict(zip(['left', 'right'], primers))
+
+    return primers
+
 def align_primers_to_sequence(primers, sequence_name, sequence):
+    primers = possibly_convert_primers_to_dictionary(primers)
+
     header = pysam.AlignmentHeader.from_references([sequence_name], [len(sequence)])
 
     mapper = SeedAndExtender(sequence, 10, header, sequence_name)
@@ -955,6 +966,8 @@ def align_primers_to_sequence(primers, sequence_name, sequence):
     return primer_alignments
 
 def amplify_oriented_sequence_with_primers(sequence, primers):
+    primers = possibly_convert_primers_to_dictionary(primers)
+
     primer_alignments = align_primers_to_sequence(primers, 'sequence', sequence) 
 
     if len(primer_alignments['left']) == 0:
@@ -983,6 +996,8 @@ def amplify_oriented_sequence_with_primers(sequence, primers):
     return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
 
 def amplify_sequence_with_primers(sequence, primers, both_orientations=False):
+    primers = possibly_convert_primers_to_dictionary(primers)
+
     try:
         product = amplify_oriented_sequence_with_primers(sequence, primers)
 

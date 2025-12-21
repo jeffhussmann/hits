@@ -149,11 +149,17 @@ def trim_by_local_alignment(adapter, seq):
 
     return trim_at
 
-def find_illumina_sequencing_primers_in_PCR_product(PCR_product):
+def find_illumina_sequencing_primers_in_PCR_product(PCR_product, custom_primers=None):
+    if custom_primers is None:
+        custom_primers = {}
+
     illumina_sequencing_primers = {
         which: {kind: primers[kind][which] for kind in ['truseq', 'nextera']}
         for which in ['R1', 'R2']
     }
+
+    for which, primer in custom_primers.items():
+        illumina_sequencing_primers[which]['custom'] = primer
     
     def find(which, sequence):
         locations = []
