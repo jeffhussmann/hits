@@ -50,10 +50,23 @@ def parse_fai(fai_file_name):
 
 def get_genome_index(genome_dir):
     fai_file_names = get_all_fai_file_names(genome_dir)
+
     entries = {}
+
     for fai_file_name in fai_file_names:
         entries.update(parse_fai(fai_file_name))
+
     return entries
+
+def get_header(genome_dir):
+    genome_index = get_genome_index(genome_dir)
+
+    names = sorted(genome_index)
+    lengths = [genome_index[name].length for name in names]
+
+    header = pysam.AlignmentHeader.from_references(names, lengths)
+
+    return header
 
 def build_base_lookup(genome_dir):
     ''' Returns a memoized function for looking up single bases from reference.
