@@ -4,12 +4,13 @@ import itertools
 import functools
 from collections import Counter
 
-import scipy.stats
-import seaborn as sns
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import pandas as pd
 import PIL
+import scipy.stats
+import seaborn as sns
 
 from .. import utilities
 from . import define_igv_colors
@@ -646,7 +647,7 @@ def make_stacked_Image(figs, orientation='vertical', dpi=None):
 
 def assign_categorical_colors(series, palette=None, sort=True):
     if palette is None:
-        palette = sns.color_palette()
+        palette = sns.color_palette().as_hex()
 
     values = series.unique()
 
@@ -657,6 +658,24 @@ def assign_categorical_colors(series, palette=None, sort=True):
     colors = series.map(value_to_color)
 
     return colors, value_to_color
+
+def add_categorical_colors_to_df(df, column):
+    if column in df.index.names:
+        s = df.index.get_level_values('perturbation_name').to_series()
+        
+        if isinstance(s.dtype, pd.CategoricalDtype):
+            s = s.astype(s.dtype.categories.dtype)
+
+        s.index = df.index
+
+    else:
+        s = df[column]
+
+    colors, value_to_color = assign_categorical_colors(s)
+
+    color_column_name = f'{column}_color'
+
+    df[color_column_name] = colors
 
 def draw_categorical_legend(value_to_color,
                             ax,

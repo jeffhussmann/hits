@@ -4,8 +4,6 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from matplotlib.pyplot import hist
-
 import numpy as np
 import scipy.cluster.hierarchy
 import bokeh
