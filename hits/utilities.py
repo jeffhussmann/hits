@@ -33,6 +33,8 @@ def complement(seq):
 def reverse_complement(seq):
     return complement(seq)[::-1]
 
+rc = reverse_complement
+
 base_order = 'ACGTN-'
 base_to_index = {b: i for i, b in enumerate(base_order)}
 base_to_complement_index = {b: i for i, b in enumerate(complement(base_order))}
