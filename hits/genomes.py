@@ -68,6 +68,14 @@ def get_header(genome_dir):
 
     return header
 
+def get_header_from_dictionary(genome):
+    names = sorted(genome)
+    lengths = [len(genome[name]) for name in names]
+
+    header = pysam.AlignmentHeader.from_references(names, lengths)
+
+    return header
+
 def build_base_lookup(genome_dir):
     ''' Returns a memoized function for looking up single bases from reference.
     '''
@@ -84,6 +92,7 @@ def build_base_lookup(genome_dir):
                 references[rname] = fasta_file.fetch(reference=rname)
 
         base = references[rname][position:position + 1]
+
         return base
 
     return base_lookup
@@ -109,6 +118,7 @@ def build_region_fetcher(genome_dir, load_references=False):
     }
 
     references = {}
+
     def lookup_loaded(seq_name, start, end):
         if seq_name not in references:
             references[seq_name] = seq_name_to_file[seq_name].fetch(seq_name)
@@ -141,14 +151,20 @@ def build_region_fetcher(genome_dir, load_references=False):
 
     return region_fetcher
 
-def load_entire_genome(genome_dir):
+def load_entire_genome(genome_dir, retain_case=False):
     seqs = {}
 
     fasta_file_names = get_all_fasta_file_names(genome_dir)
 
     for fasta_file_name in fasta_file_names:
         for record in Bio.SeqIO.parse(fasta_file_name, 'fasta'):
-            seqs[record.id] = str(record.seq)
+
+            seq = str(record.seq)
+
+            if not retain_case:
+                seq = seq.upper()
+
+            seqs[record.id] = seq
 
     return seqs
 

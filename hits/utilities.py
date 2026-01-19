@@ -409,6 +409,7 @@ def current_time_string():
     return f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}'
 
 def find_all_substring_starts(target_sequence, substring):
+    ''' Note: hits.sw.find_all_matches appears to be faster '''
     # lookahead necessary in the event of partially-overlapping matches
     return [match.start() for match in re.finditer(f'(?={substring})', target_sequence)]
 

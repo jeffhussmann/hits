@@ -5,7 +5,7 @@ import hits.utilities
 def gibson_assemble(PCR_template, PCR_primers, backbone, restriction_enzyme):
     restriction_enzyme = hits.restriction.enzyme_from_possible_string(restriction_enzyme)
 
-    PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers, both_orientations=True)
+    PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers)
 
     cut_afters = restriction_enzyme.cut_afters(backbone)
 

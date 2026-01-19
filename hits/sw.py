@@ -1,17 +1,21 @@
 import array
 import copy
+import logging
 import sys
 from collections import Counter, defaultdict
 
 import numpy as np
 import pysam
 
-from . import utilities
-from . import fastq
 from . import fasta
-from . import sam
+from . import fastq
+from . import genomes
 from . import interval
+from . import sam
+from . import utilities
 from .sw_cython import *
+
+logger = logging.getLogger(__name__)
 
 empty_alignment = {
     'score': -1e6,
@@ -710,18 +714,19 @@ def stitch_read_pair(R1, R2, before_R1='', before_R2='', indel_penalty=-5):
     return stitched
 
 class SeedAndExtender():
-    def __init__(self, target_seq_bytes, max_seed_length, header, target_name):
+    def __init__(self, target_seq_bytes, max_seed_length, header, target_name, min_seed_length=1):
         if not isinstance(target_seq_bytes, bytes):
             target_seq_bytes = target_seq_bytes.encode()
             
         self.target_seq_bytes = target_seq_bytes
+        self.min_seed_length = min_seed_length
         self.max_seed_length = max_seed_length
         self.header = header
         self.target_name = target_name
         
         seed_locations = defaultdict(set)
         
-        for k in range(1, max_seed_length + 1):
+        for k in range(min_seed_length, max_seed_length + 1):
             for start in range(len(target_seq_bytes) - k + 1):
                 k_mer = target_seq_bytes[start:start + k]
                 seed_locations[k_mer].add(start)
@@ -942,75 +947,132 @@ def extend_repeatedly(initial_al,
     return extended
 
 def possibly_convert_primers_to_dictionary(primers):
-    if len(primers) != 2:
-        raise ValueError
-
     if not isinstance(primers, dict):
+        if len(primers) != 2:
+            raise ValueError
+
         primers = dict(zip(['left', 'right'], primers))
 
     return primers
 
 def align_primers_to_sequence(primers, sequence_name, sequence):
+    ''' Can this be replaced by align_primers_to_genome? ''' 
+
     primers = possibly_convert_primers_to_dictionary(primers)
 
     header = pysam.AlignmentHeader.from_references([sequence_name], [len(sequence)])
 
-    mapper = SeedAndExtender(sequence, 10, header, sequence_name)
+    mapper = SeedAndExtender(sequence.upper(), 10, header, sequence_name, min_seed_length=10)
 
     primer_alignments = {}
+
     for primer_name, primer in primers.items():
-        primer_alignments[primer_name] = mapper.seed_and_extend(primer, len(primer) - 10, len(primer), primer_name)
-        if not primer_alignments[primer_name]:
-            raise ValueError(f'At least one primer from {primers} could not be located in {sequence_name}')
+        primer = primer.upper()
+
+        alignments = mapper.seed_and_extend(primer, len(primer) - 10, len(primer), primer_name)
+
+        if not alignments:
+            raise ValueError(f'{primer_name}: {primer} could not be located in {sequence_name}')
+
+        primer_alignments[primer_name] = [max(alignments, key=lambda al: al.query_alignment_length)]
         
     return primer_alignments
 
-def amplify_oriented_sequence_with_primers(sequence, primers):
-    primers = possibly_convert_primers_to_dictionary(primers)
+def identify_concordant_primer_alignment_pair(primer_alignments, max_length=10000):
+    ''' Find pairs of alignments that are on the same reference and point towards each other. '''
 
-    primer_alignments = align_primers_to_sequence(primers, 'sequence', sequence) 
+    def same_reference_name(first_al, second_al):
+        return first_al.reference_name == second_al.reference_name
 
-    if len(primer_alignments['left']) == 0:
-        raise ValueError
-
-    left_alignment = max(primer_alignments['left'], key=lambda al: al.query_alignment_length)
-
-    if sam.get_strand(left_alignment) != '+':
-        raise ValueError
-
-    after_left = left_alignment.reference_end
+    def in_correct_orientation(first_al, second_al):
+        ''' Check if first_al and second_al point towards each other on the same chromosome. '''
         
-    if len(primer_alignments['right']) == 0:
-        raise ValueError
-
-    right_alignment = max(primer_alignments['right'], key=lambda al: al.query_alignment_length)
+        if not same_reference_name(first_al, second_al):
+            return None
         
-    if sam.get_strand(right_alignment) != '-':
-        raise ValueError
-
-    right_start = right_alignment.reference_start
+        first_interval = interval.get_covered_on_ref(first_al)
+        second_interval = interval.get_covered_on_ref(second_al)
+        if interval.are_overlapping(first_interval, second_interval):
+            return None
         
-    if after_left >= right_start:
-        raise ValueError
-        
-    return primers['left'] + sequence[after_left:right_start] + utilities.reverse_complement(primers['right'])
+        left_al, right_al = sorted([first_al, second_al], key=lambda al: al.reference_start)
 
-def amplify_sequence_with_primers(sequence, primers, both_orientations=False):
-    primers = possibly_convert_primers_to_dictionary(primers)
-
-    try:
-        product = amplify_oriented_sequence_with_primers(sequence, primers)
-
-    except ValueError:
-        if both_orientations:
-            sequence = utilities.reverse_complement(sequence)
-            product = amplify_oriented_sequence_with_primers(sequence, primers)
+        if sam.get_strand(left_al) != '+' or sam.get_strand(right_al) != '-':
+            return None
         else:
-            raise ValueError
-    
-    return product
+            return left_al, right_al
 
-def find_all_matches(target_seq, query, case_sensitive=False):
+    def reference_extent(first_al, second_al):
+        if not same_reference_name(first_al, second_al):
+            return np.inf
+        else:
+            start = min(first_al.reference_start, second_al.reference_start)
+            end = max(first_al.reference_end, second_al.reference_end)
+
+            return end - start
+
+    correct_orientation_pairs = []
+    not_correct_orientation_pairs = []
+
+    first_name, second_name = sorted(primer_alignments)
+
+    for first_al in primer_alignments[first_name]:
+        for second_al in primer_alignments[second_name]:
+            if (oriented_pair := in_correct_orientation(first_al, second_al)) is not None:
+                correct_orientation_pairs.append(oriented_pair)
+
+            elif reference_extent(first_al, second_al) < max_length:
+                not_correct_orientation_pairs.append((first_al, second_al))
+                
+    if len(correct_orientation_pairs) == 0:
+        if len(not_correct_orientation_pairs) > 0:
+            for first_al, second_al in not_correct_orientation_pairs:
+                logger.warning(f'Found nearby primer alignments that don\'t point towards each other: {first_al.reference_name} {sam.get_strand(first_al)} {first_al.reference_start:,}-{first_al.reference_end:,}, {sam.get_strand(second_al)} {second_al.reference_start:,}-{second_al.reference_end:,}')
+
+        raise ValueError(f'Could not identify primer binding sites that point towards each other.')
+
+    # Rank pairs in the correct orientation by (shortest) amplicon length.
+
+    correct_orientation_pairs = sorted(correct_orientation_pairs, key=lambda pair: reference_extent(*pair))
+
+    if len(correct_orientation_pairs) > 1:
+        logger.warning(f'{len(correct_orientation_pairs)} concordant primer alignments found.')
+        for left_al, right_al in correct_orientation_pairs[:10]:
+            logger.warning(f'Found {reference_extent(left_al, right_al):,} nt amplicon on {left_al.reference_name} from {left_al.reference_start:,} to {right_al.reference_end - 1:,} with cigars {left_al.cigarstring}, {right_al.cigarstring}')
+
+        if len(correct_orientation_pairs) > 10:
+            logger.warning(f'... and {len(correct_orientation_pairs) - 10} more')
+
+    short_amplicons = [pair for pair in correct_orientation_pairs if reference_extent(*pair) <= 1000]
+    if len(short_amplicons) > 1:
+        logger.warning(f'{len(short_amplicons)} potential amplicons <= 1kb found. There is a risk the shortest amplicon may not be the intended target.')
+        
+    left_al, right_al = correct_orientation_pairs[0]
+
+    if reference_extent(left_al, right_al) > max_length:
+        logger.warning(f'Found {reference_extent(left_al, right_al):,} nt amplicon on {left_al.reference_name} from {left_al.reference_start:,} to {right_al.reference_end - 1:,}')
+        raise ValueError(f'Could not identify an amplicon shorter than {max_length}.')
+
+    return left_al, right_al
+
+def amplify_sequence_with_primers(sequence, primers):
+    primers = possibly_convert_primers_to_dictionary(primers)
+
+    primer_alignments = align_primers_to_sequence(primers, 'sequence', sequence)
+
+    left_al, right_al = identify_concordant_primer_alignment_pair(primer_alignments)
+
+    after_left = left_al.reference_end
+        
+    right_start = right_al.reference_start
+
+    left_primer = left_al.query_sequence
+    # right_al is guaranteed to be rc'ed
+    right_primer_rc = right_al.query_sequence
+        
+    return left_primer + sequence[after_left:right_start] + right_primer_rc
+
+def find_all_matches(target_seq, query, case_sensitive=True):
     if not case_sensitive:
         target_seq = target_seq.upper()
         query = query.upper()
@@ -1056,11 +1118,13 @@ def find_all_matches_in_genome(seq, genome, verbose=False):
     return matches
 
 def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
+    ''' Note: genome should be all upper '''
+
+    header = genomes.get_header_from_dictionary(genome)
+
     def find_alignments_of_query_suffix_to_large_target(target_seq, target_name, query_seq, query_name, suffix_length):
         if not isinstance(target_seq, bytes) or not isinstance(query_seq, bytes):
             raise TypeError
-
-        header = pysam.AlignmentHeader.from_references([target_name], [len(target_seq)])
 
         als = []
 
@@ -1068,7 +1132,14 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
 
         soft_clipped = len(query_seq) - len(query_suffix)
 
-        for reverse in [False, True]:
+        matches = find_all_matches(target_seq, query_suffix)
+
+        if verbose:
+            print(f'{len(matches)} matches')
+
+        for strand, position in matches:
+            reverse = (strand == '-')
+
             if reverse:
                 possibly_RCed_query_suffix = utilities.reverse_complement(query_suffix)
                 possibly_RCed_query_seq = utilities.reverse_complement(query_seq)
@@ -1076,38 +1147,32 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
                 possibly_RCed_query_suffix = query_suffix
                 possibly_RCed_query_seq = query_seq
 
-            matches = find_all_matches(target_seq, possibly_RCed_query_suffix)
+            al = pysam.AlignedSegment(header)
 
-            if verbose:
-                print(f'{len(matches)} matches')
-            for match in matches:
+            match_block = (sam.BAM_CMATCH, len(possibly_RCed_query_suffix))
 
-                al = pysam.AlignedSegment(header)
+            if soft_clipped > 0:
+                soft_clipped_block = (sam.BAM_CSOFT_CLIP, soft_clipped)
+                cigar_blocks = [soft_clipped_block, match_block]
+            else:
+                cigar_blocks = [match_block]
 
-                match_block = (sam.BAM_CMATCH, len(possibly_RCed_query_suffix))
+            if reverse:
+                cigar_blocks = cigar_blocks[::-1]
 
-                if soft_clipped > 0:
-                    soft_clipped_block = (sam.BAM_CSOFT_CLIP, soft_clipped)
-                    cigar_blocks = [soft_clipped_block, match_block]
-                else:
-                    cigar_blocks = [match_block]
+            al.cigartuples = cigar_blocks
 
-                if reverse:
-                    cigar_blocks = cigar_blocks[::-1]
+            al.is_reverse = reverse
+            al.is_unmapped = False
+            al.reference_name = target_name
+            al.query_sequence = possibly_RCed_query_seq
+            al.query_qualities = [41] * len(possibly_RCed_query_seq)
+            al.query_name = query_name
+            al.reference_start = position
 
-                al.cigartuples = cigar_blocks
+            al = extend_alignment(al, target_seq)
 
-                al.is_reverse = reverse
-                al.is_unmapped = False
-                al.reference_name = target_name
-                al.query_sequence = possibly_RCed_query_seq
-                al.query_qualities = [41] * len(possibly_RCed_query_seq)
-                al.query_name = query_name
-                al.reference_start = match
-
-                al = extend_alignment(al, target_seq)
-
-                als.append(al)
+            als.append(al)
 
         return als
 
@@ -1120,7 +1185,7 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
         ref_seq_bytes = ref_seq.upper().encode()
 
         for primer_name, primer_seq in primers.items():
-            primer_seq_bytes = primer_seq.encode()
+            primer_seq_bytes = primer_seq.upper().encode()
             
             als = find_alignments_of_query_suffix_to_large_target(ref_seq_bytes, ref_name, primer_seq_bytes, primer_name, suffix_length)
             
@@ -1129,7 +1194,6 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
     return primer_alignments
 
 def find_primer_prefix_ignoring_Ns(read_seq, primer_prefix):
-    read_prefix = read_seq[:len(primer_prefix) + 6]
     mismatches = mismatches_at_offset(primer_prefix.encode(), read_seq.encode())
 
     indices_of_zeros = np.where(mismatches == 0)[0]
