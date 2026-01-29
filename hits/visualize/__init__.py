@@ -100,6 +100,7 @@ def enhanced_scatter(xs, ys,
                      hist_range=None,
                      hist_alpha=0.2,
                      hist_size_ratio=0.1,
+                     hist_offset=0,
                      hist_colors=None,
                      hist_share_max=True,
                      marker_size=4,
@@ -300,9 +301,10 @@ def enhanced_scatter(xs, ys,
         if hists_location == 'inside':
             bottom = ax_position.y0
             left = ax_position.x0
+
         elif hists_location == 'outside':
-            bottom = ax_position.y1
-            left = ax_position.x1
+            bottom = ax_position.y1 + ax_position.height * hist_offset
+            left = ax_position.x1 + ax_position.width * hist_offset
         
         common_kwargs = {
             'alpha': hist_alpha,
