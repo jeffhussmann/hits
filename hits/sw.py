@@ -1104,12 +1104,11 @@ def find_all_matches(target_seq, query, case_sensitive=True):
 
     return all_matches
 
-def find_all_matches_in_genome(seq, genome, verbose=False):
+def find_all_matches_in_genome(seq, genome):
     matches = []
 
     for ref_name, ref_seq in genome.items():
-        if verbose:
-            print(f'Searching {ref_name} ({len(ref_seq):,})')
+        logger.info(f'Searching {ref_name} ({len(ref_seq):,})')
 
         ref_matches = find_all_matches(ref_seq, seq)
 
@@ -1117,7 +1116,7 @@ def find_all_matches_in_genome(seq, genome, verbose=False):
 
     return matches
 
-def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
+def align_primers_to_genome(primers, genome, suffix_length):
     ''' Note: genome should be all upper '''
 
     header = genomes.get_header_from_dictionary(genome)
@@ -1133,9 +1132,6 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
         soft_clipped = len(query_seq) - len(query_suffix)
 
         matches = find_all_matches(target_seq, query_suffix)
-
-        if verbose:
-            print(f'{len(matches)} matches')
 
         for strand, position in matches:
             reverse = (strand == '-')
@@ -1179,9 +1175,6 @@ def align_primers_to_genome(primers, genome, suffix_length, verbose=False):
     primer_alignments = {primer_name: [] for primer_name in primers}
     
     for ref_name, ref_seq in genome.items():
-        if verbose:
-            print(f'Searching {ref_name} ({len(ref_seq):,})')
- 
         ref_seq_bytes = ref_seq.upper().encode()
 
         for primer_name, primer_seq in primers.items():
