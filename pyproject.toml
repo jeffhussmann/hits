@@ -16,7 +16,7 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 dynamic = ["version"]
-requires-python = ">= 3.8"
+requires-python = ">= 3.12"
 dependencies = [
     "biopython>=1.72",
     "bokeh>=3.2",
