@@ -663,7 +663,7 @@ def assign_categorical_colors(series, palette=None, sort=True):
 
 def add_categorical_colors_to_df(df, column):
     if column in df.index.names:
-        s = df.index.get_level_values('perturbation_name').to_series()
+        s = df.index.get_level_values(column).to_series()
         
         if isinstance(s.dtype, pd.CategoricalDtype):
             s = s.astype(s.dtype.categories.dtype)
@@ -735,6 +735,7 @@ def draw_categorical_legend(value_to_color,
             color = 'black'
         else:
             color = value_to_color[category]
+
         ax.annotate(aliases.get(category, category),
                     xy=xy,
                     xycoords='axes fraction',
