@@ -38,6 +38,15 @@ dependencies = [
 Repository = "https://github.com/jeffhussmann/hits.git"
 
 [tool.setuptools]
+packages = [
+    'hits',
+    'hits.parallel',
+    'hits.test',
+    'hits.serialize',
+    'hits.visualize',
+    'hits.visualize.interactive',
+]
+
 ext-modules = [
     {name = "hits.adapters_cython", sources = ["hits/adapters_cython.pyx"]},
     {name = "hits.fastq_cython", sources = ["hits/fastq_cython.pyx"]},
