@@ -2,7 +2,6 @@
 
 import contextlib
 import copy
-import gzip
 import functools
 import heapq
 import os
@@ -790,17 +789,12 @@ def convert_bam_to_fastq(bam_fn, fastq_fn):
     bam_fn = Path(bam_fn)
     fastq_fn = Path(fastq_fn)
 
-    if fastq_fn.name.endswith('gz'):
-        writer = gzip.open(fastq_fn, 'wt', compresslevel=1)
-    else:
-        writer = open(fastq_fn, 'w')
-
     names_written = set()
 
-    with writer:
+    with fastq.Writer(fastq_fn) as fh:
         for read in bam_to_fastq(bam_fn):
             if read.name not in names_written:
-                writer.write(str(read))
+                fh.write(read)
                 names_written.add(read.name)
 
 class AlignmentSorter:

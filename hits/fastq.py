@@ -574,3 +574,22 @@ class ExternalSorter:
         with gzip.open(self.sorted_fn, 'wt', compresslevel=1) as fh:
             for read in self.merge_sorted_chunks():
                 fh.write(str(read))
+
+class Writer:
+    def __init__(self, output_file_name):
+        self.output_file_name = Path(output_file_name)
+
+        if self.output_file_name.suffix == '.gz':
+            self.writer = gzip.open(self.output_file_name, 'wt', compresslevel=1)
+        else:
+            self.writer = open(self.output_file_name, 'w')
+
+    def __enter__(self):
+        self.writer.__enter__()
+        return self
+
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.writer.close()
+
+    def write(self, read):
+        self.writer.write(str(read))
