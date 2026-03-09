@@ -15,7 +15,7 @@ import numpy as np
 
 from . import utilities
 from .fastq_cython import *
-from .utilities import identity, base_order, group_by
+from .utilities import base_order, group_by, identity, memoized_property
 
 # SANGER_OFFSET = 33 is imported from fastq_cython
 SOLEXA_OFFSET = 64
@@ -224,19 +224,19 @@ class Read(object):
     def qname(self):
         return self.name
     
-    @utilities.memoized_property
+    @memoized_property
     def query_qualities(self):
         return array.array('B', decode_sanger(self.qual))
 
-    @utilities.memoized_property
+    @memoized_property
     def Q30_fraction(self):
         return np.mean(np.array(self.query_qualities) >= 30)
 
-    @utilities.memoized_property
+    @memoized_property
     def Q93_fraction(self):
         return np.mean(np.array(self.query_qualities) == 93)
 
-    @utilities.memoized_property
+    @memoized_property
     def mean_Q(self):
         return np.mean(self.query_qualities)
     
@@ -300,6 +300,7 @@ def detect_structure(line_groups):
         first_read = line_group_to_read(first_group)
         name_standardizer = get_read_name_standardizer(first_read.name)
         line_groups = chain([first_group], line_groups)
+
     except StopIteration:
         name_standardizer = identity
         # Note: line_groups is now an empty iterator.
@@ -368,105 +369,70 @@ def read_quartets(fns, **kwargs):
 
     return (Quartet(*reads) for reads in zip(*all_reads))
 
-def get_read_name_parser(read_name):
+def get_read_name_standardizer(read_name):
+    split_on_whitespace = read_name.split()
+
     if read_name.startswith('test') or read_name.startswith('simulated'):
         # Simulated data sometimes needs read names to contain information
         # and can't use standard Illumina-formatted read names.
         parser = None
 
-    elif read_name.endswith('/ccs'):
+    elif split_on_whitespace[0].endswith('/ccs'):
         parser = parse_CCS_read_name
 
     elif read_name.startswith('SRR'):
-        if len(read_name.split('.')) == 2:
+        split_on_period = read_name.split('.')
+
+        if len(split_on_period) == 2:
             parser = parse_SRA_read_name
-        elif len(read_name.split('.')) == 3:
+
+        elif len(split_on_period) == 3:
             parser = parse_paired_SRA_read_name
 
     elif read_name.startswith('ERR') or read_name.startswith('DRR'):
         parser = parse_ERR_read_name
 
     else:
-        num_words = len(read_name.split())
+        num_words = len(split_on_whitespace)
 
         if num_words > 1:
-            location_info, member_info = read_name.split()[:2]
-            fields = location_info.split(':')
+            fields = split_on_whitespace[0].split(':')
 
             if len(fields) == 8 and any(b in fields[-1] for b in 'TCAG'):
                 parser = parse_illumina_read_name_with_UMI
+
             else:
                 parser = parse_new_illumina_read_name
 
         elif num_words == 1:
             if '#' in read_name:
                 parser = parse_old_illumina_read_name
+
             elif '/' in read_name:
                 parser = parse_unindexed_old_illumina_read_name
+
             else:
                 parser = parse_standardized_name
 
         else:
             raise ValueError(f'read name format not recognized - {read_name}')
 
-    return parser
-
-def get_read_name_standardizer(read_name):
-    ''' Looks at structure of read_name to determine the appropriate read name
-        standardizer.
-    '''
-    parser = get_read_name_parser(read_name)
-
-    if parser == parse_SRA_read_name or parser == parse_ERR_read_name:
-        standardize = templates['SRA'].format
-        def standardizer(read_name):
-            accession, number = parser(read_name)
-            standardized = standardize(accession, number)
-            return standardized
-            
-    elif parser == parse_paired_SRA_read_name:
-        standardize = templates['paired_SRA'].format
-        def standardizer(read_name):
-            accession, number, member = parser(read_name)
-            standardized = standardize(accession, number, member)
-            return standardized
-
-    elif parser == parse_illumina_read_name_with_UMI:
-        standardize = templates['UMI'].format
-        def standardizer(read_name):
-            lane, tile, x, y, member, index, UMI = parser(read_name)
-            standardized = standardize(lane, tile, x, y, UMI)
-            return standardized
-
-    elif parser == parse_CCS_read_name:
-        standardize = templates['CCS'].format
-        def standardizer(read_name):
-            movie, hole = parser(read_name)
-            standardized = standardize(movie, hole)
-            return standardized
-
-    elif parser is not None:
-        standardize = templates['default'].format
-        def standardizer(read_name):
-            lane, tile, x, y, member, index = parser(read_name)
-            standardized = standardize(lane, tile, x, y)
-            return standardized
-
-    else:
+    if parser is None:
         standardizer = identity
+    else:
+        def standardizer(read_name):
+            template_name, fields = parser(read_name)
+            return templates[template_name].format(**fields)
 
     return standardizer
 
-def standardize(template, *args):
-    return templates[template].format(*args)
-
 templates = {
-    'default': '{0:0>2.2s}:{1:0>5.5s}:{2:0>6.6s}:{3:0>6.6s}',
-    'SRA': '{0:0>9.9s}:{1:0>10.10s}',
-    'paired_SRA': '{0:0>9.9s}:{1:0>10.10s}:{2:0>1.1s}',
-    'CCS': '{0}/{1:0>12.10s}/ccs',
+    'default': '{lane:0>2.2s}:{tile:0>5.5s}:{x:0>6.6s}:{y:0>6.6s}',
+    'SRA': '{accession:0>9.9s}:{number:0>10.10s}',
+    'paired_SRA': '{accession:0>9.9s}:{number:0>10.10s}:{member:0>1.1s}',
+    'CCS': '{movie}/{hole:0>12.10s}/ccs',
 }
-templates['UMI'] = templates['default'] + ':{4}'
+templates['UMI'] = templates['default'] + ':{UMI}'
 
 def parse_illumina_read_name_with_UMI(read_name):
     location_info, member_info = read_name.split()[:2]
@@ -482,53 +448,47 @@ def parse_illumina_read_name_with_UMI(read_name):
 
     member, _, _, index = member_info.split(':')
     
-    return lane, tile, x, y, member, index, UMI
+    return 'default', locals()
 
 def parse_new_illumina_read_name(read_name):
     location_info, member_info = read_name.split()[:2]
-
     lane, tile, x, y = location_info.split(':')[-4:]
-
     member, _, _, index = member_info.split(':')
-    
-    return lane, tile, x, y, member, index
+    return 'default', locals()
 
 def parse_old_illumina_read_name(read_name):
     location_info, member_info = read_name.split('#')
     lane, tile, x, y = location_info.split(':')[-4:]
     index, member = member_info.split('/')
-    return lane, tile, x, y, member, index
+    return 'default', locals()
 
 def parse_unindexed_old_illumina_read_name(read_name):
     location_info, member = read_name.split('/')
     lane, tile, x, y = location_info.split(':')[-4:]
-    return lane, tile, x, y, member, ''
+    return 'default', locals()
 
 def parse_standardized_name(read_name):
     lane, tile, x, y, member = read_name.split(':')
-    return lane, tile, x, y, member, ''
+    return 'default', locals()
 
 def parse_CCS_read_name(read_name):
     movie, hole, _ = read_name.split('/') 
-    return movie, hole
+    return 'CCS', locals()
 
 def parse_SRA_read_name(read_name):
     accession, number = read_name.split()[0].split('.')
-    # Remove the leading 'SRR'
-    accession = accession[3:]
-    return accession, number
+    accession = accession[3:] # Remove the leading 'SRR'
+    return 'SRA', locals()
 
 def parse_paired_SRA_read_name(read_name):
     accession, number, member = read_name.split('.')
-    # Remove the leading 'SRR'
-    accession = accession[3:]
-    return accession, number, member
+    accession = accession[3:] # Remove the leading 'SRR'
+    return 'paired_SRA', locals()
 
 def parse_ERR_read_name(read_name):
     accession, number = read_name.split()[0].split('.')
-    # Remove the leading 'SRR'
-    accession = accession[3:]
-    return accession, number
+    accession = accession[3:] # Remove the leading 'SRR'
+    return 'SRA', locals()
 
 def coordinates_from_standardized(standardized):
     coordinates = standardized.split(':')[:-1]
