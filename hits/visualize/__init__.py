@@ -178,8 +178,9 @@ def enhanced_scatter(xs, ys,
     kwargs.setdefault('linewidths', (0,))
 
     scatter = ax.scatter(xs, ys, c=colors, **kwargs)
-    ax.set_xlabel(x_label, size=16)
-    ax.set_ylabel(y_label, size=16)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+
     fig = ax.figure
     ax_position = ax.get_position()
 
