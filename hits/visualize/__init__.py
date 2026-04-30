@@ -688,6 +688,7 @@ def draw_categorical_legend(value_to_color,
                             manual_xy=None,
                             aliases=None,
                             title=None,
+                            values_to_emphasize=None,
                            ):
 
     if legend_location == 'upper left':
@@ -716,7 +717,7 @@ def draw_categorical_legend(value_to_color,
         ha = 'left'
     elif legend_location == 'middle':
         xy = (0.5, 0.5)
-        va = 'center'
+        va = 'bottom'
         ha = 'center'
 
     if manual_xy is not None:
@@ -737,15 +738,33 @@ def draw_categorical_legend(value_to_color,
         else:
             color = value_to_color[category]
 
+        if title != None and i == 0:
+            weight = 'bold'
+            alpha = 1
+
+        elif values_to_emphasize is not None:
+            if category in values_to_emphasize:
+                weight = 'bold'
+                alpha = 1
+            else:
+                weight = 'normal'
+                alpha = 0.5
+
+        else:
+            weight = 'normal'
+            alpha = 1
+
         ax.annotate(aliases.get(category, category),
                     xy=xy,
                     xycoords='axes fraction',
-                    xytext=(0, -(font_size + 3) * i),
+                    xytext=(0, -(font_size * 1.3) * i),
                     textcoords='offset points',
                     color=color,
                     va=va,
                     ha=ha,
                     size=font_size,
+                    weight=weight,
+                    alpha=alpha,
                    )
 
 def add_y_axis_inset_zoom_ax(main_ax, inset_y_lim, location='right'):
