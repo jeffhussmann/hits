@@ -884,6 +884,28 @@ class multiple_AlignmentSorters(contextlib.ExitStack):
 
         self.sorters[name] = AlignmentSorter(fn, header, self.by_name)
 
+def perfectly_matching_AlignedSegment(header, ref_name, position, strand, seq, name='query', qual=None):
+    al = pysam.AlignedSegment(header)
+                    
+    al.query_name = name
+    al.reference_name = ref_name
+    al.reference_start = position
+    al.is_reverse = (strand == '-')
+    
+    possibly_RCed_seq = seq
+    if al.is_reverse:
+        possibly_RCed_seq = utilities.reverse_complement(seq)
+    
+    al.query_sequence = possibly_RCed_seq
+
+    if qual is None:
+        qual = [41] * len(possibly_RCed_seq)
+    al.query_qualities = qual
+
+    al.cigar = [(BAM_CMATCH, len(possibly_RCed_seq))]
+
+    return al
+
 class AlignedSegmentByName(object):
     def __init__(self, aligned_segment):
         self.aligned_segment = aligned_segment
