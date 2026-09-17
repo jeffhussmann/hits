@@ -489,7 +489,7 @@ def print_diagnostic(R1, R2, before_R1, before_R2, alignment, fh=sys.stdout):
 def align_read(read,
                targets,
                min_path_length,
-               header,
+               header=None,
                min_score_ratio=0.8,
                max_alignments_per_target=1,
                both_directions=True,
@@ -502,6 +502,11 @@ def align_read(read,
 
     if ref_intervals is None:
         ref_intervals = {}
+
+    if header is None:
+        names = [name for name, seq in targets]
+        lengths = [len(seq) for name, seq in targets]
+        header = pysam.AlignmentHeader.from_references(names, lengths)
 
     for target_name, target_seq in targets:
         if target_name not in ref_intervals:
@@ -735,6 +740,7 @@ class SeedAndExtender():
 
     def seed_and_extend(self, query_seq_bytes, true_query_start, true_query_end, query_name):
         ''' true_query_end should point one past the end of the seed '''
+
         if not isinstance(query_seq_bytes, bytes):
             query_seq_bytes = query_seq_bytes.encode()
 
@@ -748,6 +754,7 @@ class SeedAndExtender():
             initial_true_query_end = true_query_end
 
         als = []
+
         for is_reverse in [True, False]:
             if is_reverse:
                 seed_query_start = len(query_seq_bytes) - true_query_end
@@ -972,7 +979,7 @@ def align_primers_to_sequence(primers, sequence_name, sequence):
         alignments = mapper.seed_and_extend(primer, len(primer) - 10, len(primer), primer_name)
 
         if not alignments:
-            raise ValueError(f'{primer_name}: {primer} could not be located in {sequence_name}')
+            raise ValueError(f'{primer_name}: {primer} could not be located in {sequence_name}: {sequence}')
 
         primer_alignments[primer_name] = [max(alignments, key=lambda al: al.query_alignment_length)]
         
