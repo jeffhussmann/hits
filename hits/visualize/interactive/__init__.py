@@ -649,10 +649,14 @@ def scatter(df=None,
     
     hover = bokeh.models.HoverTool(renderers=[scatter])
     hover.tooltips = [
-        (df.index.name, '@{{{0}}}'.format(df.index.name)),
+        (df.index.name, f'@{{{df.index.name}}}'),
     ]
     for key in hover_keys:
-        hover.tooltips.append((key, '@{{{0}}}'.format(key)))
+        hover.tooltips.append((key, f'@{{{key}}}'))
+
+    for col in df.columns:
+        hover.tooltips.append((col, f'@{{{col}}}'))
+
     fig.add_tools(hover)
 
     # Set up the table.
@@ -1446,7 +1450,7 @@ def parallel_coordinates(df=None,
         # To accomodate optional injections, return the whole match if not registered.
         return injections.get(match.group(1), match.group(0))
 
-    template_with_data = re.sub("\/\*INJECT:(.*)\*\/", match_to_injection, html_template)
+    template_with_data = re.sub(r"\/\*INJECT:(.*)\*\/", match_to_injection, html_template)
     # Could probably find both /* and <-- in the same regex...
     template_with_data = re.sub("<!--*INJECT:(.*)-->", match_to_injection, template_with_data)
     
