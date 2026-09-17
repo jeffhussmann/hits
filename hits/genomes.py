@@ -1,19 +1,33 @@
-import glob
 import os
+
 from collections import namedtuple
+from pathlib import Path
 
 import pysam
 import Bio.SeqIO
 
 def get_all_fasta_file_names(genome_dir):
-    fasta_file_names = [
-        fn for fn in glob.glob('{0}/*.fa*'.format(genome_dir))
-        if not fn.endswith('.fai') and not 'fastq' in fn
+    genome_dir = Path(genome_dir)
+
+    fasta_extensions = [
+        '.fa',
+        '.fasta',
+        '.fna',
     ]
+
+    fasta_file_names = [
+        str(fn)
+        for extension in fasta_extensions
+        for fn in genome_dir.glob(f'*{extension}')
+    ]
+
     return fasta_file_names
 
 def get_all_fai_file_names(genome_dir):
-    fai_file_names = [fn for fn in glob.glob('{0}/*.fai'.format(genome_dir))]
+    genome_dir = Path(genome_dir)
+
+    fai_file_names = [fn for fn in genome_dir.glob('*.fai')]
+
     return fai_file_names
 
 def make_fais(genome_dir):
