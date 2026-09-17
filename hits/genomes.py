@@ -157,14 +157,15 @@ def load_entire_genome(genome_dir, retain_case=False):
     fasta_file_names = get_all_fasta_file_names(genome_dir)
 
     for fasta_file_name in fasta_file_names:
-        for record in Bio.SeqIO.parse(fasta_file_name, 'fasta'):
+        with open(fasta_file_name) as fasta_file:
+            for record in Bio.SeqIO.parse(fasta_file, 'fasta'):
 
-            seq = str(record.seq)
+                seq = str(record.seq)
 
-            if not retain_case:
-                seq = seq.upper()
+                if not retain_case:
+                    seq = seq.upper()
 
-            seqs[record.id] = seq
+                seqs[record.id] = seq
 
     return seqs
 

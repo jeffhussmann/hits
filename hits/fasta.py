@@ -44,8 +44,9 @@ def records(file_name):
     else:
         format = 'fasta'
 
-    for record in Bio.SeqIO.parse(file_name, format):
-        yield Record(record.name, str(record.seq).upper())
+    with open(file_name) as fh:
+        for record in Bio.SeqIO.parse(fh, format):
+            yield Record(record.name, str(record.seq).upper())
 
 Read = Record # for backwards compatibility
 reads = records
