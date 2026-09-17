@@ -164,7 +164,7 @@ def enhanced_scatter(xs, ys,
         else:
             #colors = np.asarray(colors)
             pass
-    
+
     if same_lists:
         do_fit = False
 
@@ -398,12 +398,15 @@ def label_scatter_plot(ax, xs, ys, labels,
             else:
                 color = [color]*len(xs)
 
-        if isinstance(labels, list):
+        if isinstance(labels, (list, pd.Series)):
             pass
+
         elif labels in data:
             labels = data[labels]
+
         elif labels == data.index.name:
             labels = data.index
+
         else:
             raise IndexError
 
@@ -413,59 +416,71 @@ def label_scatter_plot(ax, xs, ys, labels,
             y_offset = -np.sign(x * slope - y) * distance
             ha = 'center'
             va = 'top' if y_offset < 0 else 'bottom'
+
         elif vector == 'upper left':
             x_offset = -distance
             y_offset = distance
             ha = 'center'
             va = 'bottom'
+
         elif vector == 'lower left':
             x_offset = -distance
             y_offset = -distance
             ha = 'center'
             va = 'top'
+
         elif vector == 'lower right':
             x_offset = distance
             y_offset = -distance
             ha = 'center'
             va = 'top'
+
         elif vector == 'upper right':
             x_offset = distance
             y_offset = distance
             ha = 'center'
             va = 'bottom'
+
         elif vector == 'radial':
             norm = np.linalg.norm([x, y])
             x_offset = x * distance / norm
             y_offset = y * distance / norm
             ha = 'center'
             va = 'top' if y_offset < 0 else 'bottom'
+
         elif vector == 'above':
             x_offset = 0
             y_offset = distance
             ha = 'center'
             va = 'bottom'
+
         elif vector == 'below':
             x_offset = 0
             y_offset = -distance
             ha = 'center'
             va = 'top'
+
         elif vector == 'sideways':
             x_offset = distance
             y_offset = 0
             ha, va = 'left', 'center'
+
         elif vector == 'right':
             x_offset = distance
             y_offset = 0
             ha, va = 'left', 'center'
+
         elif vector == 'left':
             x_offset = -distance
             y_offset = 0
             ha, va = 'right', 'center'
+
         elif vector == 'manual':
             x_ratio, y_ratio = manual_ratios
             ha, va = manual_alignments
             x_offset = distance * x_ratio
             y_offset = distance * y_ratio
+
         else:
             raise ValueError(vector)
 
