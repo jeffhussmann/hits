@@ -150,16 +150,21 @@ def build_region_fetcher(genome_dir, load_references=False):
         lookup = lookup_unloaded
 
     def region_fetcher(seq_name, start, end):
-        if end < 0:
+        if end is not None and end < 0:
             return '-'*(end - start)
-        if start < 0:
+
+        if start is not None and start < 0:
             left_pad = '-'*(-start)
             start = 0
         else:
             left_pad = ''
 
         region = lookup(seq_name, start, end)
-        right_pad = '-'*((end - start) - len(region))
+
+        if start is not None and end is not None:
+            right_pad = '-'*((end - start) - len(region))
+        else:
+            right_pad = ''
 
         return left_pad + region + right_pad
 
