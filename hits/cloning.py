@@ -2,15 +2,18 @@ import hits.sw
 import hits.restriction
 import hits.utilities
 
-def gibson_assemble(PCR_template, PCR_primers, backbone, restriction_enzyme):
-    restriction_enzyme = hits.restriction.enzyme_from_possible_string(restriction_enzyme)
+def gibson_assemble(PCR_template, PCR_primers, backbone, restriction_enzymes):
+    if isinstance(restriction_enzymes, str):
+        restriction_enzymes = [restriction_enzymes]
+
+    restriction_enzymes = list(map(hits.restriction.enzyme_from_possible_string, restriction_enzymes))
 
     PCR_product = hits.sw.amplify_sequence_with_primers(PCR_template, PCR_primers)
 
-    cut_afters = restriction_enzyme.cut_afters(backbone)
+    cut_afters = [enzyme.cut_afters(backbone) for enzyme in restriction_enzymes]
 
     # for leftmost, go up to cut on top strand.
-    last_three_prime_on_left = min(cut_afters['+'])
+    last_three_prime_on_left = min(min(cut_after['+']) for cut_after in cut_afters)
     left_backbone = backbone[:last_three_prime_on_left + 1]
 
     # find last place in left that 15mer prefix of insert matches
@@ -24,7 +27,7 @@ def gibson_assemble(PCR_template, PCR_primers, backbone, restriction_enzyme):
         raise ValueError('homology arm doesn\'t match')
     
     # for rightmost, go from cut on bottom strand
-    first_three_prime_on_right = max(cut_afters['-']) + 1
+    first_three_prime_on_right = max(max(cut_after['-']) for cut_after in cut_afters) + 1
     right_backbone = backbone[first_three_prime_on_right:]
 
     # find first place in right that 15mer suffix of insert matches

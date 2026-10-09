@@ -1,3 +1,4 @@
+import Bio.SeqUtils
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 import hits.utilities
@@ -6,16 +7,28 @@ class Enzyme:
     def __init__(self, name, recognition_site, cut_offsets):
         self.name = name
         self.recognition_site = recognition_site
+        self.recognition_site_rc = hits.utilities.reverse_complement(self.recognition_site)
         self.cut_offsets = cut_offsets
 
         self.overhang = self.cut_offsets['+'] - self.cut_offsets['-']
         self.overhang_length = abs(self.overhang)
 
     def forward_matches(self, seq):
-        return hits.utilities.find_all_substring_starts(seq.upper(), self.recognition_site)
+        # Any reason not to always use nt_search?
+        if 'N' in self.recognition_site_rc:
+            _, *positions = Bio.SeqUtils.nt_search(seq.upper(), self.recognition_site)
+        else:
+            positions = hits.utilities.find_all_substring_starts(seq.upper(), self.recognition_site)
+
+        return positions
 
     def reverse_matches(self, seq):
-        return hits.utilities.find_all_substring_starts(seq.upper(), hits.utilities.reverse_complement(self.recognition_site))
+        if 'N' in self.recognition_site_rc:
+            _, *positions = Bio.SeqUtils.nt_search(seq.upper(), self.recognition_site_rc)
+        else:
+            positions = hits.utilities.find_all_substring_starts(seq.upper(), self.recognition_site_rc)
+
+        return positions
 
     def total_matches(self, seq):
         return len(self.forward_matches(seq)) + len(self.reverse_matches(seq))
@@ -189,6 +202,22 @@ enzymes = {
         {
             '+': 7,
             '-': 11,
+        },
+    ),
+    'BstXI': Enzyme(
+        'BstXI',
+        'CCANNNNNNTGG',
+        {
+            '+': 7,
+            '-': 3,
+        },
+    ),
+    'BamHI': Enzyme(
+        'BamHI',
+        'GGATCC',
+        {
+            '+': 0,
+            '-': 4,
         },
     ),
 }
