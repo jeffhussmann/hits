@@ -1625,6 +1625,7 @@ def split_at_deletions(alignment, min_length, exempt_if_overlaps=None):
     
         for i in range(len(split_at) - 1):
             query_bases_before, _, ref_start = tuples[split_at[i] + 1]
+
             if split_at[i + 1] == len(alignment.cigar):
                 query_bases_after = 0
             else:
@@ -1641,6 +1642,18 @@ def split_at_deletions(alignment, min_length, exempt_if_overlaps=None):
             split_al = copy.deepcopy(alignment)
             split_al.cigar = new_cigar
             split_al.reference_start = ref_start
+
+            if alignment.has_tag('MD'):
+                MD = alignment.get_tag('MD')
+
+                total_ref_nucs = total_reference_nucs_except_splicing(alignment.cigar)
+                removed_from_start = total_reference_nucs_except_splicing(alignment.cigar[:split_at[i] + 1])
+                removed_from_end = total_reference_nucs_except_splicing(alignment.cigar[split_at[i + 1]:])
+
+                MD = truncate_md_string_up_to(MD, total_ref_nucs - removed_from_end)
+                MD = truncate_md_string_from_beginning(MD, total_ref_nucs - removed_from_end - removed_from_start)
+
+                split_al.set_tag('MD', MD)
             
             split_alignments.append(split_al)
 
