@@ -411,8 +411,15 @@ def get_read_name_standardizer(read_name):
             elif '/' in read_name:
                 parser = parse_unindexed_old_illumina_read_name
 
+            elif '_' in read_name:
+                parser = parse_plasmidsaurus_read_name
+
             else:
-                parser = parse_standardized_name
+                try:
+                    parse_standardized_name(read_name)
+                    parser = parse_standardized_name
+                except:
+                    parser = None
 
         else:
             raise ValueError(f'read name format not recognized - {read_name}')
@@ -431,6 +438,7 @@ templates = {
     'SRA': '{accession:0>9.9s}:{number:0>10.10s}',
     'paired_SRA': '{accession:0>9.9s}:{number:0>10.10s}:{member:0>1.1s}',
     'CCS': '{movie}/{hole:0>12.10s}/ccs',
+    'plasmidsaurus': '{number:0>9.9s}_{rest}',
 }
 templates['UMI'] = templates['default'] + ':{UMI}'
 
@@ -489,6 +497,10 @@ def parse_ERR_read_name(read_name):
     accession, number = read_name.split()[0].split('.')
     accession = accession[3:] # Remove the leading 'SRR'
     return 'SRA', locals()
+
+def parse_plasmidsaurus_read_name(read_name):
+    number, rest = read_name.split('_', 1)
+    return 'plasmidsaurus', locals()
 
 def coordinates_from_standardized(standardized):
     coordinates = standardized.split(':')[:-1]
