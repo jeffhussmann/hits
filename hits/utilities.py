@@ -408,6 +408,9 @@ def get_one_mismatch_resolver(sample_indices, prioritize_exact_matches=False):
 def current_time_string():
     return f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}'
 
+def current_date():
+    return datetime.date.today().strftime('%y%m%d')
+
 def find_all_substring_starts(target_sequence, substring):
     ''' Note: hits.sw.find_all_matches appears to be faster '''
     # lookahead necessary in the event of partially-overlapping matches
