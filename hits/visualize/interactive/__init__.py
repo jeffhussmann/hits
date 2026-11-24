@@ -654,9 +654,6 @@ def scatter(df=None,
     for key in hover_keys:
         hover.tooltips.append((key, f'@{{{key}}}'))
 
-    for col in df.columns:
-        hover.tooltips.append((col, f'@{{{col}}}'))
-
     fig.add_tools(hover)
 
     # Set up the table.
