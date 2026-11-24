@@ -176,10 +176,9 @@ def find_illumina_sequencing_primers_in_PCR_product(PCR_product, custom_primers=
     
         if len(locations) == 0:
             raise ValueError('no location found')
-        elif len(locations) > 1:
-            raise ValueError('multiple locations found')
-    
-        location = locations[0]
+
+        # Prioritize custom over truseq or nextera.
+        location = sorted(locations)[0]
     
         return location
 
