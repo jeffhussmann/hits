@@ -386,20 +386,24 @@ def get_one_mismatch_resolver(sample_indices, prioritize_exact_matches=False):
         return seqs
 
     all_exact_seqs = set()
+
     for name, seqs in sample_indices.items():
         if not isinstance(seqs, list):
             seqs = [seqs]
         all_exact_seqs.update(seqs)
     
     resolver = defaultdict(list)
+
     for name, seqs in sample_indices.items():
         if not isinstance(seqs, list):
             seqs = [seqs]
+
         for seq in seqs:
             for one_mismatch_seq in get_all_one_mismatch(seq):
                 if prioritize_exact_matches and one_mismatch_seq != seq and one_mismatch_seq in all_exact_seqs:
-                    continue
-                resolver[one_mismatch_seq].append(name)
+                    pass
+                else:
+                    resolver[one_mismatch_seq].append(name)
             
     resolver = {seq: set(names) for seq, names in resolver.items()}
 
@@ -454,3 +458,4 @@ def equivalence_classes(iterable, relation):
             eq_classes.append([item])
 
     return eq_classes
+
